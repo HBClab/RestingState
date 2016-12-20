@@ -77,9 +77,9 @@ corrmat=[NaN	0.108954611	0.047385317	0.145385203	0.036248574	0.044224284	0.00437
 %%%%%%%%%
 
 % row_labels={'pcc'	'mpfc' 'Lhipp_vandjik'	'Rhipp_vandjik'	'smith_dmn_c4' 'mtl_subsystem'}
-% 
+%
 % col_labels={'pcc'	'mpfc' 'Lhipp_vandjik'	'Rhipp_vandjik'	'smith_dmn_c4' 'mtl_subsystem'}
-% 
+%
 
 %make a heatmap
 
@@ -87,15 +87,16 @@ hmo=HeatMap(corrmat,'RowLabels',row_labels,'ColumnLabels',col_labels,'Colormap',
 addTitle(hmo,'act/pass diff', 'FontSize', 20)
 %plot(hmo)
 
-    
+
 %hmo=HeatMap(corrmat_old,'RowLabels',row_labels,'ColumnLabels',col_labels,'Colormap',jet)
 %addTitle(hmo,'Chord Learning Sample: N=12 old adults', 'FontSize', 14)
 
 
 
-%%%%%%%%%  Evaluate clustering for an ROI by ROI matrix %%%%%%%%
+%%%%%%%%%
 %AH2010 paper used average linkage function on the z-transformed
 %correlation matrix
+%%%%%%%%%
 
 %dendrogram/linkage should give same thing if on corrmat or dissim mat
 

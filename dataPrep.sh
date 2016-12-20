@@ -128,7 +128,19 @@ function clobber()
   #fslmaths input.nii.gz -mul 10 test.nii.gz
 }
 
-
+##################
+#function: RPI_orient
+##################
+#purpose: Checks to see if input is in R->L,P->A,I->S orientation, and switches the image around if it isn't
+##################
+#input: a 3d nifti image
+##################
+#output: a 3d nifti image in RPI orientation
+##################
+#dependencies: FSL
+##################
+#Used in: *_prep functions
+##################
 function RPI_orient() {
     local infile=$1 &&\
     [ ! -z  "${infile}" ] ||\
@@ -316,8 +328,8 @@ function RPI_orient() {
     echo "flipping by ${flipFlag}"
 
     #Reorienting image and checking for warning messages
-    warnFlag=`fslswapdim ${infile} ${flipFlag} ${infile%.nii.gz}_RPI.nii.gz`
-    warnFlagCut=`echo ${warnFlag} | awk -F":" '{print $1}'`
+    local warnFlag=`fslswapdim ${infile} ${flipFlag} ${infile%.nii.gz}_RPI.nii.gz`
+    local warnFlagCut=`echo ${warnFlag} | awk -F":" '{print $1}'`
 
     #Reorienting the file may require swapping out the flag orientation to match the .img block
     if [[ $warnFlagCut == "WARNING" ]]; then
@@ -337,22 +349,40 @@ function RPI_orient() {
   fi
 }
 
+##################
+#function: T1Head_prep
+##################
+#purpose: prepares T1Head (brain+skull) by making sure it's in nifti format and oriented correctly
+##################
+#input: A T1 Head image
+#       An output directory
+##################
+#output: A T1Head nifti file in RPI orientation
+##################
+#dependencies: FSL, clobber
+##################
+#Used in: MAIN
+##################
 function T1Head_prep()
 {
+  #assign function input variables
   local t1Head=$1
   local t1Head_outDir=$2
   printf "\n\n%s\n\n" "....Preparing T1Head data"
 
+  #convert whatever image that was passed in to a nifti file (Not Implemented)
   ConvertToNifti ${t1Head}
 
+  #copy the nifti file to the processing directory
   clobber ${t1Head_outDir}/T1_head.nii.gz &&\
-  cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz ||\
-  { printf "%s\n" "cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 }
+  { cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz ||\
+  printf "%s\n" "cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;}
 
+  #reorient the nifti file in the processing directory
   printf "%s\n" "Reorienting T1Head to RPI"
   clobber ${t1Head_outDir}/T1_head_RPI.nii.gz &&\
-  RPI_orient ${t1Head_outDir}/T1_head.nii.gz ||\
-  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 }
+  { RPI_orient ${t1Head_outDir}/T1_head.nii.gz ||\
+  printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;}
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
@@ -397,17 +427,17 @@ function T1Brain_prep()
   ConvertToNifti ${t1Brain}
 
   clobber ${t1Brain_outDir}/T1_brain.nii.gz &&\
-  cp ${t1Head} ${t1Head_outDir}/T1_brain.nii.gz ||\
-  { printf "%s\n" "cp ${t1Brain} ${t1Brain_outDir}/T1_brain.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 }
+  { cp ${t1Head} ${t1Head_outDir}/T1_brain.nii.gz ||\
+  printf "%s\n" "cp ${t1Brain} ${t1Brain_outDir}/T1_brain.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;}
 
   printf "%s\n" "Reorienting T1Brain to RPI"
   clobber ${t1Brain_outDir}/T1_brain_RPI.nii.gz &&\
-  RPI_orient ${t1Brain_outDir}/T1_brain.nii.gz ||\
-  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 }
+  { RPI_orient ${t1Brain_outDir}/T1_brain.nii.gz ||\
+  printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;}
 
   clobber ${t1Brain_outDir}/T1_brain_RPI.nii.gz/brainMask.nii.gz &&\
-  fslmaths ${t1Brain_outDir}/T1_brain_RPI.nii.gz -bin ${t1Brain_outDir}/T1_brain_RPI.nii.gz/brainMask.nii.gz -odt char ||\
-  { printf "%s\n" "Brain Masking failed, exiting ${FUNCNAME} function" && return 1 }
+  { fslmaths ${t1Brain_outDir}/T1_brain_RPI.nii.gz -bin ${t1Brain_outDir}/T1_brain_RPI.nii.gz/brainMask.nii.gz -odt char ||\
+  printf "%s\n" "Brain Masking failed, exiting ${FUNCNAME} function" && return 1 ;}
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
@@ -422,11 +452,11 @@ function epi_prep()
   ConvertToNifti ${epi}
 
   clobber ${epi_outDir}/RestingStateRaw.nii.nii.gz &&\
-  cp ${epi} ${epi_outDir}/tmpRestingStateRaw.nii.gz &&\
+  { cp ${epi} ${epi_outDir}/tmpRestingStateRaw.nii.gz &&\
   RPI_orient ${epi_outDir}/tmpRestingStateRaw.nii.gz &&\
   mv ${epi_outDir}/tmpRestingStateRaw_RPI.nii.gz ${epi_outDir}/RestingStateRaw.nii.gz &&\
   rm ${epi_outDir}/tmpRestingStateRaw.nii.gz ||\
-  { printf "%s\n" "Re-Orientation failed" "exiting ${FUNCNAME} function" && return 1 }
+  printf "%s\n" "Re-Orientation failed" "exiting ${FUNCNAME} function" && return 1 ;}
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
@@ -441,13 +471,13 @@ function FieldMapPhase_prep()
   ConvertToNifti ${FieldMapPhase}
 
   clobber ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz &&\
-  cp ${FieldMapPhase} ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz ||\
-  { printf "%s\n" "cp ${FieldMapPhase} ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 }
+  { cp ${FieldMapPhase} ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz ||\
+  printf "%s\n" "cp ${FieldMapPhase} ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;}
 
   printf "%s\n" "Reorienting FieldMapPhase to RPI"
   clobber ${FieldMapPhase_outDir}/FieldMapPhase_RPI.nii.gz &&\
-  RPI_orient ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz ||\
-  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 }
+  { RPI_orient ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz ||\
+  printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;}
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
@@ -462,25 +492,25 @@ function FieldMapMag_prep()
   ConvertToNifti ${FieldMapMag}
 
   clobber ${FieldMapMag_outDir}/FieldMapMag.nii.gz &&\
-  cp ${FieldMapMag} ${FieldMapMag_outDir}/FieldMapMag.nii.gz ||\
-  { printf "%s\n" "cp ${FieldMapMag} ${FieldMapMag_outDir}/FieldMapMag.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 }
+  { cp ${FieldMapMag} ${FieldMapMag_outDir}/FieldMapMag.nii.gz ||\
+  printf "%s\n" "cp ${FieldMapMag} ${FieldMapMag_outDir}/FieldMapMag.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;}
 
   printf "%s\n" "Reorienting FieldMapMag to RPI"
   clobber ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz &&\
-  RPI_orient ${FieldMapMag_outDir}/FieldMapMag.nii.gz ||\
-  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 }
+  { RPI_orient ${FieldMapMag_outDir}/FieldMapMag.nii.gz ||\
+  printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;}
 
   clobber ${FieldMapMag_outDir}/fieldMapMag_mask.nii.gz &&\
-  bet ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz ${FieldMapMag_outDir}/fieldMapMag -m -n ||\
-  { printf "%s\n" "bet failed, exiting ${FUNCNAME} function" && return 1 }
+  { bet ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz ${FieldMapMag_outDir}/fieldMapMag -m -n ||\
+   printf "%s\n" "bet failed, exiting ${FUNCNAME} function" && return 1 ;}
 
   clobber ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz &&\
-  fslmaths ${FieldMapMag_outDir}/fieldMapMag_mask.nii.gz -ero ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ||\
-  { printf "%s\n" "erosion failed, exiting ${FUNCNAME} function" && return 1 }
+  { fslmaths ${FieldMapMag_outDir}/fieldMapMag_mask.nii.gz -ero ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ||\
+   printf "%s\n" "erosion failed, exiting ${FUNCNAME} function" && return 1 ;}
 
   clobber ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz &&\
-  fslmaths ${FieldMapMag_outDir}/fieldMapMag_RPI.nii.gz -mul ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz ||\
-  { printf "%s\n" "masking failed, exiting ${FUNCNAME} function" && return 1 }
+  { fslmaths ${FieldMapMag_outDir}/fieldMapMag_RPI.nii.gz -mul ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz ||\
+   printf "%s\n" "masking failed, exiting ${FUNCNAME} function" && return 1 ;}
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
@@ -497,8 +527,8 @@ function FieldMap_prep()
   case "${scannertype}" in
     'SEIMENS')
         clobber ${outDir}/func/EPItoT1optimized/fieldMap_prepped.nii.gz &&\
-        fsl_prepare_fieldmap SIEMENS ${phase} ${mag} ${outDir}/func/EPItoT1optimized/fieldMap_prepped.nii.gz $deltaTE ||\
-        { printf "%s\n" "SEIMENS: FieldMap_prep failed, exiting ${FUNCNAME} function" && return 1 }
+        { fsl_prepare_fieldmap SIEMENS ${phase} ${mag} ${outDir}/func/EPItoT1optimized/fieldMap_prepped.nii.gz $deltaTE ||\
+         printf "%s\n" "SEIMENS: FieldMap_prep failed, exiting ${FUNCNAME} function" && return 1 ;}
         ;;
     'GE')
         echo "this code is not implemented, exiting ${FUNCNAME} with error" && return 1
@@ -534,10 +564,6 @@ mkdir -p ${outDir}/{func/EPItoT1optimized,anat,fieldMap,log}
   if [[ $deltaTE == "" ]]; then
     deltaTE=2.46
   fi
-
-
-#Assuming TR is entered as seconds (defualt is 2), for input to AFNI's "to3D"
-trMsec=$(echo $tr 1000 | awk '{print $1*$2}')
 
 
 echo "Running $0 ..."
