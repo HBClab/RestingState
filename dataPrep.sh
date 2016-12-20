@@ -11,11 +11,45 @@
 #     6. Field Map prepped (combination of Phase/Magnitude images)
 ##################################################################################################################
 
-scriptPath=`perl -e 'use Cwd "abs_path";print abs_path(shift)' $0`
-scriptDir=`dirname $scriptPath`
+clob=false
+# Parse Command line arguments
+while getopts “hi:o:t:T:fF:S:c” OPTION
+do
+  case $OPTION in
+    h)
+      printCommandLine
+      ;;
+    i)
+      datafile=$(perl -e 'use Cwd "abs_path";print abs_path(shift)' $OPTARG)
+      ;;
+    o)
+      outDir=$OPTARG
+      ;;
+    t)
+      tr=$OPTARG
+      ;;
+    T)
+      te=$OPTARG
+      ;;
+    f)
+      fieldMapFlag=1
+      ;;
+    F)
+      deltaTE=$OPTARG
+      ;;
+    S)
+      scanner=${OPTARG}
+      ;;
+    c)
+      clob=true
+    ?)
+      printCommandLine
+      ;;
+     esac
+done
 
-
-function printCommandLine {
+function printCommandLine()
+{
   echo ""
   echo "Usage: dataPrep.sh -i datafile -o outputDirectory -c -t TR -T TE -f -F 2.46"
   echo ""
@@ -51,83 +85,448 @@ function printCommandLine {
   exit 1
 }
 
+##################
+#function: clobber
+##################
+#purpose: checks to see if files exist and overwrites them when clob is set to true
+##################
+#dependencies: None
+##################
+#Used in: (almost) Everything
+##################
+function clobber() 
+{
+  #Tracking Variables
+  local -i num_existing_files=0
+  local -i num_args=$#
+
+  #Tally all existing outputs
+  for arg in $@; do
+    if [ -e "${arg}" ] && [ "${clob}" == true ]; then
+      rm -rf "${arg}"
+    elif [ -e "${arg}" ] && [ "${clob}" == false ]; then
+      num_existing_files=$(( ${num_existing_files} + 1 ))
+      continue
+    elif [ ! -e "${arg}" ]; then
+      continue
+    else
+      echo "How did you get here?"
+    fi
+  done
+
+  #see if the command should be run by seeing if the requisite files exist.
+  #0=true
+  #1=false
+  if [ ${num_existing_files} -lt ${num_args} ]; then
+    return 0
+  else
+    return 1
+  fi
+
+  #example usage
+  #clobber test.nii.gz &&\
+  #fslmaths input.nii.gz -mul 10 test.nii.gz
+}
 
 
-# Parse Command line arguments
-while getopts “hi:o:t:T:fF:c” OPTION
-do
-  case $OPTION in
-    h)
-      printCommandLine
+function RPI_orient() {
+    local infile=$1 &&\
+    [ ! -z  "${infile}" ] ||\
+    ( printf '%s\n' "${FUNCNAME[0]}, input not defined" && return 1 )
+
+    #Determine qform-orientation to properly reorient file to RPI (MNI) orientation
+  xorient=`fslhd ${infile} | grep "^qform_xorient" | awk '{print $2}' | cut -c1`
+  yorient=`fslhd ${infile} | grep "^qform_yorient" | awk '{print $2}' | cut -c1`
+  zorient=`fslhd ${infile} | grep "^qform_zorient" | awk '{print $2}' | cut -c1`
+
+  native_orient=${xorient}${yorient}${zorient}
+
+  echo "native orientation = ${native_orient}"
+
+  if [ "${native_orient}" != "RPI" ]; then
+    
+    case ${native_orient} in
+
+    #L PA IS
+    LPI) 
+      flipFlag="-x y z"
       ;;
-    i)
-      datafile=`perl -e 'use Cwd "abs_path";print abs_path(shift)' $OPTARG`
+    LPS) 
+      flipFlag="-x y -z"
+          ;;
+    LAI) 
+      flipFlag="-x -y z"
+          ;;
+    LAS) 
+      flipFlag="-x -y -z"
+          ;;
+
+    #R PA IS
+    RPS) 
+      flipFlag="x y -z"
+          ;;
+    RAI) 
+      flipFlag="x -y z"
+          ;;
+    RAS) 
+      flipFlag="x -y -z"
+          ;;
+
+    #L IS PA
+    LIP) 
+      flipFlag="-x z y"
+          ;;
+    LIA) 
+      flipFlag="-x -z y"
+          ;;
+    LSP) 
+      flipFlag="-x z -y"
+          ;;
+    LSA) 
+      flipFlag="-x -z -y"
+          ;;
+
+    #R IS PA
+    RIP) 
+      flipFlag="x z y"
+          ;;
+    RIA) 
+      flipFlag="x -z y"
+          ;;
+    RSP) 
+      flipFlag="x z -y"
+          ;;
+    RSA) 
+      flipFlag="x -z -y"
+          ;;
+
+    #P IS LR
+    PIL) 
+      flipFlag="-z x y"
+          ;;
+    PIR) 
+      flipFlag="z x y"
+          ;;
+    PSL) 
+      flipFlag="-z x -y"
+          ;;
+    PSR) 
+      flipFlag="z x -y"
+          ;;
+
+    #A IS LR
+    AIL) 
+      flipFlag="-z -x y"
+          ;;
+    AIR) 
+      flipFlag="z -x y"
+          ;;
+    ASL) 
+      flipFlag="-z -x -y"
+          ;;
+    ASR) 
+      flipFlag="z -x -y"
+          ;;
+
+    #P LR IS
+    PLI) 
+      flipFlag="-y x z"
+          ;;
+    PLS) 
+      flipFlag="-y x -z"
+          ;;
+    PRI) 
+      flipFlag="y x z"
+          ;;
+    PRS) 
+      flipFlag="y x -z"
+          ;;
+
+    #A LR IS
+    ALI) 
+      flipFlag="-y -x z"
+          ;;
+    ALS) 
+      flipFlag="-y -x -z"
+          ;;
+    ARI) 
+      flipFlag="y -x z"
+          ;;
+    ARS) 
+      flipFlag="y -x -z"
+          ;;
+
+    #I LR PA
+    ILP) 
+      flipFlag="-y z x"
+          ;;
+    ILA) 
+      flipFlag="-y -z x"
+          ;;
+    IRP) 
+      flipFlag="y z x"
+          ;;
+    IRA) 
+      flipFlag="y -z x"
+          ;;
+
+    #S LR PA
+    SLP) 
+      flipFlag="-y z -x"
+          ;;
+    SLA) 
+      flipFlag="-y -z -x"
+          ;;
+    SRP) 
+      flipFlag="y z -x"
+          ;;
+    SRA) 
+      flipFlag="y -z -x"
+          ;;
+
+    #I PA LR
+    IPL) 
+      flipFlag="-z y x"
+          ;;
+    IPR) 
+      flipFlag="z y x"
+          ;;
+    IAL) 
+      flipFlag="-z -y x"
+          ;;
+    IAR) 
+      flipFlag="z -y x"
+          ;;
+
+    #S PA LR
+    SPL) 
+      flipFlag="-z y -x"
+          ;;
+    SPR) 
+      flipFlag="z y -x"
+          ;;
+    SAL) 
+      flipFlag="-z -y -x"
+          ;;
+    SAR) 
+      flipFlag="z -y -x"
+          ;;
+    esac
+
+    echo "flipping by ${flipFlag}"
+
+    #Reorienting image and checking for warning messages
+    warnFlag=`fslswapdim ${infile} ${flipFlag} ${infile%.nii.gz}_RPI.nii.gz`
+    warnFlagCut=`echo ${warnFlag} | awk -F":" '{print $1}'`
+
+    #Reorienting the file may require swapping out the flag orientation to match the .img block
+    if [[ $warnFlagCut == "WARNING" ]]; then
+    fslorient -swaporient ${infile%.nii.gz}_RPI.nii.gz
+    fi
+
+  else
+
+    echo "No need to reorient.  Dataset already in RPI orientation."
+
+    if [ ! -e ${infile%.nii.gz}_RPI.nii.gz ]; then
+
+      cp ${infile} ${infile%.nii.gz}_RPI.nii.gz
+
+    fi
+
+  fi
+}
+
+function T1Head_prep()
+{
+  local t1Head=$1
+  local t1Head_outDir=$2
+  printf "\n\n%s\n\n" "....Preparing T1Head data"
+
+  ConvertToNifti ${t1Head}
+
+  clobber ${t1Head_outDir}/T1_head.nii.gz &&\
+  cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz ||\
+  { printf "%s\n" "cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 }
+
+  printf "%s\n" "Reorienting T1Head to RPI"
+  clobber ${t1Head_outDir}/T1_head_RPI.nii.gz &&\
+  RPI_orient ${t1Head_outDir}/T1_head.nii.gz ||\
+  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 }
+
+  printf "%s\n" "${FUNCNAME} ran successfully." && return 0
+}
+
+function ConvertToNifti()
+{
+  __input=$1
+  inputDir=$(dirname ${__input})
+  inputBase=$(basename ${__input})
+  inputSuffix=${inputBase#*.}
+case "${inputSuffix}" in
+  'dcm')
+      echo "code not implemented (needs to reset epi variable)" && return 1
+      #reconstruct
+      #eval __input="'nifti_output'"
       ;;
-    o)
-      outDir=$OPTARG
-      outFlag=1
+  'BRIK')
+      echo "code not implemented (needs to reset epi variable)" && return 1
+      #reconstruct
+      #eval __input="'nifti_output'"
       ;;
-    t)
-      tr=$OPTARG
+  'IMA')
+      echo "code not implemented (needs to reset epi variable)" && return 1
+      #reconstruct
+      #eval __input="'nifti_output'"
       ;;
-    T)
-      te=$OPTARG
+  'nii.gz')
+      echo "${__input} already in NIFTI format"
       ;;
-    f)
-      fieldMapFlag=1
-      ;;
-    F)
-      deltaTE=$OPTARG
-      ;;
-    c)
-      overwriteFlag=1
-      ;;
-    ?)
-      printCommandLine
-      ;;
-     esac
-done
+esac
+
+printf "%s\n" "${FUNCNAME} ran successfully." && return 0
+}
 
 
+function T1Brain_prep()
+{
+  local t1Brain=$1
+  local t1Brain_outDir=$2
+  printf "\n\n%s\n\n" "....Preparing T1Brain data"
 
+  ConvertToNifti ${t1Brain}
 
-#Quick check for input data.  Exit with error if data is missing
+  clobber ${t1Brain_outDir}/T1_brain.nii.gz &&\
+  cp ${t1Head} ${t1Head_outDir}/T1_brain.nii.gz ||\
+  { printf "%s\n" "cp ${t1Brain} ${t1Brain_outDir}/T1_brain.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 }
+
+  printf "%s\n" "Reorienting T1Brain to RPI"
+  clobber ${t1Brain_outDir}/T1_brain_RPI.nii.gz &&\
+  RPI_orient ${t1Brain_outDir}/T1_brain.nii.gz ||\
+  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 }
+
+  clobber ${t1Brain_outDir}/T1_brain_RPI.nii.gz/brainMask.nii.gz &&\
+  fslmaths ${t1Brain_outDir}/T1_brain_RPI.nii.gz -bin ${t1Brain_outDir}/T1_brain_RPI.nii.gz/brainMask.nii.gz -odt char ||\
+  { printf "%s\n" "Brain Masking failed, exiting ${FUNCNAME} function" && return 1 }
+
+  printf "%s\n" "${FUNCNAME} ran successfully." && return 0
+}
+
+function epi_prep() 
+{
+  local epi=$1
+  local epi_outDir=$2
+
+  printf "\n\n%s\n\n" "....Preparing EPI data"
+
+  ConvertToNifti ${epi}
+
+  clobber ${epi_outDir}/RestingStateRaw.nii.nii.gz &&\
+  cp ${epi} ${epi_outDir}/tmpRestingStateRaw.nii.gz &&\
+  RPI_orient ${epi_outDir}/tmpRestingStateRaw.nii.gz &&\
+  mv ${epi_outDir}/tmpRestingStateRaw_RPI.nii.gz ${epi_outDir}/RestingStateRaw.nii.gz &&\
+  rm ${epi_outDir}/tmpRestingStateRaw.nii.gz ||\
+  { printf "%s\n" "Re-Orientation failed" "exiting ${FUNCNAME} function" && return 1 }
+
+  printf "%s\n" "${FUNCNAME} ran successfully." && return 0
+}
+
+function FieldMapPhase_prep()
+{
+  local fieldMapPhase=$1
+  local FieldMapPhase_outDir=$2
+
+  printf "\n\n%s\n\n" "....Preparing FieldMapPhase data"
+
+  ConvertToNifti ${FieldMapPhase}
+
+  clobber ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz &&\
+  cp ${FieldMapPhase} ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz ||\
+  { printf "%s\n" "cp ${FieldMapPhase} ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 }
+
+  printf "%s\n" "Reorienting FieldMapPhase to RPI"
+  clobber ${FieldMapPhase_outDir}/FieldMapPhase_RPI.nii.gz &&\
+  RPI_orient ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz ||\
+  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 }
+
+  printf "%s\n" "${FUNCNAME} ran successfully." && return 0
+}
+
+function FieldMapMag_prep()
+{
+  local fieldMapMag=$1
+  local FieldMapMag_outDir=$2
+
+  printf "\n\n%s\n\n" "....Preparing FieldMapMag data"
+
+  ConvertToNifti ${FieldMapMag}
+
+  clobber ${FieldMapMag_outDir}/FieldMapMag.nii.gz &&\
+  cp ${FieldMapMag} ${FieldMapMag_outDir}/FieldMapMag.nii.gz ||\
+  { printf "%s\n" "cp ${FieldMapMag} ${FieldMapMag_outDir}/FieldMapMag.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 }
+
+  printf "%s\n" "Reorienting FieldMapMag to RPI"
+  clobber ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz &&\
+  RPI_orient ${FieldMapMag_outDir}/FieldMapMag.nii.gz ||\
+  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 }
+
+  clobber ${FieldMapMag_outDir}/fieldMapMag_mask.nii.gz &&\
+  bet ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz ${FieldMapMag_outDir}/fieldMapMag -m -n ||\
+  { printf "%s\n" "bet failed, exiting ${FUNCNAME} function" && return 1 }
+
+  clobber ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz &&\
+  fslmaths ${FieldMapMag_outDir}/fieldMapMag_mask.nii.gz -ero ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ||\
+  { printf "%s\n" "erosion failed, exiting ${FUNCNAME} function" && return 1 }
+
+  clobber ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz &&\
+  fslmaths ${FieldMapMag_outDir}/fieldMapMag_RPI.nii.gz -mul ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz ||\
+  { printf "%s\n" "masking failed, exiting ${FUNCNAME} function" && return 1 }
+
+  printf "%s\n" "${FUNCNAME} ran successfully." && return 0
+}
+
+function FieldMap_prep()
+{
+  local phase=$1
+  local mag=$2
+  local fieldMap_outDir=$3
+  local scannertype=$4
+
+  printf "\n\n%s\n\n" "....Prepping FieldMap data (from Phase and Magnitude images) for subsequent registration steps"
+
+  case "${scannertype}" in
+    'SEIMENS')
+        clobber ${outDir}/func/EPItoT1optimized/fieldMap_prepped.nii.gz &&\
+        fsl_prepare_fieldmap SIEMENS ${phase} ${mag} ${outDir}/func/EPItoT1optimized/fieldMap_prepped.nii.gz $deltaTE ||\
+        { printf "%s\n" "SEIMENS: FieldMap_prep failed, exiting ${FUNCNAME} function" && return 1 }
+        ;;
+    'GE')
+        echo "this code is not implemented, exiting ${FUNCNAME} with error" && return 1
+        ;;
+  esac
+
+  printf "%s\n" "${FUNCNAME} ran successfully." && return 0  
+}
+
+#############################   MAIN   ###########################
+#Quick check for input data. Exit with error if data is missing
 if [[ $datafile == "" ]]; then
   echo "Error: data file must be specified with the -i option"
   exit 1
 fi
 
-
+#Quick check for output directory. Exit with error if data is missing
+if [[ $outDir == "" ]]; then
+  echo "Error: output Directory must be specified with the -o option"
+  exit 1
+fi
 
 #Check for output directory flag and sub-directory creation if this is set
-if [[ $outDir != "" ]]; then
-  if [ ! -e $outDir/func ]; then
-    mkdir -p $outDir/func
-  fi
-  if [ ! -e $outDir/anat ]; then
-    mkdir -p $outDir/anat
-  fi
-  if [[ $fieldMapFlag == 1 ]]; then
-    if [ ! -e $outDir/fieldMap ]; then
-      mkdir -p $outDir/fieldMap
-    fi
-    if [ ! -e $outDir/func/EPItoT1optimized ]; then
-      mkdir -p $outDir/func/EPItoT1optimized
-    fi
-  fi
-fi
+mkdir -p ${outDir}/{func/EPItoT1optimized,anat,fieldMap,log}
 
 
 
   #A few default parameters (if input not specified, these parameters are assumed)
-  if [[ $overwriteFlag == "" ]]; then
-    overwriteFlag=0
-  fi
-
-  if [[ $outFlag == "" ]]; then
-    outFlag=0
-  fi
-
   if [[ $tr == "" ]]; then
     tr=2
   fi
@@ -138,1493 +537,117 @@ fi
 
 
 #Assuming TR is entered as seconds (defualt is 2), for input to AFNI's "to3D"
-trMsec=`echo $tr 1000 | awk '{print $1*$2}'`
+trMsec=$(echo $tr 1000 | awk '{print $1*$2}')
 
 
 echo "Running $0 ..."
  
 
-index=1
 
-#Eliminating the loop.  Making is so that only ONE subject can be in the "-i" datafile
+###### Basic Input/variables ########################################
 
-#while [ 1 ]
-#do
+#Input files
+t1Head=$(awk '{print $1}' $datafile)
+t1Brain=$(awk '{print $2}' $datafile)
+epi=$(awk '{print $3}' $datafile)  
+if [[ $fieldMapFlag == 1 ]]; then
+  fieldMapPhase=$(awk '{print $4}' $datafile)
+  fieldMapMag=$(awk '{print $5}' $datafile)
+fi
 
-  ###### Basic Input/variables ########################################
+#Checking for appropriate input data
+if [ "$t1Head" == "" ]; then
+  echo "T1 (with skull) must be set in order to run this script."
+  exit 1
+fi
 
-  #Input files
-  t1Skull=`sed -n "${index}p" $datafile | awk '{print $1}'`
-  t1=`sed -n "${index}p" $datafile | awk '{print $2}'`
-  epi=`sed -n "${index}p" $datafile | awk '{print $3}'`  
-  if [[ $fieldMapFlag == 1 ]]; then
-    fieldMapPhase=`sed -n "${index}p" $datafile | awk '{print $4}'`
-    fieldMapMag=`sed -n "${index}p" $datafile | awk '{print $5}'`
-  fi
+if [ "$t1Brain" == "" ]; then
+  echo "T1 (skull-stripped) must be set in order to run this script."
+  exit 1
+fi
 
-  #Checking for appropriate input data
-  if [ "$t1Skull" == "" ]; then
-    echo "T1 (with skull) must be set in order to run this script."
+if [ "$epi" == "" ]; then
+  echo "EPI must be set in order to run this script."
+  exit 1
+fi
+
+if [[ $fieldMapFlag == 1 ]]; then
+  if [ "$fieldMapPhase" == "" ]; then
+    echo "FieldMap (Phase) must be set in order to run this script."
     exit 1
   fi
 
-  if [ "$t1" == "" ]; then
-    echo "T1 (skull-stripped) must be set in order to run this script."
+  if [ "$fieldMapMag" == "" ]; then
+    echo "FieldMap (Magnitude) must be set in order to run this script."
     exit 1
   fi
-
-  if [ "$epi" == "" ]; then
-    echo "EPI must be set in order to run this script."
-    exit 1
-  fi
-
-  if [[ $fieldMapFlag == 1 ]]; then
-    if [ "$fieldMapPhase" == "" ]; then
-      echo "FieldMap (Phase) must be set in order to run this script."
-      exit 1
-    fi
-
-    if [ "$fieldMapMag" == "" ]; then
-      echo "FieldMap (Magnitude) must be set in order to run this script."
-      exit 1
-    fi
-  fi
+fi
 
 
 
 
+
+#Base directory for input EPI, T1 & FieldMap
+epiDir=$(dirname $epi)
+epiName=$(basename ${epi})
+
+t1HeadDir=$(dirname $t1Skull)
+t1HeadName=$(basename $t1Skull)
+
+t1BrainDir=$(dirname $t1)
+t1BrainName=$(basename $t1)
+
+if [[ $fieldMapFlag == 1 ]]; then
+
+  fieldMapPhaseDir=$(dirname $fieldMapPhase)
+  fieldMapPhasename=$(basename $fieldMapPhase)
+
+  fieldMapMagDir=$(dirname $fieldMapMag)
+  fieldMapMagname=$(basename $fieldMapMag)
+fi
+
+
+##Echo out all input parameters into a log
+
+
+echo "------------------------------------" >> $outDir/log/DataPrep.log
+echo "-i $datafile" >> $outDir/log/DataPrep.log
+echo "-o $outDir" >> $outDir/log/DataPrep.log
+if [[ ${clob} == true ]]; then
+  echo "-c" >> $outDir/log/DataPrep.log
+fi
+
+echo "-t $tr" >> $outDir/log/DataPrep.log
+if [[ $fieldMapFlag == 1 ]]; then
+  echo "-f" >> $outDir/log/DataPrep.log
+  echo "-F $deltaTE" >> $outDir/log/DataPrep.log
+fi
+echo "$(date)" >> $outDir/log/DataPrep.log
+echo "" >> $outDir/log/DataPrep.log
+
+
+
+#Processing T1Skull
+T1Head_prep ${t1Head} ${outDir}/anat | tee -a ${outDir}/log/DataPrep.log ||\
+{ printf "%s\n" "T1Head_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
+#Processing T1brain
+T1Brain_prep ${t1Brain} ${outDir}/anat | tee -a ${outDir}/log/DataPrep.log ||\
+{ printf "%s\n" "T1Brain_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
+#processing EPI
+epi_prep ${epi} ${outDir}/func | tee -a ${outDir}/log/DataPrep.log ||\
+{ printf "%s\n" "epi_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
+
+if [[ $fieldMapFlag == 1 ]]; then
+  ###### FieldMap (Phase)
+  FieldMapPhase_prep ${fieldMapPhase} ${outDir}/fieldMap | tee -a ${outDir}/log/DataPrep.log ||\
+  { printf "%s\n" "FieldMapPhase_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
+  ###### FieldMap (Magnitude)    
+  FieldMapMag_prep ${fieldMapMag} ${outDir}/fieldMap | tee -a ${outDir}/log/DataPrep.log ||\
+  { printf "%s\n" "FieldMapMag_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
   
-  #Base directory for input EPI, T1 & FieldMap
-  epiDir=`dirname $epi`
-
-  t1SkullDir=`dirname $t1Skull`
-  t1Skullname=`basename $t1Skull`
-
-  t1Dir=`dirname $t1`
-  t1name=`basename $t1`
-
-  if [[ $fieldMapFlag == 1 ]]; then
-
-    fieldMapPhaseDir=`dirname $fieldMapPhase`
-    fieldMapPhasename=`basename $fieldMapPhase`
-
-    fieldMapMagDir=`dirname $fieldMapMag`
-    fieldMapMagname=`basename $fieldMapMag`
-  fi
-
-
-  ##Echo out all input parameters into a log
-  if [[ "$outDir" != "" ]]; then
-    epiOutDirTEMP=$outDir/func    
-  else
-    epiOutDirTEMP=$epiDir  
-  fi
-  logDir=$epiOutDirTEMP
-  echo "$scriptPath" >> $logDir/rsParams_log
-  echo "------------------------------------" >> $logDir/rsParams_log
-  echo "-i $datafile" >> $logDir/rsParams_log
-  if [[ $outFlag == 1 ]]; then
-    echo "-o $outDir" >> $logDir/rsParams_log
-  fi
-  if [[ $overwriteFlag == 1 ]]; then
-    echo "-c" >> $logDir/rsParams_log
-  fi
-  echo "-t $tr" >> $logDir/rsParams_log  
-  if [[ $fieldMapFlag == 1 ]]; then
-    echo "-f" >> $logDir/rsParams_log
-    echo "-F $deltaTE" >> $logDir/rsParams_log
-  fi
-  echo "`date`" >> $logDir/rsParams_log
-  echo "" >> $logDir/rsParams_log
-  echo "" >> $logDir/rsParams_log
-
-
-  #Directory for processed EPI/T1/FieldMap
-  if [[ "$outDir" != "" ]]; then
-    epiOutDir=$outDir/func
-    t1OutDir=$outDir/anat
-    t1SkullOutDir=$outDir/anat
-    if [[ $fieldMapFlag == 1 ]]; then
-      fieldMapPhaseOutDir=$outDir/fieldMap
-      fieldMapMagOutDir=$outDir/fieldMap
-    fi
-  else
-    epiOutDir=$epiDir
-    t1OutDir=$t1Dir
-    t1SkullOutDir=$t1SkullDir
-    if [[ $fieldMapFlag == 1 ]]; then
-      fieldMapPhaseOutDir=$fieldMapPhaseDir
-      fieldMapMagOutDir=$fieldMapMagDir
-    fi
-    outDir=$epiDir   
-  fi
-
-
-  #Place where bulk of donwstream processing will be saved to
-  resultsDir=$epiOutDir
-
-  #Saving variables for logging and for donwstream processing
-  if [[ $overwriteFlag == 1 ]]; then
-    echo "_dataPrep_clobber" >> $resultsDir/rsParams
-  fi
-
-  echo "resultsDir=$resultsDir" >> $resultsDir/rsParams
-
-  ################################################################
-  
-
-
-
-
-  ###### T1 (Skull) ########################################
-
-  #Begin processing T1Skull
-  echo ""
-  echo ""
-  echo "....Preparing T1Skull data"
-  echo ""
-  echo ""  
-
-  echo "Reorienting T1Skull to RPI"
-  if [[ ! -e $t1SkullOutDir/FSLORIENT/T1_MNI.nii.gz ]]; then
-    ##File doesn't exist
-    if [[ ! -e $t1SkullOutDir/FSLORIENT ]]; then
-      mkdir $t1SkullOutDir/FSLORIENT
-    fi
-
-    cd $t1SkullOutDir/FSLORIENT
-
-    if [[ ! -e ${t1Skullname%.nii.gz}_MNI.nii.gz ]]; then
-      cp $t1SkullDir/${t1Skullname} $t1SkullOutDir/FSLORIENT/tmpT1Skull.nii.gz
-      #Convert to RPI orientation - call upon an external FSL reorienting script
-      $scriptDir/fslreorient.sh tmpT1Skull.nii.gz
-      mv tmpT1Skull_MNI.nii.gz T1_MNI.nii.gz
-
-      if [[ $outFlag == 1 ]]; then
-        cp T1_MNI.nii.gz $t1SkullOutDir
-        cd $t1SkullOutDir
-        rm -rf $t1SkullOutDir/FSLORIENT
-      else
-        t1SkullOutDir=$t1SkullOutDir/FSLORIENT
-        rm $t1SkullOutDir/tmpT1Skull.nii.gz
-        cd $t1SkullOutDir
-      fi
-
-    else        
-      #Convert to RPI orientation - call upon an external FSL reorienting script
-      $scriptDir/fslreorient.sh ${t1Skullname%.nii.gz}_MNI.nii.gz
-      t1SkullOutDir=$t1SkullOutDir/FSLORIENT
-    fi
-
-    #Saving variables for logging and for donwstream processing
-    echo "t1Skull=$t1SkullOutDir/T1_MNI.nii.gz" >> $resultsDir/rsParams
-      
-  else
-    ##If user set overwrite (-c), overwrite previous file (file already exists)
-    if [[ $overwriteFlag == 1 ]]; then
-      if [[ ! -e $t1SkullOutDir/FSLORIENT ]]; then
-        mkdir $t1SkullOutDir/FSLORIENT
-      fi
-
-      cd $t1SkullOutDir/FSLORIENT        
-      cp $t1SkullOutDir/${t1Skullname} $t1SkullOutDir/FSLORIENT/tmpT1Skull.nii.gz
-
-      #Convert to RPI orientation - call upon an external FSL reorienting script
-      $scriptDir/fslreorient.sh tmpT1Skull.nii.gz
-      mv tmpT1Skull_MNI.nii.gz T1_MNI.nii.gz
-
-      if [[ $outFlag == 1 ]]; then
-        cp T1_MNI.nii.gz $t1SkullOutDir
-        rm -rf $t1SkullOutDir/FSLORIENT
-      else
-        t1SkullOutDir=$t1SkullOutDir/FSLORIENT
-        rm $t1SkullOutDir/tmpT1Skull.nii.gz
-        cd $t1SkullOutDir
-      fi
-
-      #Saving variables for logging and for donwstream processing
-      echo "t1Skull=$t1SkullOutDir/T1_MNI.nii.gz" >> $resultsDir/rsParams
-               
-    else
-      echo "overwrite flag (-c) not specified and T1Skull file already exists.  Skipping T1Skull setup"
-    fi
-  fi
-
-  ################################################################
-
-
-
-
-
-  ###### T1 (skull-stripped) ########################################
-
-  #Begin processing T1
-  echo ""
-  echo ""
-  echo "....Preparing T1 data"
-  echo ""
-  echo ""  
-
-  echo "Reorienting T1 to RPI"
-  if [[ ! -e $t1OutDir/FSLORIENT/T1_MNI_brain.nii.gz ]]; then
-    ##File doesn't exist
-    if [[ ! -e $t1OutDir/FSLORIENT ]]; then
-      mkdir $t1OutDir/FSLORIENT
-    fi
-
-    cd $t1OutDir/FSLORIENT
-
-    if [[ ! -e ${t1name%.nii.gz}_MNI_brain.nii.gz ]]; then
-      cp $t1Dir/${t1name} $t1OutDir/FSLORIENT/tmpT1.nii.gz
-      #Convert to RPI orientation - call upon an external FSL reorienting script
-      $scriptDir/fslreorient.sh tmpT1.nii.gz
-      mv tmpT1_MNI.nii.gz T1_MNI_brain.nii.gz
-
-      if [[ $outFlag == 1 ]]; then
-        cp T1_MNI_brain.nii.gz $t1OutDir
-        cd $t1OutDir
-        rm -rf $t1OutDir/FSLORIENT
-      else
-        t1OutDir=$t1OutDir/FSLORIENT
-        rm $t1OutDir/tmpT1.nii.gz
-        cd $t1OutDir
-      fi
-    else        
-      #Convert to RPI orientation - call upon an external FSL reorienting script
-      $scriptDir/fslreorient.sh ${t1name%.nii.gz}_MNI_brain.nii.gz
-      t1OutDir=$t1OutDir/FSLORIENT
-    fi
-
-    #Create a brainMask from skullstripped T1
-    fslmaths $t1OutDir/T1_MNI_brain.nii.gz -bin $t1OutDir/brainMask.nii.gz -odt char
-
-    #Saving variables for logging and for donwstream processing
-    echo "t1=$t1OutDir/T1_MNI_brain.nii.gz" >> $resultsDir/rsParams
-    echo "t1Mask=$t1OutDir/brainMask.nii.gz" >> $resultsDir/rsParams
-      
-  else
-    ##If user set overwrite (-c), overwrite previous file (file already exists)
-    if [[ $overwriteFlag == 1 ]]; then
-      if [[ ! -e $t1OutDir/FSLORIENT ]]; then
-        mkdir $t1OutDir/FSLORIENT
-      fi
-
-      cd $t1OutDir/FSLORIENT        
-      cp $t1OutDir/${t1name} $t1OutDir/FSLORIENT/tmpT1.nii.gz
-
-      #Convert to RPI orientation - call upon an external FSL reorienting script
-      $scriptDir/fslreorient.sh tmpT1.nii.gz
-      mv tmpT1_MNI.nii.gz T1_MNI_brain.nii.gz
-
-      if [[ $outFlag == 1 ]]; then
-        cp T1_MNI_brain.nii.gz $t1OutDir
-        rm -rf $t1OutDir/FSLORIENT
-      else
-        t1OutDir=$t1OutDir/FSLORIENT
-        rm $t1OutDir/tmpT1.nii.gz
-        cd $t1OutDir
-      fi
-
-      #Create a brainMask from skullstripped T1
-      fslmaths $t1OutDir/T1_MNI_brain.nii.gz -bin $t1OutDir/brainMask.nii.gz -odt char
-
-      #Saving variables for logging and for donwstream processing
-      echo "t1=$t1OutDir/T1_MNI_brain.nii.gz" >> $resultsDir/rsParams
-      echo "t1Mask=$t1OutDir/brainMask.nii.gz" >> $resultsDir/rsParams
-               
-    else
-      echo "overwrite flag (-c) not specified and T1 file already exists.  Skipping T1 setup"
-    fi
-  fi
-
-  ################################################################
-
-
-
-
-
-  ###### EPI ########################################
-
-  ##Pre setup for EPI files
-  #Allowing for IMA and files other than DCM
-  epiname=`basename $epi`
-  epiDelimCount=`echo $epiname | awk -F"." '{print NF}' | awk -F"." '{print $1}'`
-  epiSuffixTmp=`echo $epiname | awk -F"." -v var=$epiDelimCount '{print $var}'`
-
-  #Check for .gz extension (may have to go one level in for the suffix)
-  if [[ $epiSuffixTmp == "gz" ]]; then
-    epiDelimCount2=`echo $epiDelimCount | awk '{print $1-1}'`
-    epiSuffix=`echo $epiname | awk -F"." -v var=${epiDelimCount2} '{print $var}'`
-  else
-    epiSuffix=`echo $epiname | awk -F"." -v var=$epiDelimCount '{print $var}'`
-  fi
-
-  
-  #Begin processing EPI data
-  echo ""
-  echo ""
-  echo "....Preparing EPI data"
-  echo ""
-  echo ""
-
-
-####CASE 1: If Resting state nifti file exists (and called RestingStateRaw.nii.gz  ####
-  if  [ ! -e $epiOutDir/RestingStateRaw.nii* ]; then
-    #RestingState file does not already exist
-
-    #Check to see if input EPI is already processed/NIfTI format
-      #Making a wild assumption that if it is NOT dcm or ima, it will be NIFTI (most likely .nii or nii.gz as the suffix)
-    if [ $epiSuffix == "nii" ]; then
-
-      echo ""
-      echo ""
-      echo "....Checking EPI data for correct orientation and naming convention"
-      echo ""
-      echo ""
-
-      #NIFTI input      
-        ##Version where input is NIFTI, needs to be oriented correctly and named properly
-          #check to see if NIFTI EPI volume is in RPI orientaiton
-            #Convert to RPI orientation, skullstrip (via AFNI)
-      cd $epiOutDir
-
-      #Output number of epiVols
-      epiVols=`fslhd $epiDir/$epiname | grep "^dim4" | awk '{print $2}'`
-      echo "epiNumVols=$epiVols" >> $resultsDir/rsParams
-     #Log Default Phase Encoding Direction
-        echo "peDir=-y" >> $resultsDir/rsParams
-      
-      #Reorient, rename
-           ###Issues with lesioned subject having improper masks.  Using T1 mask, warped, in qualityControl script
-      #Convert Raw EPI image to NIFTI, reorient to RPI (for use with Signal:Noise Calculation in qualityCheck.sh)
-      3dcopy $epiDir/$epiname tmpRestingState
-      3dresample -orient rpi -rmode Cu -prefix RestingStateRaw_tmp -inset tmpRestingState+orig
-      3dAFNItoNIFTI -prefix RestingStateRaw.nii.gz RestingStateRaw_tmp+orig
-      #bet RestingStateRaw.nii.gz tmp -m -n -f 0.3
-      #fslmaths tmp_mask.nii.gz -bin RestingStateMask.nii.gz -odt char
-      #fslmaths RestingStateRaw.nii.gz -mul RestingStateMask.nii.gz RestingState.nii.gz
-
-      #Cleanup
-      #rm *HEAD *BRIK #tmp_mask.nii.gz
-      rm *HEAD *BRIK
-         
-      #epiFile=$epiOutDir/RestingState.nii.gz
-      epiRaw=$epiOutDir/RestingStateRaw.nii.gz
-      #epiMask=$epiOutDir/RestingStateMask.nii.gz      
-
-####CASE 2: If no Resting state nifti file exists, go through IMAS or dcm's  ####
-    else
-      ###Assumption that this is raw DICOM/IMA data that needs to be converted to NIFTI, reoriented, skull-stripped, etc.
-        ##Will create a reoriented/renamed AND skull-stripped version from DICOM/IMA
-          #"Raw" version is NON skull-stripped (used for SNR calcs, etc. with qualityCheck.sc
-      cd $epiDir
-      images=`ls *${epiSuffix} | sort -t. -k 5 -n`
-      numDcm=`echo $images | awk '{print NF}'`
-
-      #Grab first DICOM image to strip some header info for use later
-      dcmPic=`ls *${epiSuffix} | sort -t. -k 5 -n | head -1 | tail -1`
-
-      #EPI Dwell Time (ms)
-        #From https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=FSL;48be2924.1105
-        #Find the bandwidth, phase encoding direction, dimension of the phase encode as well
-          #dwellTime=1/(BW*peDim)
-         ##Using AcquisitionMatrixText for $dimPE now
-          #Echo Spacing = 1 / [(0019,1028) * (0051,100b component #1)]        
-
-        #Bandwidth (Phase Encoding direction)
-        #BWpe=`strings $dcmPic | grep -A1 "BandwidthPerPixelPhaseEncode" | head -2 | tail -1`
-
-        filename=run_HeaderInfo.m;
-cat > $filename << EOF
-close all;
-clear all;
-addpath('${scriptDir}');
-dicomScripts=['${scriptDir}','/Octave/dicom'];
-addpath(dicomScripts);
-dicomFilename='${dcmPic}';
-header=dicominfo(dicomFilename);
-[status,input] = dicom_get_header(header,'BandwidthPerPixelPhaseEncode')
-quit;
-EOF
-
-  BWpeTMP=`matlab -nodisplay -r "run run_HeaderInfo.m"`
-  BWpe=`echo $BWpeTMP | awk -F"=" '{print $NF}' | awk '{$1=$1}1' | awk '{print $1}'`
-  rm run_HeaderInfo.m
-          
-        #Phase Encoding steps
-        #dimpe=`strings $dcmPic | grep -A1 "PhaseEncodingLines" | head -1 | awk '{print $3}'`
-          #dimpe=`strings $dcmPic | grep -A2 "AcquisitionMatrixText" | tail -1 | awk -F"*" '{print $1}'`
-        #dimpe=`dicom_hdr $dcmPic | grep "0051 100b" | awk -F"//" '{print $NF}' | awk -F"*" '{print $1}'`
-
-        filename=run_HeaderInfo.m;
-cat > $filename << EOF
-close all;
-clear all;
-addpath('${scriptDir}');
-dicomScripts=['${scriptDir}','/Octave/dicom'];
-addpath(dicomScripts);
-dicomFilename='${dcmPic}';
-header=dicominfo(dicomFilename);
-[status,input] = dicom_get_header(header,'NumberOfPhaseEncodingSteps')
-quit;
-EOF
-
-        dimpeTMP=`matlab -nodisplay -r "run run_HeaderInfo.m"`
-        dimpe=`echo $dimpeTMP | awk -F"=" '{print $NF}' | awk '{$1=$1}1' | awk '{print $1}'`
-        rm run_HeaderInfo.m
-
-      #Dwell Time
-      dwellTime=`echo $BWpe $dimpe | awk '{print (1/($1*$2))}'`
-
-      #Phase Encoding direction, Part I
-        #Expected output is x/y/z/-x/-y/-z (Not sure that z/-z would ever be used)
-
-        #Search header for direction (ROW or COL)
-          #Remove any trailing whitespace
-        peType=`dicom_hdr $dcmPic | grep "ACQ Phase Encoding Direction" | awk -F"//" '{print $NF}' | awk '{$1=$1}1' | awk '{print $1}'`
-
-        #Assign peChar (character) (x/y/z)
-        if [[ "$peType" == "ROW" ]]; then
-          peChar=x
-        elif [[ "$peType" == "COL" ]]; then
-          peChar=y
-        else
-          peChar=z
-        fi
-      
-
-        #Check header for TR, TE (mS), override user flag with actual data
-        trMsecNew=`strings $dcmPic | grep "alTR" | awk '{print ($3/1000)}'`
-        trNew=`echo $trMsecNew | awk '{print ($1/1000)}'`
-        te=`strings $dcmPic | grep "alTE" | awk '{print ($3/1000)}'`
-
-      #Use sed to repopulate the rsParams_log if DICOM TR value is used
-      trReplaceString=`cat $logDir/rsParams_log | grep "\-t $tr" | tail -1`
-      sed -i "s/${trReplaceString}/\-t\ $trNew/g" $logDir/rsParams_log
-
-        #Account for change of TR
-        tr=$trNew
-        trMsec=$trMsecNew
-      
-
-      #Output some info on EPI data
-      echo "epiNumVols=$numDcm" >> $resultsDir/rsParams
-      echo "epiDwell=$dwellTime" >> $resultsDir/rsParams
-         
-      #Number of slices
-      numSlices=`strings $epi | grep "sSliceArray.lSize" | awk '{print $3}'`
-
-      #Slice order acquisition (e.g. interleaving)
-      sliceAcqOrder=`strings $epi | grep "sSliceArray.ucMode" | awk '{print $3}'`
-
-      #If the overwrite flag is set, remove the AFNI RestingState files (to avoid conflict with to3d)
-      if [[ $overwriteFlag == 1 ]]; then
-        if [[ -e RestingState+orig.HEAD ]]; then
-          rm RestingState+orig.HEAD
-        fi
-        if [[ -e RestingState+orig.BRIK ]]; then
-          rm RestingState+orig.BRIK
-        fi
-      fi
-
-      #Convert from DICOM to AFNI HEAD/BRIK
-      if [ "$sliceAcqOrder" == "0x1" ]; then
-        to3d -session $epiOutDir -prefix RestingState -time:zt $numSlices $numDcm $trMsec seq+z $images
-      elif [ "$sliceAcqOrder" == "0x2" ]; then
-        to3d -session $epiOutDir -prefix RestingState -overwrite -time:zt $numSlices $numDcm $trMsec seq-z $images
-      else
-        oddSlices=`echo ${numSlices}%2 | bc`
-        if [ $oddSlices == 1 ]; then
-          to3d -session $epiOutDir -prefix RestingState -overwrite -time:zt $numSlices $numDcm $trMsec alt+z $images
-        else
-          to3d -session $epiOutDir -prefix RestingState -overwrite -time:zt $numSlices $numDcm $trMsec alt+z2 $images
-        fi
-      fi
-
-              
-        #Phase Encoding direction, Part II
-          #Phase encoding direction corresponds to the y-direction.  P>>A = postive, A>>P = negative
-           #http://web.mit.edu/swg/Manual_FieldMap_v2.0.pdf
-           #https://xwiki.nbirn.org:8443/bin/view/Function-BIRN/PhaseEncodeDirectionIssues
-           #http://www.nmr.mgh.harvard.edu/~greve/dicom-unpack
-            #Scan the AFNI .HEAD file for "[-orient"
-
-        peSign=`3dinfo $epiOutDir/RestingState | grep "\[-orient" | awk -F"[" '{print $2}' | cut -c 9-11`
-        peSignDirCheck=`echo $peSign | grep "P"`
-         
-        #Assign the direction with sign (only needed if negative)
-          #If grep check of $peSign comes back as empty (direction is A>>P = negative), else direction is positive
-        
-        if [[ "$peSignDirCheck" == "" ]]; then
-          peDir="-${peChar}"
-        else
-          peDir=$peChar
-        fi
-
-        #Log Phase Encoding Direction
-        echo "peDir=$peDir" >> $resultsDir/rsParams
-
-        ##I believe this logic is incorrect but left in for legacy
-        #Making assumption that the sign will always be the end string after PhaseEncodingDirection
-	  #e.g. PhaseEncodingDirectionPositive
-          #Remove any trailing whitespaces
-        #peSign=`strings $dcmPic | grep "PhaseEncodingDirection" | sed "s/PhaseEncodingDirection//" | awk '{$1=$1}1'`
-
-        #Assign the direction with sign (only needed if negative)
-        #if [[ "$peSign" == "Positive" ]]; then
-          #peDir=$peChar
-        #else
-          #peDir="-${peChar}"
-        #fi
-     
-      #Skull-strip the EPI
-      cd $epiOutDir
-
-            ###Issues with lesioned subject having improper masks.  Using T1 mask, warped, in qualityControl script
-                  ###Using Bet with -f 0.3 instead of AFNI
-      #Convert Raw EPI image to NIFTI, reorient to RPI (for use with Signal:Noise Calculation in qualityCheck.sh)
-      3dresample -orient rpi -rmode Cu -prefix RestingStateRaw_tmp -inset RestingState+orig
-      3dAFNItoNIFTI -prefix RestingStateRaw.nii.gz RestingStateRaw_tmp+orig
-      #bet RestingStateRaw.nii.gz tmp -m -n -f 0.3
-      #fslmaths tmp_mask.nii.gz -bin RestingStateMask.nii.gz -odt char
-      #fslmaths RestingStateRaw.nii.gz -mul RestingStateMask.nii.gz RestingState.nii.gz
-
-      #Cleanup
-      #rm RestingState*+orig.* tmp_mask.nii.gz
-      rm RestingState*+orig.*
-
-      #epiFile=$epiOutDir/RestingState.nii.gz
-      epiRaw=$epiOutDir/RestingStateRaw.nii.gz
-      #epiMask=$epiOutDir/RestingStateMask.nii.gz
-    fi
-
-    #Saving variables for logging and for downstream processing
-    if [[ $epiRaw != "" ]]; then
-      echo "epiRaw=$epiRaw" >> $resultsDir/rsParams
-    fi
-    #echo "epiStripped=$epiFile" >> $resultsDir/rsParams
-    #echo "epiMask=$epiMask" >> $resultsDir/rsParams  
-    echo "epiTR=$tr" >> $resultsDir/rsParams
-    echo "epiTE=$te" >> $resultsDir/rsParams
-    
-  else
-
-     ####CASE 3: Resting state nifti file exists (but called RestingState.nii.gz) ####
-
-    #RestingState.nii.gz file already exists
-      #EPI (NIFTI) file already exists, make sure everything is properly aligned, etc.
-      
-    echo ""
-    echo ""
-    echo "....Checking EPI data for correct orientation and naming convention"
-    echo ""
-    echo ""
-
-    #Remove the existing files
-    if [ -e $epiOutDir/RestingState.nii.gz ]; then
-      rm $epiOutDir/RestingState.nii.gz
-    fi
-    if [ -e $epiOutDir/RestingStateRaw.nii.gz ]; then
-      rm $epiOutDir/RestingStateRaw.nii.gz
-    fi
-    #if [ -e $epiOutDir/RestingStateMask.nii.gz ]; then
-      #rm $epiOutDir/RestingStateMask.nii.gz
-    #fi
-
-
-
-    #Check to see if input EPI is already processed/NIfTI format
-      #Making a wild assumption that if it is NOT dcm or ima, it will be NIFTI (most likely .nii or nii.gz as the suffix)
-    if [ $epiSuffix == "nii" ]; then
-
-      echo ""
-      echo ""
-      echo "....Checking EPI data for correct orientation and naming convention"
-      echo ""
-      echo ""
-
-      #NIFTI input      
-        ##Version where input is NIFTI, needs to be oriented correctly and named properly
-          #check to see if NIFTI EPI volume is in RPI orientaiton
-            #Convert to RPI orientation, skullstrip (via AFNI)
-      cd $epiOutDir
-
-      #Output number of epiVols
-      epiVols=`fslhd $epiDir/$epiname | grep "^dim4" | awk '{print $2}'`
-      echo "epiNumVols=$epiVols" >> $resultsDir/rsParams
-      #Log Default Phase Encoding Direction
-        echo "peDir=-y" >> $resultsDir/rsParams
-
-
-      #Reorient, rename and skullstrip
-           ###Using Bet with -f 0.3 instead of AFNI
-      #Convert Raw EPI image to NIFTI, reorient to RPI (for use with Signal:Noise Calculation in qualityCheck.sh)
-      3dcopy $epiDir/$epiname tmpRestingState
-      3dresample -orient rpi -rmode Cu -prefix RestingStateRaw_tmp -inset tmpRestingState+orig
-      3dAFNItoNIFTI -prefix RestingStateRaw.nii.gz RestingStateRaw_tmp+orig
-      #bet RestingStateRaw.nii.gz tmp -m -n -f 0.3
-      #fslmaths tmp_mask.nii.gz -bin RestingStateMask.nii.gz -odt char
-      #fslmaths RestingStateRaw.nii.gz -mul RestingStateMask.nii.gz RestingState.nii.gz
-
-      #Cleanup
-      rm *HEAD *BRIK tmp_mask.nii.gz   
-         
-      #epiFile=$epiOutDir/RestingState.nii.gz
-      epiRaw=$epiOutDir/RestingStateRaw.nii.gz
-      #epiMask=$epiOutDir/RestingStateMask.nii.gz      
-      
+  ###### FieldMap (Prepped) ########################################
+  FieldMap_prep ${outDir}/fieldMap/FieldMapPhase_RPI.nii.gz ${outDir}/fieldMap/fieldMapMag_RPI_stripped.nii.gz | tee -a ${outDir}/log/DataPrep.log ||\
+  { printf "%s\n" "FieldMap_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
+fi
  
-     ####CASE 4: ####CASE 2: If no Resting state nifti file exists, go through IMAS or dcm's  ####
-
-    else 
-      ###Assumption that this is raw DICOM/IMA data that needs to be converted to NIFTI, reoriented, skull-stripped, etc.
-        ##Will create a reoriented/renamed AND skull-stripped version from DICOM/IMA
-          #"Raw" version is NON skull-stripped (used for SNR calcs, etc. with qualityCheck.sc
-      cd $epiDir
-      images=`ls *${epiSuffix} | sort -t. -k 5 -n`
-      numDcm=`echo $images | awk '{print NF}'`
-
-      #Grab first DICOM image to strip some header info for use later
-      dcmPic=`ls *${epiSuffix} | sort -t. -k 5 -n | head -1 | tail -1`
-
-      #EPI Dwell Time (ms)
-        #From https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=FSL;48be2924.1105
-        #Find the bandwidth, phase encoding direction, dimension of the phase encode as well
-          #dwellTime=1/(BW*peDim)
-         ##Using AcquisitionMatrixText for $dimPE now
-          #Echo Spacing = 1 / [(0019,1028) * (0051,100b component #1)]        
-
-        #Bandwidth (Phase Encoding direction)
-        #BWpe=`strings $dcmPic | grep -A1 "BandwidthPerPixelPhaseEncode" | head -2 | tail -1`
-
-        filename=run_HeaderInfo.m;
-cat > $filename << EOF
-close all;
-clear all;
-addpath('${scriptDir}');
-dicomScripts=['${scriptDir}','/Octave/dicom'];
-addpath(dicomScripts);
-dicomFilename='${dcmPic}';
-header=dicominfo(dicomFilename);
-[status,input] = dicom_get_header(header,'BandwidthPerPixelPhaseEncode')
-quit;
-EOF
-
-        BWpeTMP=`matlab -nodisplay -r "run run_HeaderInfo.m"`
-        BWpe=`echo $BWpeTMP | awk -F"=" '{print $NF}' | awk '{$1=$1}1' | awk '{print $1}'`
-        rm run_HeaderInfo.m
-          
-        #Phase Encoding steps
-        #dimpe=`strings $dcmPic | grep -A1 "PhaseEncodingLines" | head -1 | awk '{print $3}'`
-          #dimpe=`strings $dcmPic | grep -A2 "AcquisitionMatrixText" | tail -1 | awk -F"*" '{print $1}'`
-        #dimpe=`dicom_hdr $dcmPic | grep "0051 100b" | awk -F"//" '{print $NF}' | awk -F"*" '{print $1}'`
-
-        filename=run_HeaderInfo.m;
-cat > $filename << EOF
-close all;
-clear all;
-addpath('${scriptDir}');
-dicomScripts=['${scriptDir}','/Octave/dicom'];
-addpath(dicomScripts);
-dicomFilename='${dcmPic}';
-header=dicominfo(dicomFilename);
-[status,input] = dicom_get_header(header,'NumberOfPhaseEncodingSteps')
-quit;
-EOF
-
-        dimpeTMP=`matlab -nodisplay -r "run run_HeaderInfo.m"`
-        dimpe=`echo $dimpeTMP | awk -F"=" '{print $NF}' | awk '{$1=$1}1' | awk '{print $1}'`
-        rm run_HeaderInfo.m
-
-      #Dwell Time
-      dwellTime=`echo $BWpe $dimpe | awk '{print (1/($1*$2))}'`
-
-      #Phase Encoding direction, Part I
-        #Expected output is x/y/z/-x/-y/-z (Not sure that z/-z would ever be used)
-
-        #Search header for direction (ROW or COL)
-          #Remove any trailing whitespace
-        peType=`dicom_hdr $dcmPic | grep "ACQ Phase Encoding Direction" | awk -F"//" '{print $NF}' | awk '{$1=$1}1' | awk '{print $1}'`
-
-        #Assign peChar (character) (x/y/z)
-        if [[ "$peType" == "ROW" ]]; then
-          peChar=x
-        elif [[ "$peType" == "COL" ]]; then
-          peChar=y
-        else
-          peChar=z
-        fi
-
-
-        #Check header for TR, TE (mS), override user flag with actual data
-        trMsecNew=`strings $dcmPic | grep "alTR" | awk '{print ($3/1000)}'`
-        trNew=`echo $trMsecNew | awk '{print ($1/1000)}'`
-        te=`strings $dcmPic | grep "alTE" | awk '{print ($3/1000)}'`
-
-      #Use sed to repopulate the rsParams_log if DICOM TR value is used
-      trReplaceString=`cat $logDir/rsParams_log | grep "\-t $tr" | tail -1`
-      sed -i "s/${trReplaceString}/\-t\ $trNew/g" $logDir/rsParams_log
-
-        #Account for change of TR
-        tr=$trNew
-        trMsec=$trMsecNew
-
-
-      #Output some info on EPI data
-      echo "epiNumVols=$numDcm" >> $resultsDir/rsParams
-      echo "epiDwell=$dwellTime" >> $resultsDir/rsParams
-        
-         
-      #Number of slices
-      numSlices=`strings $epi | grep "sSliceArray.lSize" | awk '{print $3}'`
-
-      #Slice order acquisition (e.g. interleaving)
-      sliceAcqOrder=`strings $epi | grep "sSliceArray.ucMode" | awk '{print $3}'`
-
-      #If the overwrite flag is set, remove the AFNI RestingState files (to avoid conflict with to3d)
-      if [[ $overwriteFlag == 1 ]]; then
-        if [[ -e RestingState+orig.HEAD ]]; then
-          rm RestingState+orig.HEAD
-        fi
-        if [[ -e RestingState+orig.BRIK ]]; then
-          rm RestingState+orig.BRIK
-        fi
-      fi
-
-      #Convert from DICOM to AFNI HEAD/BRIK
-      if [ "$sliceAcqOrder" == "0x1" ]; then
-        to3d -session $epiOutDir -prefix RestingState -time:zt $numSlices $numDcm $trMsec seq+z $images
-      elif [ "$sliceAcqOrder" == "0x2" ]; then
-        to3d -session $epiOutDir -prefix RestingState -overwrite -time:zt $numSlices $numDcm $trMsec seq-z $images
-      else
-        oddSlices=`echo ${numSlices}%2 | bc`
-        if [ $oddSlices == 1 ]; then
-          to3d -session $epiOutDir -prefix RestingState -overwrite -time:zt $numSlices $numDcm $trMsec alt+z $images
-        else
-          to3d -session $epiOutDir -prefix RestingState -overwrite -time:zt $numSlices $numDcm $trMsec alt+z2 $images
-        fi
-      fi
-
-
-
-        #Phase Encoding direction, Part II
-          #Phase encoding direction corresponds to the y-direction.  P>>A = postive, A>>P = negative
-           #http://web.mit.edu/swg/Manual_FieldMap_v2.0.pdf
-           #https://xwiki.nbirn.org:8443/bin/view/Function-BIRN/PhaseEncodeDirectionIssues
-           #http://www.nmr.mgh.harvard.edu/~greve/dicom-unpack
-            #Scan the AFNI .HEAD file for "[-orient"
-
-        peSign=`3dinfo $epiOutDir/RestingState | grep "\[-orient" | awk -F"[" '{print $2}' | cut -c 9-11`
-        peSignDirCheck=`echo $peSign | grep "P"`
-
-        #Assign the direction with sign (only needed if negative)
-          #If grep check of $peSign comes back as empty (direction is A>>P = negative), else direction is positive
-        
-        if [[ "$peSignDirCheck" == "" ]]; then
-          peDir="-${peChar}"
-        else
-          peDir=$peChar
-        fi
-
-        #Log Phase Encoding Direction
-        echo "peDir=$peDir" >> $resultsDir/rsParams
-
-        ##I believe this logic is incorrect but left in for legacy
-        #Making assumption that the sign will always be the end string after PhaseEncodingDirection
-	  #e.g. PhaseEncodingDirectionPositive
-          #Remove any trailing whitespaces
-        #peSign=`strings $dcmPic | grep "PhaseEncodingDirection" | sed "s/PhaseEncodingDirection//" | awk '{$1=$1}1'`
-
-        #Assign the direction with sign (only needed if negative)
-        #if [[ "$peSign" == "Positive" ]]; then
-          #peDir=$peChar
-        #else
-          #peDir="-${peChar}"
-        #fi
-     
-      #Skull-strip the EPI
-      cd $epiOutDir
-
-            ###Issues with lesioned subject having improper masks.  Using T1 mask, warped, in qualityControl script
-                  ###Using Bet with -f 0.3 instead of AFNI
-      #Convert Raw EPI image to NIFTI, reorient to RPI (for use with Signal:Noise Calculation in qualityCheck.sh)
-      3dresample -orient rpi -rmode Cu -prefix RestingStateRaw_tmp -inset RestingState+orig
-      3dAFNItoNIFTI -prefix RestingStateRaw.nii.gz RestingStateRaw_tmp+orig
-      #bet RestingStateRaw.nii.gz tmp -m -n -f 0.3
-      #fslmaths tmp_mask.nii.gz -bin RestingStateMask.nii.gz -odt char
-      #fslmaths RestingStateRaw.nii.gz -mul RestingStateMask.nii.gz RestingState.nii.gz
-
-      #Cleanup
-      rm RestingState*+orig.* tmp_mask.nii.gz
-
-      #epiFile=$epiOutDir/RestingState.nii.gz
-      epiRaw=$epiOutDir/RestingStateRaw.nii.gz
-      #epiMask=$epiOutDir/RestingStateMask.nii.gz
-    fi
-
-    #Saving variables for logging and for downstream processing
-    echo "epiRaw=$epiRaw" >> $resultsDir/rsParams
-    #echo "epiStripped=$epiFile" >> $resultsDir/rsParams
-    #echo "epiMask=$epiMask" >> $resultsDir/rsParams  
-    echo "epiTR=$tr" >> $resultsDir/rsParams
-    echo "epiTE=$te" >> $resultsDir/rsParams
-
-
-  fi
-
-  ################################################################
-
-
-
-
-
-  ###### FieldMap ########################################
-
-  if [[ $fieldMapFlag == 1 ]]; then
-    #Only process FieldMap data if flagged
-
-   #Log processing via Fieldmap
-   echo "fieldMapCorrection=1" >> $resultsDir/rsParams
-
-
-    ###### FieldMap (Phase) ########################################
-
-    ##Pre setup for FieldMap (Phase) files
-    #Allowing for IMA and files other than DCM
-    fieldMapPhasename=`basename $fieldMapPhase`
-    fieldMapPhaseDelimCount=`echo $fieldMapPhasename | awk -F"." '{print NF}' | awk -F"." '{print $1}'`
-    fieldMapPhaseSuffixTmp=`echo $fieldMapPhasename | awk -F"." -v var=$fieldMapPhaseDelimCount '{print $var}'`
-
-    #Check for .gz extension (may have to go one level in for the suffix)
-    if [[ $fieldMapPhaseSuffixTmp == "gz" ]]; then
-      fieldMapPhaseDelimCount2=`echo $fieldMapPhaseDelimCount | awk '{print $1-1}'`
-      fieldMapPhaseSuffix=`echo $fieldMapPhasename | awk -F"." -v var=${fieldMapPhaseDelimCount2} '{print $var}'`
-    else
-      fieldMapPhaseSuffix=`echo $fieldMapPhasename | awk -F"." -v var=${fieldMapPhaseDelimCount} '{print $var}'`
-    fi
-
-
-    #Begin processing FieldMap (Phase) data
-    echo ""
-    echo ""
-    echo "....Preparing FieldMap (Phase) data"
-    echo ""
-    echo ""
-
-    if  [ ! -e $fieldMapPhaseOutDir/fieldMapPhase_MNI.nii* ]; then
-
-      #Check to see if input FieldMap (Phase) is already processed/NIfTI format
-        #Making a wild assumption that if it is NOT dcm or ima, it will be NIFTI (most likely .nii or nii.gz as the suffix)
-      if [ $fieldMapPhaseSuffix == "nii" ]; then
-        echo ""
-        echo ""
-        echo "....Checking FieldMap (Phase) data for correct orientation and naming convention"
-        echo ""
-        echo ""
-
-        #NIFTI input, just needs to be oriented correctly and named properly
-        cd $fieldMapPhaseOutDir
-
-        echo "...Reorienting FieldMap (Phase) to RPI"
-        if [[ ! -e $fieldMapPhaseOutDir/FSLORIENT/fieldMapPhase_MNI.nii.gz ]]; then
-          ##File doesn't exist
-          if [[ ! -e $fieldMapPhaseOutDir/FSLORIENT ]]; then
-            mkdir $fieldMapPhaseOutDir/FSLORIENT
-          fi
-
-          cd $fieldMapPhaseOutDir/FSLORIENT
-
-          if [[ ! -e ${fieldMapPhasename%.nii.gz}_MNI_brain.nii.gz ]]; then
-            cp $fieldMapPhaseDir/${fieldMapPhasename} $fieldMapPhaseOutDir/FSLORIENT/${fieldMapPhasename}
-            #Convert to RPI orientation - call upon an external FSL reorienting script
-            $scriptDir/fslreorient.sh ${fieldMapPhasename}
-            mv ${fieldMapPhasename%.nii.gz}_MNI.nii.gz fieldMapPhase_MNI.nii.gz
-
-            if [[ $outFlag == 1 ]]; then
-              cp fieldMapPhase_MNI.nii.gz $fieldMapPhaseOutDir
-              cd $fieldMapPhaseOutDir
-              rm -rf $fieldMapPhaseOutDir/FSLORIENT
-            else
-              fieldMapPhaseOutDir=$fieldMapPhaseOutDir/FSLORIENT
-              rm $fieldMapPhaseOutDir/${fieldMapPhasename}
-              cd $fieldMapPhaseOutDir
-            fi
-          else        
-            #Convert to RPI orientation - call upon an external FSL reorienting script
-            $scriptDir/fslreorient.sh ${fieldMapPhasename%.nii.gz}_MNI_brain.nii.gz
-            fieldMapPhaseOutDir=$fieldMapPhaseOutDir/FSLORIENT
-          fi
-
-          #Saving variables for logging and for donwstream processing
-          echo "fieldMapPhase=$fieldMapPhaseOutDir/fieldMapPhase_MNI.nii.gz" >> $resultsDir/rsParams
-     
-        else
-          ##If user set overwrite (-c), overwrite previous file (file already exists)
-          if [[ $overwriteFlag == 1 ]]; then
-            if [[ ! -e $fieldMapPhaseOutDir/FSLORIENT ]]; then
-              mkdir $fieldMapPhaseOutDir/FSLORIENT
-            fi
-
-            cd $fieldMapPhaseOutDir/FSLORIENT        
-            cp $fieldMapPhaseOutDir/${fieldMapPhasename} $fieldMapPhaseOutDir/FSLORIENT/${fieldMapPhasename}
-
-            #Convert to RPI orientation - call upon an external FSL reorienting script
-            $scriptDir/fslreorient.sh ${fieldMapPhasename}
-            mv ${fieldMapPhasename%.nii.gz}_MNI.nii.gz fieldMapPhase_MNI.nii.gz
-
-            if [[ $outFlag == 1 ]]; then
-              cp fieldMapPhase_MNI.nii.gz $fieldMapPhaseOutDir
-              rm -rf $fieldMapPhaseOutDir/FSLORIENT
-            else
-              fieldMapPhaseOutDir=$fieldMapPhaseOutDir/FSLORIENT
-              rm $fieldMapPhaseOutDir/${fieldMapPhasename}
-              cd $fieldMapPhaseOutDir
-            fi
-
-            #Saving variables for logging and for donwstream processing
-            echo "fieldMapPhase=$fieldMapPhaseOutDir/fieldMapPhase_MNI.nii.gz" >> $resultsDir/rsParams
-               
-          else
-            echo "overwrite flag (-c) not specified and FieldMap (Phase) file already exists.  Skipping FieldMap (Phase) setup"
-          fi
-        fi
-
-      else
-        ###Assumption that this is raw DICOM/IMA data that needs to be converted to NIFTI, reoriented, etc.
-        cd $fieldMapPhaseDir
-        
-        #Grab first DICOM image to strip some header info for use later
-        dcmPic=`ls *${fieldMapPhaseSuffix} | sort -t. -k 5 -n | head -1 | tail -1`
-
-        #fieldMapPhase deltaTE (ms)
-          #Grabs the third column (TE times for alTE[0] and alTE[1], subtracts them and divides by 1000 (conversion to seconds from ms))
-        deltaTENew=`strings $dcmPic | grep "alTE" | awk 'p{print ($3-p)/1000}{p=$3}'`
-
-        #Use sed to repopulate the rsParams_log if DICOM deltaTE value is used
-        deltaTEReplaceString=`cat $logDir/rsParams_log | grep "\-F $deltaTE" | tail -1`
-        sed -i "s/${deltaTEReplaceString}/\-F\ $deltaTENew/g" $logDir/rsParams_log
-
-          #Account for change of deltaTE
-          deltaTE=$deltaTENew
-
-        #Output some info on fieldMapPhase data
-        echo "deltaTE=$deltaTE" >> $resultsDir/rsParams
-        
-        #Convert from DICOM to NIfTI     
-        mri_convert --in_type siemens_dicom --out_type nii $dcmPic $fieldMapPhaseOutDir/fieldMapPhase.nii.gz
-         
-        cd $fieldMapPhaseOutDir
-
-        #Reorienting file to RPI
-        if [[ ! -e $fieldMapPhaseOutDir/FSLORIENT ]]; then
-          mkdir $fieldMapPhaseOutDir/FSLORIENT
-        fi
-
-        cd $fieldMapPhaseOutDir/FSLORIENT        
-        cp $fieldMapPhaseOutDir/fieldMapPhase.nii.gz $fieldMapPhaseOutDir/FSLORIENT
-
-        #Convert to RPI orientation - call upon an external FSL reorienting script
-        $scriptDir/fslreorient.sh fieldMapPhase
-
-        if [[ $outFlag == 1 ]]; then
-          cp fieldMapPhase_MNI.nii.gz $fieldMapPhaseOutDir
-          rm -rf $fieldMapPhaseOutDir/FSLORIENT
-        else
-          fieldMapPhaseOutDir=$fieldMapPhaseOutDir/FSLORIENT
-          rm $fieldMapPhaseOutDir/fieldMapPhase.nii.gz
-          cd $fieldMapPhaseOutDir
-        fi
-
-        #Saving variables for logging and for donwstream processing
-        echo "fieldMapPhase=$fieldMapPhaseOutDir/fieldMapPhase_MNI.nii.gz" >> $resultsDir/rsParams
-      fi
-
-    else
-      #Check for overwrite permissions
-      if [[ $overwriteFlag == 1 ]]; then
-
-        #Main script (processRestingState.sh) checks to see if things need to be/should be overwritten.  Assuming things have passed that stage
-          #(and that "-c" overwrite flag is passed on if it SHOULD be)....
-            #fieldMapPhase (NIFTI) file already exists, make sure everything is properly aligned, etc.      
-
-        #Remove pre-existing files
-        if [[ -e $fieldMapPhaseOutDir/FSLORIENT ]]; then
-          rm -rf $fieldMapPhaseOutDir/FSLORIENT
-        fi        
-        if [[ -e $fieldMapPhaseOutDir/fieldMapPhase_MNI.nii* ]]; then
-          rm $fieldMapPhaseOutDir/fieldMapPhase_MNI.nii*
-        fi
-
-
-        #Recreate files
-        if [ $fieldMapPhaseSuffix == "nii" ]; then
-          echo ""
-          echo ""
-          echo "....Checking FieldMap (Phase) data for correct orientation and naming convention"
-          echo ""
-          echo ""
-
-          #NIFTI input, just needs to be oriented correctly and named properly
-          cd $fieldMapPhaseOutDir
-
-          echo "...Reorienting FieldMap (Phase) to RPI"
-        
-          mkdir $fieldMapPhaseOutDir/FSLORIENT
-          
-          cd $fieldMapPhaseOutDir/FSLORIENT
-
-          
-          cp $fieldMapPhaseDir/${fieldMapPhasename} $fieldMapPhaseOutDir/FSLORIENT/${fieldMapPhasename}
-          #Convert to RPI orientation - call upon an external FSL reorienting script
-          $scriptDir/fslreorient.sh ${fieldMapPhasename}
-          mv ${fieldMapPhasename%.nii.gz}_MNI.nii.gz fieldMapPhase_MNI.nii.gz
-
-          if [[ $outFlag == 1 ]]; then
-            cp fieldMapPhase_MNI.nii.gz $fieldMapPhaseOutDir
-            cd $fieldMapPhaseOutDir
-            rm -rf $fieldMapPhaseOutDir/FSLORIENT
-          else
-            fieldMapPhaseOutDir=$fieldMapPhaseOutDir/FSLORIENT
-            rm $fieldMapPhaseOutDir/${fieldMapPhasename}
-            cd $fieldMapPhaseOutDir
-          fi          
-
-          #Saving variables for logging and for donwstream processing
-          echo "fieldMapPhase=$fieldMapPhaseOutDir/fieldMapPhase_MNI.nii.gz" >> $resultsDir/rsParams
-
-        else
-          ###Assumption that this is raw DICOM/IMA data that needs to be converted to NIFTI, reoriented, etc.
-          cd $fieldMapPhaseDir
-        
-          #Grab first DICOM image to strip some header info for use later
-          dcmPic=`ls *${fieldMapPhaseSuffix} | sort -t. -k 5 -n | head -1 | tail -1`
-
-          #fieldMapPhase deltaTE (ms)
-            #Grabs the third column (TE times for alTE[0] and alTE[1], subtracts them and divides by 1000 (conversion to seconds from ms))
-          deltaTENew=`strings $dcmPic | grep "alTE" | awk 'p{print ($3-p)/1000}{p=$3}'`
-
-          #Use sed to repopulate the rsParams_log if DICOM deltaTE value is used
-          deltaTEReplaceString=`cat $logDir/rsParams_log | grep "\-F $deltaTE" | tail -1`
-          sed -i "s/${deltaTEReplaceString}/\-F\ $deltaTENew/g" $logDir/rsParams_log
-
-            #Account for change of deltaTE
-            deltaTE=$deltaTENew
-
-          #Output some info on fieldMapPhase data
-          echo "deltaTE=$deltaTE" >> $resultsDir/rsParams
-        
-          #Convert from DICOM to NIfTI     
-          mri_convert --in_type siemens_dicom --out_type nii $dcmPic $fieldMapPhaseOutDir/fieldMapPhase.nii.gz
-         
-          cd $fieldMapPhaseOutDir
-
-          #Reorienting file to RPI
-          mkdir $fieldMapPhaseOutDir/FSLORIENT
-        
-          cd $fieldMapPhaseOutDir/FSLORIENT        
-          cp $fieldMapPhaseOutDir/fieldMapPhase.nii.gz $fieldMapPhaseOutDir/FSLORIENT
-
-          #Convert to RPI orientation - call upon an external FSL reorienting script
-          $scriptDir/fslreorient.sh fieldMapPhase
-
-          if [[ $outFlag == 1 ]]; then
-            cp fieldMapPhase_MNI.nii.gz $fieldMapPhaseOutDir
-            rm -rf $fieldMapPhaseOutDir/FSLORIENT
-          else
-            fieldMapPhaseOutDir=$fieldMapPhaseOutDir/FSLORIENT
-            rm $fieldMapPhaseOutDir/fieldMapPhase.nii.gz
-            cd $fieldMapPhaseOutDir
-          fi
-
-          #Saving variables for logging and for donwstream processing
-          echo "fieldMapPhase=$fieldMapPhaseOutDir/fieldMapPhase_MNI.nii.gz" >> $resultsDir/rsParams
-        fi
-
-      else
-        echo "overwrite flag (-c) not specified and FieldMap (Phase) file already exists.  Skipping FieldMap (Phase) setup"
-      fi
-    fi
-
-    ################################################################
-
-
-
-
-
-    ###### FieldMap (Magnitude) ########################################        
-
-    ##Pre setup for FieldMap (Mag) files
-    #Allowing for IMA and files other than DCM
-    fieldMapMagname=`basename $fieldMapMag`
-    fieldMapMagDelimCount=`echo $fieldMapMagname | awk -F"." '{print NF}' | awk -F"." '{print $1}'`
-    fieldMapMagSuffixTmp=`echo $fieldMapMagname | awk -F"." -v var=$fieldMapMagDelimCount '{print $var}'`
-
-    #Check for .gz extension (may have to go one level in for the suffix)
-    if [[ $fieldMapMagSuffixTmp == "gz" ]]; then
-      fieldMapMagDelimCount2=`echo $fieldMapMagDelimCount | awk '{print $1-1}'`
-      fieldMapMagSuffix=`echo $fieldMapMagname | awk -F"." -v var=${fieldMapMagDelimCount2} '{print $var}'`
-    else
-      fieldMapMagSuffix=`echo $fieldMapMagname | awk -F"." -v var=${fieldMapMagDelimCount} '{print $var}'`
-    fi
-
-
-    #Begin processing FieldMap (Mag) data
-    echo ""
-    echo ""
-    echo "....Preparing FieldMap (Mag) data"
-    echo ""
-    echo ""
-
-    if  [ ! -e $fieldMapMagOutDir/fieldMapMag_MNI.nii* ]; then
-
-      #Check to see if input FieldMap (Mag) is already processed/NIfTI format
-        #Making a wild assumption that if it is NOT dcm or ima, it will be NIFTI (most likely .nii or nii.gz as the suffix)
-      if [ $fieldMapMagSuffix == "nii" ]; then
-        echo ""
-        echo ""
-        echo "....Checking FieldMap (Mag) data for correct orientation and naming convention"
-        echo ""
-        echo ""
-
-        #NIFTI input, just needs to be oriented correctly and named properly
-        cd $fieldMapMagOutDir
-
-        echo "...Reorienting FieldMap (Mag) to RPI"
-        if [[ ! -e $fieldMapMagOutDir/FSLORIENT/fieldMapMag_MNI.nii.gz ]]; then
-          ##File doesn't exist
-          if [[ ! -e $fieldMapMagOutDir/FSLORIENT ]]; then
-            mkdir $fieldMapMagOutDir/FSLORIENT
-          fi
-
-          cd $fieldMapMagOutDir/FSLORIENT
-
-          if [[ ! -e ${fieldMapMagname%.nii.gz}_MNI_brain.nii.gz ]]; then
-            cp $fieldMapMagDir/${fieldMapMagname} $fieldMapMagOutDir/FSLORIENT/${fieldMapMagname}
-            #Convert to RPI orientation - call upon an external FSL reorienting script
-            $scriptDir/fslreorient.sh ${fieldMapMagname}
-            mv ${fieldMapMagname%.nii.gz}_MNI.nii.gz fieldMapMag_MNI.nii.gz
-
-            #Skull-strip the Magnitude image
-            bet fieldMapMag_MNI.nii.gz fieldMapMag -m -n
-            fslmaths fieldMapMag_mask.nii.gz -ero fieldMapMag_mask_eroded.nii.gz
-            fslmaths fieldMapMag_MNI.nii.gz -mul fieldMapMag_mask_eroded.nii.gz fieldMapMag_MNI_stripped.nii.gz
-
-            if [[ $outFlag == 1 ]]; then
-              cp fieldMapMag_MNI.nii.gz $fieldMapMagOutDir
-              cp fieldMapMag_MNI_stripped.nii.gz $fieldMapMagOutDir
-              cd $fieldMapMagOutDir
-              rm -rf $fieldMapMagOutDir/FSLORIENT
-            else
-              fieldMapMagOutDir=$fieldMapMagOutDir/FSLORIENT
-              rm $fieldMapMagOutDir/${fieldMapMagname}
-              cd $fieldMapMagOutDir
-            fi
-
-          else        
-            #Convert to RPI orientation - call upon an external FSL reorienting script
-            $scriptDir/fslreorient.sh ${fieldMapMagname%.nii.gz}_MNI_brain.nii.gz
-            fieldMapMagOutDir=$fieldMapMagOutDir/FSLORIENT
-          fi
-
-          #Saving variables for logging and for donwstream processing
-          echo "fieldMapMag=$fieldMapMagOutDir/fieldMapMag_MNI.nii.gz" >> $resultsDir/rsParams
-          echo "fieldMapMagStripped=$fieldMapMagOutDir/fieldMapMag_MNI_stripped.nii.gz" >> $resultsDir/rsParams
-     
-        else
-          ##If user set overwrite (-c), overwrite previous file (file already exists)
-          if [[ $overwriteFlag == 1 ]]; then
-            if [[ ! -e $fieldMapMagOutDir/FSLORIENT ]]; then
-              mkdir $fieldMapMagOutDir/FSLORIENT
-            fi
-
-            cd $fieldMapMagOutDir/FSLORIENT        
-            cp $fieldMapMagOutDir/${fieldMapMagname} $fieldMapMagOutDir/FSLORIENT/${fieldMapMagname}
-
-            #Convert to RPI orientation - call upon an external FSL reorienting script
-            $scriptDir/fslreorient.sh ${fieldMapMagname}
-            mv ${fieldMapMagname%.nii.gz}_MNI.nii.gz fieldMapMag_MNI.nii.gz
-
-            #Skull-strip the Magnitude image
-            bet fieldMapMag_MNI.nii.gz fieldMapMag -m -n
-            fslmaths fieldMapMag_mask.nii.gz -ero fieldMapMag_mask_eroded.nii.gz
-            fslmaths fieldMapMag_MNI.nii.gz -mul fieldMapMag_mask_eroded.nii.gz fieldMapMag_MNI_stripped.nii.gz
-
-            if [[ $outFlag == 1 ]]; then
-              cp fieldMapMag_MNI.nii.gz $fieldMapMagOutDir
-              cp fieldMapMag_MNI_stripped.nii.gz $fieldMapMagOutDir
-              cd $fieldMapMagOutDir
-              rm -rf $fieldMapMagOutDir/FSLORIENT
-            else
-              fieldMapMagOutDir=$fieldMapMagOutDir/FSLORIENT
-              rm $fieldMapMagOutDir/${fieldMapMagname}
-              cd $fieldMapMagOutDir
-            fi
-
-            #Saving variables for logging and for donwstream processing
-            echo "fieldMapMag=$fieldMapMagOutDir/fieldMapMag_MNI.nii.gz" >> $resultsDir/rsParams
-            echo "fieldMapMagStripped=$fieldMapMagOutDir/fieldMapMag_MNI_stripped.nii.gz" >> $resultsDir/rsParams
-               
-          else
-            echo "overwrite flag (-c) not specified and FieldMap (Mag) file already exists.  Skipping FieldMap (Mag) setup"
-          fi
-        fi
-
-      else
-        ###Assumption that this is raw DICOM/IMA data that needs to be converted to NIFTI, reoriented, etc.
-        cd $fieldMapMagDir
-        
-        #Grab first DICOM image
-        dcmPic=`ls *${fieldMapMagSuffix} | sort -t. -k 5 -n | head -1 | tail -1`
-
-        #Convert from DICOM to NIfTI     
-        mri_convert --in_type siemens_dicom --out_type nii $dcmPic $fieldMapMagOutDir/fieldMapMag.nii.gz
-         
-        cd $fieldMapMagOutDir
-
-        #Reorienting file to RPI
-        if [[ ! -e $fieldMapMagOutDir/FSLORIENT ]]; then
-          mkdir $fieldMapMagOutDir/FSLORIENT
-        fi
-
-        cd $fieldMapMagOutDir/FSLORIENT        
-        cp $fieldMapMagOutDir/fieldMapMag.nii.gz $fieldMapMagOutDir/FSLORIENT
-
-        #Convert to RPI orientation - call upon an external FSL reorienting script
-        $scriptDir/fslreorient.sh fieldMapMag
-
-        #Skull-strip the Magnitude image
-        bet fieldMapMag_MNI.nii.gz fieldMapMag -m -n
-        fslmaths fieldMapMag_mask.nii.gz -ero fieldMapMag_mask_eroded.nii.gz
-        fslmaths fieldMapMag_MNI.nii.gz -mul fieldMapMag_mask_eroded.nii.gz fieldMapMag_MNI_stripped.nii.gz
-
-        if [[ $outFlag == 1 ]]; then
-          cp fieldMapMag_MNI.nii.gz $fieldMapMagOutDir
-          cp fieldMapMag_MNI_stripped.nii.gz $fieldMapMagOutDir
-          cd $fieldMapMagOutDir
-          rm -rf $fieldMapMagOutDir/FSLORIENT
-        else
-          fieldMapMagOutDir=$fieldMapMagOutDir/FSLORIENT
-          rm $fieldMapMagOutDir/fieldMapMag.nii.gz
-          cd $fieldMapMagOutDir
-        fi
-
-        #Saving variables for logging and for donwstream processing
-        echo "fieldMapMag=$fieldMapMagOutDir/fieldMapMag_MNI.nii.gz" >> $resultsDir/rsParams
-        echo "fieldMapMagStripped=$fieldMapMagOutDir/fieldMapMag_MNI_stripped.nii.gz" >> $resultsDir/rsParams
-      fi
-
-    else
-      #Check for overwrite permissions
-      if [[ $overwriteFlag == 1 ]]; then
-
-        #Main script (processRestingState.sh) checks to see if things need to be/should be overwritten.  Assuming things have passed that stage
-          #(and that "-c" overwrite flag is passed on if it SHOULD be)....
-            #fieldMapMag (NIFTI) file already exists, make sure everything is properly aligned, etc.      
-
-        #Remove pre-existing files
-        if [[ -e $fieldMapMagOutDir/FSLORIENT ]]; then
-          rm -rf $fieldMapMagOutDir/FSLORIENT
-        fi        
-        if [[ -e $fieldMapMagOutDir/fieldMapMag_MNI.nii* ]]; then
-          rm $fieldMapMagOutDir/fieldMapMag_MNI.nii*
-        fi
-
-
-        #Recreate files
-        if [ $fieldMapMagSuffix == "nii" ]; then
-          echo ""
-          echo ""
-          echo "....Checking FieldMap (Mag) data for correct orientation and naming convention"
-          echo ""
-          echo ""
-
-          #NIFTI input, just needs to be oriented correctly and named properly
-          cd $fieldMapMagOutDir
-
-          echo "...Reorienting FieldMap (Mag) to RPI"
-        
-          mkdir $fieldMapMagOutDir/FSLORIENT
-          
-          cd $fieldMapMagOutDir/FSLORIENT
-
-          
-          cp $fieldMapMagDir/${fieldMapMagname} $fieldMapMagOutDir/FSLORIENT/${fieldMapMagname}
-          #Convert to RPI orientation - call upon an external FSL reorienting script
-          $scriptDir/fslreorient.sh ${fieldMapMagname}
-          mv ${fieldMapMagname%.nii.gz}_MNI.nii.gz fieldMapMag_MNI.nii.gz
-
-          #Skull-strip the Magnitude image
-          bet fieldMapMag_MNI.nii.gz fieldMapMag -m -n
-          fslmaths fieldMapMag_mask.nii.gz -ero fieldMapMag_mask_eroded.nii.gz
-          fslmaths fieldMapMag_MNI.nii.gz -mul fieldMapMag_mask_eroded.nii.gz fieldMapMag_MNI_stripped.nii.gz
-
-          if [[ $outFlag == 1 ]]; then
-            cp fieldMapMag_MNI.nii.gz $fieldMapMagOutDir
-            cp fieldMapMag_MNI_stripped.nii.gz $fieldMapMagOutDir
-            cd $fieldMapMagOutDir
-            rm -rf $fieldMapMagOutDir/FSLORIENT
-          else
-            fieldMapMagOutDir=$fieldMapMagOutDir/FSLORIENT
-            rm $fieldMapMagOutDir/${fieldMapMagname}
-            cd $fieldMapMagOutDir
-          fi
-
-          #Saving variables for logging and for donwstream processing
-          echo "fieldMapMag=$fieldMapMagOutDir/fieldMapMag_MNI.nii.gz" >> $resultsDir/rsParams
-          echo "fieldMapMagStripped=$fieldMapMagOutDir/fieldMapMag_MNI_stripped.nii.gz" >> $resultsDir/rsParams
-
-        else
-          ###Assumption that this is raw DICOM/IMA data that needs to be converted to NIFTI, reoriented, etc.
-          cd $fieldMapMagDir
-        
-          #Grab first DICOM image
-          dcmPic=`ls *${fieldMapMagSuffix} | sort -t. -k 5 -n | head -1 | tail -1`
-
-          #Convert from DICOM to NIfTI     
-          mri_convert --in_type siemens_dicom --out_type nii $dcmPic $fieldMapMagOutDir/fieldMapMag.nii.gz
-         
-          cd $fieldMapMagOutDir
-
-          #Reorienting file to RPI
-          mkdir $fieldMapMagOutDir/FSLORIENT
-        
-          cd $fieldMapMagOutDir/FSLORIENT        
-          cp $fieldMapMagOutDir/fieldMapMag.nii.gz $fieldMapMagOutDir/FSLORIENT
-
-          #Convert to RPI orientation - call upon an external FSL reorienting script
-          $scriptDir/fslreorient.sh fieldMapMag
-
-
-          #Skull-strip the Magnitude image
-          bet fieldMapMag_MNI.nii.gz fieldMapMag -m -n
-          fslmaths fieldMapMag_mask.nii.gz -ero fieldMapMag_mask_eroded.nii.gz
-          fslmaths fieldMapMag_MNI.nii.gz -mul fieldMapMag_mask_eroded.nii.gz fieldMapMag_MNI_stripped.nii.gz
-
-
-          if [[ $outFlag == 1 ]]; then
-            cp fieldMapMag_MNI.nii.gz $fieldMapMagOutDir
-            cp fieldMapMag_MNI_stripped.nii.gz $fieldMapMagOutDir
-            cd $fieldMapMagOutDir
-            rm -rf $fieldMapMagOutDir/FSLORIENT
-          else
-            fieldMapMagOutDir=$fieldMapMagOutDir/FSLORIENT
-            rm $fieldMapMagOutDir/fieldMapMag.nii.gz
-            cd $fieldMapMagOutDir
-          fi
-
-          #Saving variables for logging and for donwstream processing
-          echo "fieldMapMag=$fieldMapMagOutDir/fieldMapMag_MNI.nii.gz" >> $resultsDir/rsParams
-          echo "fieldMapMagStripped=$fieldMapMagOutDir/fieldMapMag_MNI_stripped.nii.gz" >> $resultsDir/rsParams
-        fi
-
-      else
-        echo "overwrite flag (-c) not specified and FieldMap (Mag) file already exists.  Skipping FieldMap (Mag) setup"
-      fi
-    fi
-
-    ################################################################
-
-
-
-
-
-    ###### FieldMap (Prepped) ########################################
-
-    #Begin prepping fieldMap data for BBR registration downstream
-      #Prepare the field Map from stripped Mag image and converted Phase image    
-
-    echo ""
-    echo ""
-    echo "....Prepping FieldMap data (from Phase and Magnitude images) for subsequent registration steps"
-    echo ""
-    echo ""
-
-    #Dependency of presence/abasence of outFlag
-    if [[ $outFlag == 1 ]]; then
-      #File will be in /func/EPItoT1optimized
-
-    
-      #Check for presence of file/overwrite permissions
-      if [[ ! -e $resultsDir/EPItoT1optimized/fieldMap_prepped.nii* ]]; then
-        #File doesn't exist
-
-        cd $resultsDir/EPItoT1optimized
-
-        #Prepare the fieldMaps
-        fsl_prepare_fieldmap SIEMENS $fieldMapPhaseOutDir/fieldMapPhase_MNI.nii.gz $fieldMapMagOutDir/fieldMapMag_MNI_stripped.nii.gz $resultsDir/EPItoT1optimized/fieldMap_prepped.nii.gz $deltaTE
-
-        #Saving variables for logging and for donwstream processing
-        echo "fieldMapPrepped=$resultsDir/EPItoT1optimized/fieldMap_prepped.nii.gz" >> $resultsDir/rsParams
-
-      else
-        #File exists      
-        if [[ $overwriteFlag == 1 ]]; then
-
-          cd $resultsDir/EPItoT1optimized
-
-          #Prepare the fieldMaps
-          fsl_prepare_fieldmap SIEMENS $fieldMapPhaseOutDir/fieldMapPhase_MNI.nii.gz $fieldMapMagOutDir/fieldMapMag_MNI_stripped.nii.gz $resultsDir/EPItoT1optimized/fieldMap_prepped.nii.gz $deltaTE
-
-          #Saving variables for logging and for donwstream processing
-          echo "fieldMapPrepped=$resultsDir/EPItoT1optimized/fieldMap_prepped.nii.gz" >> $resultsDir/rsParams
-
-        else
-          echo "overwrite flag (-c) not specified and FieldMap (Prepped) file already exists.  Skipping FieldMap (Prepped) setup"
-        fi
-      fi
-
-    else
-      #File will be in EPI input directory ($resultsDir)
-      cd $resultsDir
-
-      if [[ ! -e  $resultsDir/EPItoT1optimized ]]; then
-        mkdir $resultsDir/EPItoT1optimized
-      fi
-
-      fieldMapPreppedOutDir=$resultsDir/EPItoT1optimized
-
-
-      #Check for presence of file/overwrite permissions
-      if [[ ! -e $fieldMapPreppedOutDir/fieldMap_prepped.nii* ]]; then
-        #File doesn't exist
-
-        cd $fieldMapPreppedOutDir
-
-        #Prepare the fieldMaps
-        fsl_prepare_fieldmap SIEMENS $fieldMapPhaseOutDir/fieldMapPhase_MNI.nii.gz $fieldMapMagOutDir/fieldMapMag_MNI_stripped.nii.gz $fieldMapPreppedOutDir/fieldMap_prepped.nii.gz $deltaTE
-
-        #Saving variables for logging and for donwstream processing
-        echo "fieldMapPrepped=$fieldMapPreppedOutDir/fieldMap_prepped.nii.gz" >> $resultsDir/rsParams
-
-      else
-        #File exists      
-        if [[ $overwriteFlag == 1 ]]; then
-
-          cd $fieldMapPreppedOutDir
-
-          #Prepare the fieldMaps
-          fsl_prepare_fieldmap SIEMENS $fieldMapPhaseOutDir/fieldMapPhase_MNI.nii.gz $fieldMapMagOutDir/fieldMapMag_MNI_stripped.nii.gz $fieldMapPreppedOutDir/fieldMap_prepped.nii.gz $deltaTE
-
-          #Saving variables for logging and for donwstream processing
-          echo "fieldMapPrepped=$fieldMapPreppedOutDir/fieldMap_prepped.nii.gz" >> $resultsDir/rsParams
-
-        else
-          echo "overwrite flag (-c) not specified and FieldMap (Prepped) file already exists.  Skipping FieldMap (Prepped) setup"
-        fi
-      fi
-    fi
-
-    ################################################################
-  fi
-
-#let index+=1
-#done
-
-echo "$0 Complete"
-echo ""
-echo ""
-
-
-
-
-
+printf "\n\n%s\n\n" "$0 Complete"
