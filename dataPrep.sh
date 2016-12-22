@@ -47,7 +47,7 @@ do
       ;;
      esac
 done
-
+#############################   HELPER FUNCTIONS   #############################
 function printCommandLine()
 {
   echo ""
@@ -89,6 +89,10 @@ function printCommandLine()
 #function: clobber
 ##################
 #purpose: checks to see if files exist and overwrites them when clob is set to true
+##################
+#input: any number of filenames that may or may not exist
+##################
+#output: a 1 (false) or 0 (true)
 ##################
 #dependencies: None
 ##################
@@ -350,6 +354,56 @@ function RPI_orient() {
 }
 
 ##################
+#function: ConvertToNifti
+##################
+#purpose: converts images from various formats into nifti
+##################
+#input: An image in a non-specified format
+##################
+#output: nifti file
+##################
+#preconditions: No "." in the names of the input files
+##################
+#dependencies: FSL, clobber, AFNI (probably others)
+##################
+#Used in: *_prep
+##################
+function ConvertToNifti()
+{
+  #I am overwiting a variable name in the main script, so I need to a global variable, I think this is the way to do it.
+  __input=$1
+  #local variables mean they do not interfere with the main script.
+  local inputDir=$(dirname ${__input})
+  local inputBase=$(basename ${__input})
+  #this gets rid of anything before the first ".", please don't put "." in the name of the file.
+  local inputSuffix=${inputBase#*.}
+case "${inputSuffix}" in
+  'dcm')
+      echo "code not implemented (needs to reset epi variable)" && return 1
+      #reconstruct
+      #eval __input="'nifti_output'"
+      ;;
+  'BRIK')
+      echo "code not implemented (needs to reset epi variable)" && return 1
+      #reconstruct
+      #eval __input="'nifti_output'"
+      ;;
+  'IMA')
+      echo "code not implemented (needs to reset epi variable)" && return 1
+      #reconstruct
+      #eval __input="'nifti_output'"
+      ;;
+  'nii.gz')
+      echo "${__input} already in NIFTI format"
+      ;;
+esac
+
+printf "%s\n" "${FUNCNAME} ran successfully." && return 0
+}
+
+#############################   MAIN FUNCTIONS   #############################
+
+##################
 #function: T1Head_prep
 ##################
 #purpose: prepares T1Head (brain+skull) by making sure it's in nifti format and oriented correctly
@@ -377,6 +431,13 @@ function T1Head_prep()
   clobber ${t1Head_outDir}/T1_head.nii.gz &&\
   { cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz ||\
   printf "%s\n" "cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;}
+  #^^^^the logic: 
+  #if the file exists and clob=false, don't run the next two commands.
+  #if the file doesn't exist, do the copy command; then
+    #if the copy command fails (returns a 1), print the error message and exit the function with a failure (return with a 1)
+  #The cp and print commands are grouped together because I never want to run one without the other. 
+  #If I don't group them and the clobber command returns a 1,
+  # then the print statement will automatically print, even though the command didn't fail, it just wasn't ran.
 
   #reorient the nifti file in the processing directory
   printf "%s\n" "Reorienting T1Head to RPI"
@@ -387,54 +448,43 @@ function T1Head_prep()
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
 
-function ConvertToNifti()
-{
-  __input=$1
-  inputDir=$(dirname ${__input})
-  inputBase=$(basename ${__input})
-  inputSuffix=${inputBase#*.}
-case "${inputSuffix}" in
-  'dcm')
-      echo "code not implemented (needs to reset epi variable)" && return 1
-      #reconstruct
-      #eval __input="'nifti_output'"
-      ;;
-  'BRIK')
-      echo "code not implemented (needs to reset epi variable)" && return 1
-      #reconstruct
-      #eval __input="'nifti_output'"
-      ;;
-  'IMA')
-      echo "code not implemented (needs to reset epi variable)" && return 1
-      #reconstruct
-      #eval __input="'nifti_output'"
-      ;;
-  'nii.gz')
-      echo "${__input} already in NIFTI format"
-      ;;
-esac
-
-printf "%s\n" "${FUNCNAME} ran successfully." && return 0
-}
-
-
+##################
+#function: T1Brain_prep
+##################
+#purpose: prepares T1Brain by making sure it's in nifti format and oriented correctly
+##################
+#input: A skullstriped T1 image
+#       An output directory
+##################
+#output: A T1Brain nifti file in RPI orientation
+#        Brain Mask
+##################
+#dependencies: FSL, clobber
+##################
+#Used in: MAIN
+##################
 function T1Brain_prep()
 {
   local t1Brain=$1
   local t1Brain_outDir=$2
   printf "\n\n%s\n\n" "....Preparing T1Brain data"
 
+  #convert whatever image that was passed in to a nifti file (Not Implemented)
   ConvertToNifti ${t1Brain}
 
+  #copy the nifti file to the processing directory
   clobber ${t1Brain_outDir}/T1_brain.nii.gz &&\
   { cp ${t1Head} ${t1Head_outDir}/T1_brain.nii.gz ||\
   printf "%s\n" "cp ${t1Brain} ${t1Brain_outDir}/T1_brain.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;}
 
+  #reorient the nifti file in the processing directory
   printf "%s\n" "Reorienting T1Brain to RPI"
   clobber ${t1Brain_outDir}/T1_brain_RPI.nii.gz &&\
   { RPI_orient ${t1Brain_outDir}/T1_brain.nii.gz ||\
   printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;}
 
+  #make a binary brainmask from the reoriented T1
+  printf "%s\n" "Making a T1 brain Mask"
   clobber ${t1Brain_outDir}/T1_brain_RPI.nii.gz/brainMask.nii.gz &&\
   { fslmaths ${t1Brain_outDir}/T1_brain_RPI.nii.gz -bin ${t1Brain_outDir}/T1_brain_RPI.nii.gz/brainMask.nii.gz -odt char ||\
   printf "%s\n" "Brain Masking failed, exiting ${FUNCNAME} function" && return 1 ;}
@@ -442,6 +492,20 @@ function T1Brain_prep()
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
 
+##################
+#function: epi_prep
+##################
+#purpose: prepares EPI by making sure it's in nifti format and oriented correctly
+##################
+#input: EPI image
+#       An output directory
+##################
+#output: EPI nifti file in RPI orientation
+##################
+#dependencies: FSL, clobber
+##################
+#Used in: MAIN
+##################
 function epi_prep() 
 {
   local epi=$1
@@ -449,8 +513,10 @@ function epi_prep()
 
   printf "\n\n%s\n\n" "....Preparing EPI data"
 
+  #convert whatever image that was passed in to a nifti file (Not Implemented)
   ConvertToNifti ${epi}
 
+  #this does the copying, orienting and renaming, I don't think a temporary file is necessary
   clobber ${epi_outDir}/RestingStateRaw.nii.nii.gz &&\
   { cp ${epi} ${epi_outDir}/tmpRestingStateRaw.nii.gz &&\
   RPI_orient ${epi_outDir}/tmpRestingStateRaw.nii.gz &&\
@@ -461,6 +527,20 @@ function epi_prep()
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
 
+##################
+#function: FieldMapPhase_prep
+##################
+#purpose: prepares FieldMapPhase image by making sure it's in nifti format and oriented correctly
+##################
+#input: Fieldmap Phase image
+#       An output directory
+##################
+#output: Fieldmapphase nifti file in RPI orientation
+##################
+#dependencies: FSL, clobber
+##################
+#Used in: MAIN
+##################
 function FieldMapPhase_prep()
 {
   local fieldMapPhase=$1
@@ -468,12 +548,15 @@ function FieldMapPhase_prep()
 
   printf "\n\n%s\n\n" "....Preparing FieldMapPhase data"
 
+  #convert whatever image that was passed in to a nifti file (Not Implemented)
   ConvertToNifti ${FieldMapPhase}
 
+  #copy the nifti file to the processing directory
   clobber ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz &&\
   { cp ${FieldMapPhase} ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz ||\
   printf "%s\n" "cp ${FieldMapPhase} ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;}
 
+  #reorient the nifti file in the processing directory
   printf "%s\n" "Reorienting FieldMapPhase to RPI"
   clobber ${FieldMapPhase_outDir}/FieldMapPhase_RPI.nii.gz &&\
   { RPI_orient ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz ||\
@@ -482,6 +565,21 @@ function FieldMapPhase_prep()
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
 
+##################
+#function: FieldMapMag_prep
+##################
+#purpose: prepares FieldMap magnitude image by making sure it's in nifti format and oriented correctly
+##################
+#input: Field Map magnitude
+#       An output directory
+##################
+#output: FieldMap Magnitude nifti file in RPI orientation
+#        Brain Mask
+##################
+#dependencies: FSL, clobber
+##################
+#Used in: MAIN
+##################
 function FieldMapMag_prep()
 {
   local fieldMapMag=$1
@@ -489,25 +587,31 @@ function FieldMapMag_prep()
 
   printf "\n\n%s\n\n" "....Preparing FieldMapMag data"
 
+  #convert whatever image that was passed in to a nifti file (Not Implemented)
   ConvertToNifti ${FieldMapMag}
 
+  #copy the nifti file to the processing directory
   clobber ${FieldMapMag_outDir}/FieldMapMag.nii.gz &&\
   { cp ${FieldMapMag} ${FieldMapMag_outDir}/FieldMapMag.nii.gz ||\
   printf "%s\n" "cp ${FieldMapMag} ${FieldMapMag_outDir}/FieldMapMag.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;}
 
+  #reorient the nifti file in the processing directory to RPI.
   printf "%s\n" "Reorienting FieldMapMag to RPI"
   clobber ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz &&\
   { RPI_orient ${FieldMapMag_outDir}/FieldMapMag.nii.gz ||\
   printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;}
 
+  #make a brain mask for the image using FSL's bet.
   clobber ${FieldMapMag_outDir}/fieldMapMag_mask.nii.gz &&\
   { bet ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz ${FieldMapMag_outDir}/fieldMapMag -m -n ||\
    printf "%s\n" "bet failed, exiting ${FUNCNAME} function" && return 1 ;}
 
+  #make the brainmask smaller: reason: ???
   clobber ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz &&\
   { fslmaths ${FieldMapMag_outDir}/fieldMapMag_mask.nii.gz -ero ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ||\
    printf "%s\n" "erosion failed, exiting ${FUNCNAME} function" && return 1 ;}
 
+  #multiply the brainmask with the fieldmap to get a brain masked fieldmap.
   clobber ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz &&\
   { fslmaths ${FieldMapMag_outDir}/fieldMapMag_RPI.nii.gz -mul ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz ||\
    printf "%s\n" "masking failed, exiting ${FUNCNAME} function" && return 1 ;}
@@ -515,19 +619,37 @@ function FieldMapMag_prep()
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
 
+##################
+#function: FieldMap_prep
+##################
+#purpose: prepares FieldMap to be used in EPI registration
+##################
+#input: Fieldmap magnitude
+#       Fieldmap phase
+#       dTE
+#       outDir
+#       scannertype
+##################
+#output: ????
+##################
+#dependencies: FSL, clobber
+##################
+#Used in: MAIN
+##################
 function FieldMap_prep()
 {
   local phase=$1
   local mag=$2
-  local fieldMap_outDir=$3
-  local scannertype=$4
+  local dTE=$3
+  local fieldMap_outDir=$4
+  local scannertype=$5
 
   printf "\n\n%s\n\n" "....Prepping FieldMap data (from Phase and Magnitude images) for subsequent registration steps"
 
   case "${scannertype}" in
     'SEIMENS')
         clobber ${outDir}/func/EPItoT1optimized/fieldMap_prepped.nii.gz &&\
-        { fsl_prepare_fieldmap SIEMENS ${phase} ${mag} ${outDir}/func/EPItoT1optimized/fieldMap_prepped.nii.gz $deltaTE ||\
+        { fsl_prepare_fieldmap SIEMENS ${phase} ${mag} ${outDir}/func/EPItoT1optimized/fieldMap_prepped.nii.gz $dTE ||\
          printf "%s\n" "SEIMENS: FieldMap_prep failed, exiting ${FUNCNAME} function" && return 1 ;}
         ;;
     'GE')
@@ -538,7 +660,11 @@ function FieldMap_prep()
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0  
 }
 
-#############################   MAIN   ###########################
+
+#############################   MAIN   #############################
+
+#DATA CHECKS AND VARIABLE SETTING
+
 #Quick check for input data. Exit with error if data is missing
 if [[ $datafile == "" ]]; then
   echo "Error: data file must be specified with the -i option"
@@ -570,7 +696,7 @@ echo "Running $0 ..."
  
 
 
-###### Basic Input/variables ########################################
+###### Basic Input/variables
 
 #Input files
 t1Head=$(awk '{print $1}' $datafile)
@@ -609,10 +735,6 @@ if [[ $fieldMapFlag == 1 ]]; then
   fi
 fi
 
-
-
-
-
 #Base directory for input EPI, T1 & FieldMap
 epiDir=$(dirname $epi)
 epiName=$(basename ${epi})
@@ -634,8 +756,6 @@ fi
 
 
 ##Echo out all input parameters into a log
-
-
 echo "------------------------------------" >> $outDir/log/DataPrep.log
 echo "-i $datafile" >> $outDir/log/DataPrep.log
 echo "-o $outDir" >> $outDir/log/DataPrep.log
@@ -652,28 +772,34 @@ echo "$(date)" >> $outDir/log/DataPrep.log
 echo "" >> $outDir/log/DataPrep.log
 
 
-
+# MAIN PROCESSING COMMANDS
 #Processing T1Skull
-T1Head_prep ${t1Head} ${outDir}/anat | tee -a ${outDir}/log/DataPrep.log ||\
-{ printf "%s\n" "T1Head_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
+T1Head_prep ${t1Head} ${outDir}/anat | tee -a ${outDir}/log/DataPrep.log &&\
+{ [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "T1Head_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
 #Processing T1brain
-T1Brain_prep ${t1Brain} ${outDir}/anat | tee -a ${outDir}/log/DataPrep.log ||\
-{ printf "%s\n" "T1Brain_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
+T1Brain_prep ${t1Brain} ${outDir}/anat | tee -a ${outDir}/log/DataPrep.log &&\
+{ [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "T1Brain_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
 #processing EPI
-epi_prep ${epi} ${outDir}/func | tee -a ${outDir}/log/DataPrep.log ||\
-{ printf "%s\n" "epi_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
+epi_prep ${epi} ${outDir}/func | tee -a ${outDir}/log/DataPrep.log &&\
+{ [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "epi_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
 
 if [[ $fieldMapFlag == 1 ]]; then
-  ###### FieldMap (Phase)
-  FieldMapPhase_prep ${fieldMapPhase} ${outDir}/fieldMap | tee -a ${outDir}/log/DataPrep.log ||\
-  { printf "%s\n" "FieldMapPhase_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
-  ###### FieldMap (Magnitude)    
+  #Processing FieldMap (Phase)
+  FieldMapPhase_prep ${fieldMapPhase} ${outDir}/fieldMap | tee -a ${outDir}/log/DataPrep.log &&\
+  { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMapPhase_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
+  #Processing FieldMap (Magnitude)    
   FieldMapMag_prep ${fieldMapMag} ${outDir}/fieldMap | tee -a ${outDir}/log/DataPrep.log ||\
-  { printf "%s\n" "FieldMapMag_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
+  { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMapMag_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
   
-  ###### FieldMap (Prepped) ########################################
+  #Processing FieldMap (Prepped)
   FieldMap_prep ${outDir}/fieldMap/FieldMapPhase_RPI.nii.gz ${outDir}/fieldMap/fieldMapMag_RPI_stripped.nii.gz | tee -a ${outDir}/log/DataPrep.log ||\
-  { printf "%s\n" "FieldMap_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
+  { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMap_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
 fi
  
+#^^^^logic of command format
+#The function is called and the function's output is printed out to the screen (stout) and into the log file (appending, not overwrite) via the "tee" command
+#Since the tee command will always return 0 unless something is wrong with bash, we need to do a separate check to see if the function failed
+#PIPESTATUS is a builtin bash variable array that we can use to query whether a particular command in a pipe sequence (e.g. func input | tee -a log)
+#succeeded or failed. The first element in the PIPESTATUS array is the function we called such as T1Head_prep. So if the T1Head_prep function exited with a non-zero
+#status then the error message will be printed out to the terminal (stout) and to the log. The script will also exit with error.
 printf "\n\n%s\n\n" "$0 Complete"
