@@ -101,30 +101,30 @@ function printCommandLine()
 function clobber() 
 {
   #Tracking Variables
-  local -i num_existing_files=0
-  local -i num_args=$#
+  local -i num_existing_files=0 #this number will be used to compare with how many files should exist
+  local -i num_args=$# #this measures the number of files that were passed into the function
 
   #Tally all existing outputs
-  for arg in $@; do
-    if [ -e "${arg}" ] && [ "${clob}" == true ]; then
-      rm -rf "${arg}"
-    elif [ -e "${arg}" ] && [ "${clob}" == false ]; then
-      num_existing_files=$(( ${num_existing_files} + 1 ))
-      continue
-    elif [ ! -e "${arg}" ]; then
-      continue
-    else
-      echo "How did you get here?"
+  for arg in $@; do #for each file that is passed into this function, do the following:
+    if [ -e "${arg}" ] && [ "${clob}" == true ]; then #if the file exists and you want to clobber the results...
+      rm -rf "${arg}" #remove the file with prejudice
+    elif [ -e "${arg}" ] && [ "${clob}" == false ]; then #if the file exists and you don't want to clobber the results
+      num_existing_files=$(( ${num_existing_files} + 1 )) #add one to the counter which measures how many files that were passed into clobber actually exist
+      continue #move on to the next file (not really necessary to do this I think)
+    elif [ ! -e "${arg}" ]; then #if the file does not exist...
+      continue #don't need to do anything, move on to the next file
+    else #catch everything else, if you didn't set clob, you can get here.
+      echo "How did you get here?, did you set clob?"
     fi
   done
 
-  #see if the command should be run by seeing if the requisite files exist.
+  #see if the command should be run by checking if the requisite files exist.
   #0=true
   #1=false
-  if [ ${num_existing_files} -lt ${num_args} ]; then
-    return 0
-  else
-    return 1
+  if [ ${num_existing_files} -lt ${num_args} ]; then #if all the files that are supposed to exist don't...
+    return 0 #return 0 and run the command
+  else #all the files exist
+    return 1 #don't run the command
   fi
 
   #example usage
