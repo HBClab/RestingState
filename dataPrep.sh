@@ -431,7 +431,7 @@ function T1Head_prep()
   #copy the nifti file to the processing directory
   clobber ${t1Head_outDir}/T1_head.nii.gz &&\
   { cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz ||\
-  printf "%s\n" "cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;}
+  { printf "%s\n" "cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;} ;}
   #^^^^the logic: 
   #if the file exists and clob=false, don't run the next two commands.
   #if the file doesn't exist, do the copy command; then
@@ -444,7 +444,7 @@ function T1Head_prep()
   printf "%s\n" "Reorienting T1Head to RPI"
   clobber ${t1Head_outDir}/T1_head_RPI.nii.gz &&\
   { RPI_orient ${t1Head_outDir}/T1_head.nii.gz ||\
-  printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;}
+  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
@@ -476,19 +476,19 @@ function T1Brain_prep()
   #copy the nifti file to the processing directory
   clobber ${t1Brain_outDir}/T1_brain.nii.gz &&\
   { cp ${t1Brain} ${t1Brain_outDir}/T1_brain.nii.gz ||\
-  printf "%s\n" "cp ${t1Brain} ${t1Brain_outDir}/T1_brain.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;}
+  { printf "%s\n" "cp ${t1Brain} ${t1Brain_outDir}/T1_brain.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;} ;}
 
   #reorient the nifti file in the processing directory
   printf "%s\n" "Reorienting T1Brain to RPI"
   clobber ${t1Brain_outDir}/T1_brain_RPI.nii.gz &&\
   { RPI_orient ${t1Brain_outDir}/T1_brain.nii.gz ||\
-  printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;}
+  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
 
   #make a binary brainmask from the reoriented T1
   printf "%s\n" "Making a T1 brain Mask"
   clobber ${t1Brain_outDir}/brainMask.nii.gz &&\
   { fslmaths ${t1Brain_outDir}/T1_brain_RPI.nii.gz -bin ${t1Brain_outDir}//brainMask.nii.gz -odt char ||\
-  printf "%s\n" "Brain Masking failed, exiting ${FUNCNAME} function" && return 1 ;}
+  { printf "%s\n" "Brain Masking failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
@@ -523,7 +523,7 @@ function epi_prep()
   RPI_orient ${epi_outDir}/tmpRestingStateRaw.nii.gz &&\
   mv ${epi_outDir}/tmpRestingStateRaw_RPI.nii.gz ${epi_outDir}/RestingStateRaw.nii.gz &&\
   rm ${epi_outDir}/tmpRestingStateRaw.nii.gz ||\
-  printf "%s\n" "Re-Orientation failed" "exiting ${FUNCNAME} function" && return 1 ;}
+  { printf "%s\n" "Re-Orientation failed" "exiting ${FUNCNAME} function" && return 1 ;} ;}
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
@@ -615,7 +615,7 @@ function FieldMapMag_prep()
   #multiply the brainmask with the fieldmap to get a brain masked fieldmap.
   clobber ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz &&\
   { fslmaths ${FieldMapMag_outDir}/fieldMapMag_RPI.nii.gz -mul ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz ||\
-   printf "%s\n" "masking failed, exiting ${FUNCNAME} function" && return 1 ;}
+   { printf "%s\n" "masking failed, exiting ${FUNCNAME} function" && return 1; } ;}
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
@@ -740,11 +740,11 @@ fi
 epiDir=$(dirname $epi)
 epiName=$(basename ${epi})
 
-t1HeadDir=$(dirname $t1Skull)
-t1HeadName=$(basename $t1Skull)
+t1HeadDir=$(dirname $t1Head)
+t1HeadName=$(basename $t1Head)
 
-t1BrainDir=$(dirname $t1)
-t1BrainName=$(basename $t1)
+t1BrainDir=$(dirname $t1Brain)
+t1BrainName=$(basename $t1Brain)
 
 if [[ $fieldMapFlag == 1 ]]; then
 
