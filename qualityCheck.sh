@@ -445,13 +445,105 @@ function T1ToStd()
 
 ################################################################
 
-function EPItoT1()
-{
-  printf "%s\n" "...Optimizing EPI (func) to T1 (highres) registration."
+function EPItoT1Master()
+{ 
+  #basic args (without fieldmap)
+  local epi=$1
+  local T1_brain=$2
+  local T1_head=$3
+  local outDir=$4
+  #additional arguments for fieldmap processing
+  local fieldmap=$5
+  local fieldmapMagHead=$6
+  local fieldmapMagBrain=$7
+  local dwellTime=$8
+  local peDir=$9
+  #number of arguments to decide which processing stream.
+  local num_args=$#
 
-  
+
+  printf "%s\n" "...Optimizing EPI (func) to T1 (highres) registration."
+  mkdir -p ${outDir}/func/EPItoT1 ||\
+  { printf "%s\n" "creation of ${outDir}/func/EPItoT1 failed, exiting ${FUNCNAME}" && return 1; }
+
+  case ${num_args} in
+    4)
+      clobber something &&\
+      EPItoT1FieldMap ${epi} ${T1_brain} ${outDir}/func/EPItoT1 ||\
+      { printf "%s\n"  "Generic Error Statement" && return 1; }
+      ;;
+    9)
+      clobber something &&\
+      EPItoT1 ${epi} ${outDir}/func/EPItoT1 ||\
+      { printf "%s\n" "Generic Error Statement"&& return 1; }
+      ;;
+    *)
+      printf "%s\n" "Error, the number of arguments does not match the number required for normal or fieldmap EPItoT1 processing" &&\
+      return 1
+      ;;
+  esac 
+
+  printf "%s\n" "${FUNCNAME} completed successfully" && return 0
 }
 
+function EPItoT1FieldMap()
+{
+  #basic args (without fieldmap)
+  local epi=$1
+  local T1_brain=$2
+  local T1_head=$3
+  local outDir=$4
+  #additional arguments for fieldmap processing
+  local fieldmap=$5
+  local fieldmapMagHead=$6
+  local fieldmapMagBrain=$7
+  local dwellTime=$8
+  local peDir=$9
+
+  printf "%s\n" "......Registration With FieldMap Correction."
+
+  #Warp using FieldMap correction
+  #Output will be a (warp) .nii.gz file
+  #epi_reg --epi=${indir}/mcImgMean.nii.gz --t1=${t1SkullData} --t1brain=${t1Data} --wmseg=$epiWarpDir/T1_MNI_brain_wmseg.nii.gz --out=$epiWarpDir/EPItoT1 --fmap=${fieldMap} --fmapmag=${fieldMapMagSkull} --fmapmagbrain=${fieldMapMag} --echospacing=${dwellTime} --pedir=${peDir}
+
+  #clobber IDK? &&\
+  epi_reg --epi=${epi} \
+  --t1=${T1_head} \
+  --t1brain=${T1_brain} \
+  --out=${outDir} \
+  --fmap=${fieldMap} \
+  --fmapmag=${fieldMapMagHead} \
+  --fmapmagbrain=${fieldMapMagBrain} \
+  --echospacing=${dwellTime} \
+  --pedir=${peDir} --noclean ||\
+  { printf "epi_reg failed, exiting ${FUNCNAME}" && return 1; }
+
+  #Invert the affine registration (to get T1toEPI)
+  clobber $epiWarpDir/T1toEPI.mat
+  convert_xfm -omat $epiWarpDir/T1toEPI.mat -inverse $epiWarpDir/EPItoT1.mat
+
+  #Invert the nonlinear warp (to get T1toEPI)
+  invwarp -w $epiWarpDir/EPItoT1_warp.nii.gz -r ${indir}/mcImgMean.nii.gz -o $epiWarpDir/T1toEPI_warp.nii.gz
+
+  #Apply the inverted (T1toEPI) warp to the brain mask
+  applywarp --ref=${indir}/mcImgMean.nii.gz --in=${T1mask} --out=${indir}/mcImgMean_mask.nii.gz --warp=${epiWarpDir}/T1toEPI_warp.nii.gz --datatype=char --interp=nn
+
+   #Create a stripped version of the EPI (mcImg) file, apply the warp
+  fslmaths ${indir}/mcImgMean.nii.gz -mas ${indir}/mcImgMean_mask.nii.gz ${indir}/mcImgMean_stripped.nii.gz
+  applywarp --ref=${t1Data} --in=${indir}/mcImgMean_stripped.nii.gz --out=$epiWarpDir/EPIstrippedtoT1.nii.gz --warp=$epiWarpDir/EPItoT1_warp.nii.gz
+
+  #Sum the nonlinear warp (MNItoT1_warp.nii.gz) with the second nonlinear warp (T1toEPI_warp.nii.gz) to get a warp from MNI to EPI
+  convertwarp --ref=${indir}/mcImgMean.nii.gz --warp1=${t1WarpDir}/MNItoT1_warp.nii.gz --warp2=${epiWarpDir}/T1toEPI_warp.nii.gz --out=${epiWarpDir}/MNItoEPI_warp.nii.gz --relout
+
+  #Invert the warp to get EPItoMNI_warp.nii.gz
+  invwarp -w ${epiWarpDir}/MNItoEPI_warp.nii.gz -r $fslDir/data/standard/MNI152_T1_2mm.nii.gz -o ${epiWarpDir}/EPItoMNI_warp.nii.gz
+
+  #Apply EPItoMNI warp to EPI file
+  applywarp --ref=$fslDir/data/standard/MNI152_T1_2mm.nii.gz --in=${indir}/mcImgMean_stripped.nii.gz --out=$epiWarpDir/EPItoMNI.nii.gz --warp=${epiWarpDir}/EPItoMNI_warp.nii.gz
+
+
+
+}
 #Do we need to run fast if epi_reg runs fast?
 ########## Tissue class segmentation ###########
 echo "...Creating Tissue class segmentations."
