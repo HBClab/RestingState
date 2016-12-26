@@ -29,7 +29,7 @@ do
       tr=$OPTARG
       ;;
     T)
-      te=$OPTARG
+      te=$OPTARG #is this argument used?
       ;;
     f)
       fieldMapFlag=1
@@ -42,6 +42,7 @@ do
       ;;
     c)
       clob=true
+      ;;
     ?)
       printCommandLine
       ;;
