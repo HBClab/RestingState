@@ -756,20 +756,9 @@ fi
 
 
 ##Echo out all input parameters into a log
-echo "------------------------------------" >> $outDir/log/DataPrep.log
-echo "-i $datafile" >> $outDir/log/DataPrep.log
-echo "-o $outDir" >> $outDir/log/DataPrep.log
-if [[ ${clob} == true ]]; then
-  echo "-c" >> $outDir/log/DataPrep.log
-fi
-
-echo "-t $tr" >> $outDir/log/DataPrep.log
-if [[ $fieldMapFlag == 1 ]]; then
-  echo "-f" >> $outDir/log/DataPrep.log
-  echo "-F $deltaTE" >> $outDir/log/DataPrep.log
-fi
-echo "$(date)" >> $outDir/log/DataPrep.log
-echo "" >> $outDir/log/DataPrep.log
+printf "%s\n" "$0 $@"
+#$0: name of the script
+#$@ all of the arguments given to the script (including flags)
 
 
 # MAIN PROCESSING COMMANDS

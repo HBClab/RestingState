@@ -1,6 +1,7 @@
 dataPrep.sh
 clob
 datafile
+outDir
 tr
 te
 fieldMapFlag
