@@ -798,12 +798,15 @@ fi
 
 
 ##Echo out all input parameters into a log
-printf "%s\n" "$0 $@"
+printf "%s\n" "------------------------" | tee -a ${outDir}/log/DataPrep.log
+date >> ${outDir}/log/DataPrep.log
+printf "%s\t" "$0 $@" | tee -a ${outDir}/log/DataPrep.log
 #$0: name of the script
 #$@ all of the arguments given to the script (including flags)
 
 
 # MAIN PROCESSING COMMANDS
+
 #Processing T1Skull
 T1Head_prep ${t1Head} ${outDir}/anat | tee -a ${outDir}/log/DataPrep.log &&\
 { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "T1Head_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; }
