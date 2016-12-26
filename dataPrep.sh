@@ -475,7 +475,7 @@ function T1Brain_prep()
 
   #copy the nifti file to the processing directory
   clobber ${t1Brain_outDir}/T1_brain.nii.gz &&\
-  { cp ${t1Head} ${t1Head_outDir}/T1_brain.nii.gz ||\
+  { cp ${t1Brain} ${t1Brain_outDir}/T1_brain.nii.gz ||\
   printf "%s\n" "cp ${t1Brain} ${t1Brain_outDir}/T1_brain.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;}
 
   #reorient the nifti file in the processing directory
