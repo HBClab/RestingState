@@ -487,7 +487,7 @@ function T1Brain_prep()
   #make a binary brainmask from the reoriented T1
   printf "%s\n" "Making a T1 brain Mask"
   clobber ${t1Brain_outDir}/brainMask.nii.gz &&\
-  { fslmaths ${t1Brain_outDir}/T1_brain_RPI.nii.gz -bin ${t1Brain_outDir}/T1_brain_RPI.nii.gz/brainMask.nii.gz -odt char ||\
+  { fslmaths ${t1Brain_outDir}/T1_brain_RPI.nii.gz -bin ${t1Brain_outDir}//brainMask.nii.gz -odt char ||\
   printf "%s\n" "Brain Masking failed, exiting ${FUNCNAME} function" && return 1 ;}
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
