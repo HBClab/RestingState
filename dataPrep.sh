@@ -765,25 +765,24 @@ printf "%s\n" "$0 $@"
 # MAIN PROCESSING COMMANDS
 #Processing T1Skull
 T1Head_prep ${t1Head} ${outDir}/anat | tee -a ${outDir}/log/DataPrep.log &&\
-{ [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "T1Head_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
+{ [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "T1Head_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; }
 #Processing T1brain
 T1Brain_prep ${t1Brain} ${outDir}/anat | tee -a ${outDir}/log/DataPrep.log &&\
-{ [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "T1Brain_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
+{ [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "T1Brain_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; }
 #processing EPI
 epi_prep ${epi} ${outDir}/func | tee -a ${outDir}/log/DataPrep.log &&\
-{ [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "epi_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
+{ [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "epi_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; }
 
 if [[ $fieldMapFlag == 1 ]]; then
   #Processing FieldMap (Phase)
   FieldMapPhase_prep ${fieldMapPhase} ${outDir}/fieldMap | tee -a ${outDir}/log/DataPrep.log &&\
-  { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMapPhase_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
+  { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMapPhase_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; }
   #Processing FieldMap (Magnitude)    
   FieldMapMag_prep ${fieldMapMag} ${outDir}/fieldMap | tee -a ${outDir}/log/DataPrep.log ||\
-  { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMapMag_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
-  
+  { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMapMag_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; } 
   #Processing FieldMap (Prepped)
   FieldMap_prep ${outDir}/fieldMap/FieldMapPhase_RPI.nii.gz ${outDir}/fieldMap/fieldMapMag_RPI_stripped.nii.gz | tee -a ${outDir}/log/DataPrep.log ||\
-  { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMap_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1 }
+  { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMap_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; }
 fi
  
 #^^^^logic of command format
