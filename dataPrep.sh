@@ -436,9 +436,47 @@ function T1Head_prep()
   #if the file exists and clob=false, don't run the next two commands.
   #if the file doesn't exist, do the copy command; then
     #if the copy command fails (returns a 1), print the error message and exit the function with a failure (return with a 1)
-  #The cp and print commands are grouped together because I never want to run one without the other. 
+  #The cp and printf commands are grouped together because I never want to run one without the other. 
   #If I don't group them and the clobber command returns a 1,
   # then the print statement will automatically print, even though the command didn't fail, it just wasn't ran.
+  #how the logic connectors work: (A && (B || (C && D))) 
+  #In english:
+  # if A evaluates to be false, then don't run the next argument
+  # if A evaluates to be true, then run the next argument (B)
+    # if B evaluates to be true, then the logic statement is over
+    # if B evaluates to be false, then run C
+      # if C evaluates to be false, then the logic statement is over
+      # if C evaluates to be true, then run D
+        # if D evaluates to be true, then the logic statement is over
+        # if D evaluates to be false, then the logic statement is over
+
+  #How it applies to this statement
+
+  #clob=false
+  #A: if the file exists, don't run the next command
+  #A: if the file does not exist, run the next command
+    #B: if the cp command succeeds, don't run the error statements
+    #B: if the cp command fails, run the error statements
+      #C: printing the error message fails (should never happen)
+      #C: print the error message and return a bad result (D)
+        #D: returns the bad result
+        #D: can't return the bad result (should never happen)
+      
+
+  #clob=true
+  #A: if the file exists, run the next command
+  #A: if the file does not exist, run the next command
+    #B: if the cp command succeeds, don't run the error statements
+    #B: if the cp command fails, run the error statements
+      #C: printing the error message fails (should never happen)
+      #C: print the error message and return a bad result (D)
+        #D: returns the bad result
+        #D: can't return the bad result (should never happen)
+      
+
+
+  
+
 
   #reorient the nifti file in the processing directory
   printf "%s\n" "Reorienting T1Head to RPI"
@@ -555,13 +593,13 @@ function FieldMapPhase_prep()
   #copy the nifti file to the processing directory
   clobber ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz &&\
   { cp ${FieldMapPhase} ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz ||\
-  printf "%s\n" "cp ${FieldMapPhase} ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;}
+  { printf "%s\n" "cp ${FieldMapPhase} ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;} ;}
 
   #reorient the nifti file in the processing directory
   printf "%s\n" "Reorienting FieldMapPhase to RPI"
   clobber ${FieldMapPhase_outDir}/FieldMapPhase_RPI.nii.gz &&\
   { RPI_orient ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz ||\
-  printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;}
+  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
@@ -594,28 +632,28 @@ function FieldMapMag_prep()
   #copy the nifti file to the processing directory
   clobber ${FieldMapMag_outDir}/FieldMapMag.nii.gz &&\
   { cp ${FieldMapMag} ${FieldMapMag_outDir}/FieldMapMag.nii.gz ||\
-  printf "%s\n" "cp ${FieldMapMag} ${FieldMapMag_outDir}/FieldMapMag.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;}
+  { printf "%s\n" "cp ${FieldMapMag} ${FieldMapMag_outDir}/FieldMapMag.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;} ;}
 
   #reorient the nifti file in the processing directory to RPI.
   printf "%s\n" "Reorienting FieldMapMag to RPI"
   clobber ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz &&\
   { RPI_orient ${FieldMapMag_outDir}/FieldMapMag.nii.gz ||\
-  printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;}
+  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
 
   #make a brain mask for the image using FSL's bet.
   clobber ${FieldMapMag_outDir}/fieldMapMag_mask.nii.gz &&\
   { bet ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz ${FieldMapMag_outDir}/fieldMapMag -m -n ||\
-   printf "%s\n" "bet failed, exiting ${FUNCNAME} function" && return 1 ;}
+  { printf "%s\n" "bet failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
 
   #make the brainmask smaller: reason: ???
   clobber ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz &&\
   { fslmaths ${FieldMapMag_outDir}/fieldMapMag_mask.nii.gz -ero ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ||\
-   printf "%s\n" "erosion failed, exiting ${FUNCNAME} function" && return 1 ;}
+  { printf "%s\n" "erosion failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
 
   #multiply the brainmask with the fieldmap to get a brain masked fieldmap.
   clobber ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz &&\
   { fslmaths ${FieldMapMag_outDir}/fieldMapMag_RPI.nii.gz -mul ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz ||\
-   { printf "%s\n" "masking failed, exiting ${FUNCNAME} function" && return 1; } ;}
+  { printf "%s\n" "masking failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
@@ -679,7 +717,10 @@ if [[ $outDir == "" ]]; then
 fi
 
 #Check for output directory flag and sub-directory creation if this is set
-mkdir -p ${outDir}/{func/EPItoT1optimized,anat,fieldMap,log}
+mkdir -p ${outDir}/{func/EPItoT1optimized,anat,log}
+if [[ fieldMapFlag -eq 1 ]]; then
+  mkdir -p ${outDir}/func/fieldmap
+fi
 
 
 
