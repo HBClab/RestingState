@@ -404,7 +404,34 @@ printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
 
 #############################   MAIN FUNCTIONS   #############################
+##################
+#function: SoftwareCheck
+##################
+#purpose: makes sure you have the prerequisite software to run the commands
+##################
+#input: software/commands
+##################
+#output: 0 : all software exists
+#        1 : at least one command/software doesn't exist
+##################
+#dependencies: None
+##################
+#Used in: MAIN
+##################
+function SoftwareCheck()
+{
+  local missing_command=0
+  declare com
+  for com in $@; do
+    local command_check=$(which ${com})
+    if [[ "${command_check}" == "" ]]; then
+      local missing_command=1
+      printf "%s\n" "${command} is missing"
+    fi
+  done
 
+  return ${missing_command}
+}
 ##################
 #function: T1Head_prep
 ##################
@@ -807,6 +834,10 @@ printf "%s\t" "$0 $@" | tee -a ${outDir}/log/DataPrep.log
 
 
 # MAIN PROCESSING COMMANDS
+
+#check software prerequisites (fsl & afni currently)
+SoftwareCheck fsl afni ||\
+{ printf "%s\n" "Prerequisite software doesn't exist, exiting script with errors" && exit 1 ;}
 
 #Processing T1Skull
 T1Head_prep ${t1Head} ${outDir}/anat | tee -a ${outDir}/log/DataPrep.log &&\
