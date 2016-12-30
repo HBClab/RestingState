@@ -76,8 +76,8 @@ function printCommandLine()
   echo "       **If using DICOM as input for the FieldMap data, delaTE will be calculated from the header information."
   echo ""
   echo ""
-  echo "     A few notes:"
-  echo "       *If fieldMap correction is to be run, you must ALSO run the '-f' flag & '-s' flag"  #-s or -S?
+  echo "     A few notes:" 
+  echo "       *If fieldMap correction is to be run, you must ALSO run the '-f' flag & '-S' flag"  #-s or -S?
   echo "       *The T1 files MUST be in NIFTI format"
   echo "         ** The skull-stripped file will be renamed T1_MNI_brain.  The image with skull will be renamed T1_MNI."
   echo "       *If EPI is in DICOM format, it will be converted to NIFTI.  If already NIFTI, it will be checked for"
@@ -720,7 +720,7 @@ function FieldMap_prep()
     'SEIMENS')
         clobber ${outDir}/func/EPItoT1optimized/fieldMap_prepped.nii.gz &&\
         { fsl_prepare_fieldmap SIEMENS ${phase} ${mag} ${outDir}/func/EPItoT1optimized/fieldMap_prepped.nii.gz $dTE ||\
-         printf "%s\n" "SEIMENS: FieldMap_prep failed, exiting ${FUNCNAME} function" && return 1 ;}
+         printf "%s\n" "SIEMENS: FieldMap_prep failed, exiting ${FUNCNAME} function" && return 1 ;}
         ;;
     'GE')
         echo "this code is not implemented, exiting ${FUNCNAME} with error" && return 1
