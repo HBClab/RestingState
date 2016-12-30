@@ -2,7 +2,7 @@
 
 ##################################################################################################################
 # Data Preparation (extraction, orientation, naming) And Other inital processing for Resting State Analysis
-#     1. T1 (Skull)		
+#     1. T1 (Skull)
 #     2. T1 (skull-stripped)
 #     3. EPI
 #  ##Optional####
@@ -52,7 +52,7 @@ done
 function printCommandLine()
 {
   echo ""
-  echo "Usage: dataPrep.sh -i datafile -o outputDirectory -c -t TR -T TE -f -F 2.46"
+  echo "Usage: dataPrep.sh -i datafile -o outputDirectory -c -t TR -T TE -f -F 2.46" # ADD in -S?
   echo ""
   echo "   where:"
   echo "   -i Data file having a space-separated list of anatomical and epi images"
@@ -77,12 +77,13 @@ function printCommandLine()
   echo ""
   echo ""
   echo "     A few notes:"
-  echo "       *If fieldMap correction is to be run, you must ALSO run the '-f' flag & '-S' flag"  
+  echo "       *If fieldMap correction is to be run, you must ALSO run the '-f' flag & '-S' flag"  #-s or -S? #JK: -S capital S is the correct term. 
   echo "       *The T1 files MUST be in NIFTI format"
-  echo "         ** The skull-stripped file will be renamed T1_MNI_brain.  The image with skull will be renamed T1_MNI." 
+  echo "         ** The skull-stripped file will be renamed T1_MNI_brain.  The image with skull will be renamed T1_MNI."
   echo "       *If EPI is in DICOM format, it will be converted to NIFTI.  If already NIFTI, it will be checked for"
   echo "        naming convention and orientation."
   echo "       *TR, deltaTE will be sourced from DICOM header (will overwrite flag-settings)."
+  echo "       *Please refrain from putting '.' in the names of files (e.g. sub1.post.nii.gz should be sub1_post.nii.gz)" #JK: added suggested precondition for ConvertToNifti
   echo ""
   exit 1
 }
@@ -100,7 +101,7 @@ function printCommandLine()
 ##################
 #Used in: (almost) Everything
 ##################
-function clobber() 
+function clobber()
 {
   #Tracking Variables
   local -i num_existing_files=0 #this number will be used to compare with how many files should exist
@@ -116,7 +117,9 @@ function clobber()
     elif [ ! -e "${arg}" ]; then #if the file does not exist...
       continue #don't need to do anything, move on to the next file
     else #catch everything else, if you didn't set clob, you can get here.
-      echo "How did you get here?, did you set clob?"
+      echo "clobber is not set, did you set the variable clob?" #JAMES-would it be better to change this to something like "clobber not set"? "How did you get here?" isn't a helpful error message
+      return 1 #don't run the command
+      #JK: good point, when I made this function, I actually didn't know how to get here, but subsequent testing has shown that not setting clob gets you here.
     fi
   done
 
@@ -148,9 +151,15 @@ function clobber()
 #Used in: *_prep functions
 ##################
 function RPI_orient() {
+    #JK: probably overkill to check the variable was set without error.
     local infile=$1 &&\
+    #-z tests if a string is null, so what I'm saying here is:
+    #if the variable ${infile} is not an empty string (return 0) then don't run the following command 
+    #if the variable ${infile} is an empty string (return 1), then do run the next command.
     [ ! -z  "${infile}" ] ||\
-    ( printf '%s\n' "${FUNCNAME[0]}, input not defined" && return 1 )
+    #I used () brackets, but should be {} I believe.
+    { printf '%s\n' "${FUNCNAME[0]}, input not defined" && return 1 ;} #JAMES-Not clear how this conditional works. Please comment to explain.
+    #JK: added some comments to the function
 
     #Determine qform-orientation to properly reorient file to RPI (MNI) orientation
   xorient=`fslhd ${infile} | grep "^qform_xorient" | awk '{print $2}' | cut -c1`
@@ -161,172 +170,172 @@ function RPI_orient() {
 
   echo "native orientation = ${native_orient}"
 
-  if [ "${native_orient}" != "RPI" ]; then
-    
+  if [ "${native_orient}" != "RPI" ]; then #setting flip flags if native orientaiton is not already RPI
+
     case ${native_orient} in
 
     #L PA IS
-    LPI) 
+    LPI)
       flipFlag="-x y z"
       ;;
-    LPS) 
+    LPS)
       flipFlag="-x y -z"
           ;;
-    LAI) 
+    LAI)
       flipFlag="-x -y z"
           ;;
-    LAS) 
+    LAS)
       flipFlag="-x -y -z"
           ;;
 
     #R PA IS
-    RPS) 
+    RPS)
       flipFlag="x y -z"
           ;;
-    RAI) 
+    RAI)
       flipFlag="x -y z"
           ;;
-    RAS) 
+    RAS)
       flipFlag="x -y -z"
           ;;
 
     #L IS PA
-    LIP) 
+    LIP)
       flipFlag="-x z y"
           ;;
-    LIA) 
+    LIA)
       flipFlag="-x -z y"
           ;;
-    LSP) 
+    LSP)
       flipFlag="-x z -y"
           ;;
-    LSA) 
+    LSA)
       flipFlag="-x -z -y"
           ;;
 
     #R IS PA
-    RIP) 
+    RIP)
       flipFlag="x z y"
           ;;
-    RIA) 
+    RIA)
       flipFlag="x -z y"
           ;;
-    RSP) 
+    RSP)
       flipFlag="x z -y"
           ;;
-    RSA) 
+    RSA)
       flipFlag="x -z -y"
           ;;
 
     #P IS LR
-    PIL) 
+    PIL)
       flipFlag="-z x y"
           ;;
-    PIR) 
+    PIR)
       flipFlag="z x y"
           ;;
-    PSL) 
+    PSL)
       flipFlag="-z x -y"
           ;;
-    PSR) 
+    PSR)
       flipFlag="z x -y"
           ;;
 
     #A IS LR
-    AIL) 
+    AIL)
       flipFlag="-z -x y"
           ;;
-    AIR) 
+    AIR)
       flipFlag="z -x y"
           ;;
-    ASL) 
+    ASL)
       flipFlag="-z -x -y"
           ;;
-    ASR) 
+    ASR)
       flipFlag="z -x -y"
           ;;
 
     #P LR IS
-    PLI) 
+    PLI)
       flipFlag="-y x z"
           ;;
-    PLS) 
+    PLS)
       flipFlag="-y x -z"
           ;;
-    PRI) 
+    PRI)
       flipFlag="y x z"
           ;;
-    PRS) 
+    PRS)
       flipFlag="y x -z"
           ;;
 
     #A LR IS
-    ALI) 
+    ALI)
       flipFlag="-y -x z"
           ;;
-    ALS) 
+    ALS)
       flipFlag="-y -x -z"
           ;;
-    ARI) 
+    ARI)
       flipFlag="y -x z"
           ;;
-    ARS) 
+    ARS)
       flipFlag="y -x -z"
           ;;
 
     #I LR PA
-    ILP) 
+    ILP)
       flipFlag="-y z x"
           ;;
-    ILA) 
+    ILA)
       flipFlag="-y -z x"
           ;;
-    IRP) 
+    IRP)
       flipFlag="y z x"
           ;;
-    IRA) 
+    IRA)
       flipFlag="y -z x"
           ;;
 
     #S LR PA
-    SLP) 
+    SLP)
       flipFlag="-y z -x"
           ;;
-    SLA) 
+    SLA)
       flipFlag="-y -z -x"
           ;;
-    SRP) 
+    SRP)
       flipFlag="y z -x"
           ;;
-    SRA) 
+    SRA)
       flipFlag="y -z -x"
           ;;
 
     #I PA LR
-    IPL) 
+    IPL)
       flipFlag="-z y x"
           ;;
-    IPR) 
+    IPR)
       flipFlag="z y x"
           ;;
-    IAL) 
+    IAL)
       flipFlag="-z -y x"
           ;;
-    IAR) 
+    IAR)
       flipFlag="z -y x"
           ;;
 
     #S PA LR
-    SPL) 
+    SPL)
       flipFlag="-z y -x"
           ;;
-    SPR) 
+    SPR)
       flipFlag="z y -x"
           ;;
-    SAL) 
+    SAL)
       flipFlag="-z -y -x"
           ;;
-    SAR) 
+    SAR)
       flipFlag="z -y -x"
           ;;
     esac
@@ -372,16 +381,20 @@ function RPI_orient() {
 ##################
 function ConvertToNifti()
 {
-  #I am overwiting a variable name in the main script, so I need to a global variable, I think this is the way to do it.
+  #I am overwiting a variable name in the functions, so I need to a global variable, I think this is the way to do it. #JAMES-What variable are you overwriting? Unclear
+  #JK: I am overwriting whatever variable is passed into __input. for example if ${t1head} is passed into __input
+  #and t1head used to equal /some/path/to/dicoms/*dcm, then this function would overwrite what t1head points to, making it a nifti file instead
+  # such as t1head=/some/path/to/dicoms/t1head.nii.gz or something like that.
+  # I am not married to this method and I am open to just giving the nifti file a different variable name such as t1headnii.
   __input=$1
   #local variables mean they do not interfere with the main script.
   local inputDir=$(dirname ${__input})
   local inputBase=$(basename ${__input})
-  #this gets rid of anything before the first ".", please don't put "." in the name of the file.
+  #this gets rid of anything before the first ".", please don't put "." in the name of the file. #JAMES-if that's the case, this should be documented in the helper call for dataPrep.sh
   local inputSuffix=${inputBase#*.}
 case "${inputSuffix}" in
   'dcm')
-      echo "code not implemented (needs to reset epi variable)" && return 1
+      echo "code not implemented (needs to reset epi variable)" && return 1 #JAMES-assuming this is temporary/placeholder #JK: you are correct, idk what type of dicom processing is wanted/necessary.
       #reconstruct
       #eval __input="'nifti_output'"
       ;;
@@ -421,7 +434,10 @@ printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 function SoftwareCheck()
 {
   local missing_command=0
-  declare com
+  local com #JAMES-what does declare/com mean?
+              #JK: in this context declare makes the variable local.
+              #I was under the impression if I used 'local' I would have to set the variable
+              #in the same line. I was wrong. corrected
   for com in $@; do
     local command_check=$(which ${com})
     if [[ "${command_check}" == "" ]]; then
@@ -457,17 +473,30 @@ function T1Head_prep()
   ConvertToNifti ${t1Head}
 
   #copy the nifti file to the processing directory
-  clobber ${t1Head_outDir}/T1_head.nii.gz &&\
-  { cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz ||\
-  { printf "%s\n" "cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;} ;}
-  #^^^^the logic: 
+  clobber ${t1Head_outDir}/T1_head.nii.gz &&\ #JAMES so this reads to me as "run clobber on T1_head.nii.gz AND..."
+  { cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz ||\ #JAMES Copy T1 head to the directory OR...
+  { printf "%s\n" "cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;} ;} #JAMES print error statements"
+
+  #JAMES-I appreciate the detailed explanation below, but I guess coming from MATLAB or other usage of logical operators, I see && and assume it's an AND conditional, likewise || implies an OR conditional to me. I kinda get how that holds here, but the 1/0 status of the clobber operation on the first line relative to the rest of the statement REALLY confuses things for me. If i had to debug this, how would i know if my error was because clobber was set wrong, or because there isn't a file to copy, or because there's an error with copy? Is there any way to separate the clobber operation from the rest of this? I think it would help a lot with readability.
+  #JK: good comment, and drives an important underlying structure to all bash commands. 
+  #Namely, all bash commands either return a 0 or non-zero (one in my case) status. 
+  #so the cp command will return either a zero (it ran successfully, equivalent to a true status), or a non-zero number (equivalent to a false status)
+  #the && and || conditionals only care about whether each command was run successfully (returned a zero) or not successfully (returned a non-zero)
+  #I updated to the clobber function to not run any commands if clob is not set. 
+  #to get at your question on how to tell whether the clobber function failed, or if the cp function failed:
+  #the clobber function will return the error message (updated) and a one, meaning the cp command will not be run.
+  #you will be able to tell it was the clobber function because of the error message clobber gives.
+  #I am unaware of other ways clobber could fail.
+  #if clobber runs successfully, then I can tell whether cp runs successfully by seeing if a error message saying cp failed appears.
+
+  #^^^^the logic:
   #if the file exists and clob=false, don't run the next two commands.
   #if the file doesn't exist, do the copy command; then
     #if the copy command fails (returns a 1), print the error message and exit the function with a failure (return with a 1)
-  #The cp and printf commands are grouped together because I never want to run one without the other. 
+  #The cp and printf commands are grouped together because I never want to run one without the other.
   #If I don't group them and the clobber command returns a 1,
   # then the print statement will automatically print, even though the command didn't fail, it just wasn't ran.
-  #how the logic connectors work: (A && (B || (C && D))) 
+  #how the logic connectors work: (A && (B || (C && D)))
   #In english:
   # if A evaluates to be false, then don't run the next argument
   # if A evaluates to be true, then run the next argument (B)
@@ -489,7 +518,7 @@ function T1Head_prep()
       #C: print the error message and return a bad result (D)
         #D: returns the bad result
         #D: can't return the bad result (should never happen)
-      
+
 
   #clob=true
   #A: if the file exists, run the next command
@@ -500,10 +529,10 @@ function T1Head_prep()
       #C: print the error message and return a bad result (D)
         #D: returns the bad result
         #D: can't return the bad result (should never happen)
-      
 
 
-  
+
+
 
 
   #reorient the nifti file in the processing directory
@@ -573,7 +602,7 @@ function T1Brain_prep()
 ##################
 #Used in: MAIN
 ##################
-function epi_prep() 
+function epi_prep()
 {
   local epi=$1
   local epi_outDir=$2
@@ -583,7 +612,9 @@ function epi_prep()
   #convert whatever image that was passed in to a nifti file (Not Implemented)
   ConvertToNifti ${epi}
 
-  #this does the copying, orienting and renaming, I don't think a temporary file is necessary
+  #this does the copying, orienting and renaming, I don't think a temporary file is necessary #JAMES-okay, but the logic of four && conditionals in a row need to be better clarified
+  #JK: each && statement is saying that if the previous command returned a 0, run the next command.
+  #if one of the commands fails within the daisy chain of &&, then jump to the || and print the error message
   clobber ${epi_outDir}/RestingStateRaw.nii.nii.gz &&\
   { cp ${epi} ${epi_outDir}/tmpRestingStateRaw.nii.gz &&\
   RPI_orient ${epi_outDir}/tmpRestingStateRaw.nii.gz &&\
@@ -724,7 +755,7 @@ function FieldMap_prep()
         ;;
   esac
 
-  printf "%s\n" "${FUNCNAME} ran successfully." && return 0  
+  printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
 
 
@@ -763,7 +794,7 @@ fi
 
 
 echo "Running $0 ..."
- 
+
 
 
 ###### Basic Input/variables
@@ -771,8 +802,8 @@ echo "Running $0 ..."
 #Input files
 t1Head=$(awk '{print $1}' $datafile)
 t1Brain=$(awk '{print $2}' $datafile)
-epi=$(awk '{print $3}' $datafile)  
-if [[ $fieldMapFlag == 1 ]]; then
+epi=$(awk '{print $3}' $datafile)
+if [[ $fieldMapFlag == 1 ]]; then #Will need to update for GE fieldmap format
   fieldMapPhase=$(awk '{print $4}' $datafile)
   fieldMapMag=$(awk '{print $5}' $datafile)
 fi
@@ -853,14 +884,15 @@ if [[ $fieldMapFlag == 1 ]]; then
   #Processing FieldMap (Phase)
   FieldMapPhase_prep ${fieldMapPhase} ${outDir}/fieldMap | tee -a ${outDir}/log/DataPrep.log &&\
   { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMapPhase_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; }
-  #Processing FieldMap (Magnitude)    
+  #Processing FieldMap (Magnitude)
   FieldMapMag_prep ${fieldMapMag} ${outDir}/fieldMap | tee -a ${outDir}/log/DataPrep.log ||\
-  { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMapMag_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; } 
+  { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMapMag_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; }
   #Processing FieldMap (Prepped)
   FieldMap_prep ${outDir}/fieldMap/FieldMapPhase_RPI.nii.gz ${outDir}/fieldMap/fieldMapMag_RPI_stripped.nii.gz | tee -a ${outDir}/log/DataPrep.log ||\
   { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMap_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; }
 fi
- 
+#JAMES -this all looks fine. Do you know if the tee command is standard across Linux distros? I've never encountered this function before.
+#JK: good question, tee, while not as popular as mv or cp, is a core linux function and should be available on most instances of linux
 #^^^^logic of command format
 #The function is called and the function's output is printed out to the screen (stout) and into the log file (appending, not overwrite) via the "tee" command
 #Since the tee command will always return 0 unless something is wrong with bash, we need to do a separate check to see if the function failed
