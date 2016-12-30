@@ -76,13 +76,14 @@ function printCommandLine()
   echo "       **If using DICOM as input for the FieldMap data, delaTE will be calculated from the header information."
   echo ""
   echo ""
-  echo "     A few notes:" 
-  echo "       *If fieldMap correction is to be run, you must ALSO run the '-f' flag & '-S' flag"  #-s or -S?
+  echo "     A few notes:"
+  echo "       *If fieldMap correction is to be run, you must ALSO run the '-f' flag & '-S' flag"  #-s or -S? #JK: -S capital S is the correct term. 
   echo "       *The T1 files MUST be in NIFTI format"
   echo "         ** The skull-stripped file will be renamed T1_MNI_brain.  The image with skull will be renamed T1_MNI."
   echo "       *If EPI is in DICOM format, it will be converted to NIFTI.  If already NIFTI, it will be checked for"
   echo "        naming convention and orientation."
   echo "       *TR, deltaTE will be sourced from DICOM header (will overwrite flag-settings)."
+  echo "       *Please refrain from putting '.' in the names of files (e.g. sub1.post.nii.gz should be sub1_post.nii.gz)" #JK: added suggested precondition for ConvertToNifti
   echo ""
   exit 1
 }
@@ -116,7 +117,9 @@ function clobber()
     elif [ ! -e "${arg}" ]; then #if the file does not exist...
       continue #don't need to do anything, move on to the next file
     else #catch everything else, if you didn't set clob, you can get here.
-      echo "How did you get here?, did you set clob?" #JAMES-would it be better to change this to something like "clobber not set"? "How did you get here?" isn't a helpful error message
+      echo "clobber is not set, did you set the variable clob?" #JAMES-would it be better to change this to something like "clobber not set"? "How did you get here?" isn't a helpful error message
+      return 1 #don't run the command
+      #JK: good point, when I made this function, I actually didn't know how to get here, but subsequent testing has shown that not setting clob gets you here.
     fi
   done
 
@@ -148,9 +151,15 @@ function clobber()
 #Used in: *_prep functions
 ##################
 function RPI_orient() {
+    #JK: probably overkill to check the variable was set without error.
     local infile=$1 &&\
+    #-z tests if a string is null, so what I'm saying here is:
+    #if the variable ${infile} is not an empty string (return 0) then don't run the following command 
+    #if the variable ${infile} is an empty string (return 1), then do run the next command.
     [ ! -z  "${infile}" ] ||\
-    ( printf '%s\n' "${FUNCNAME[0]}, input not defined" && return 1 ) #JAMES-Not clear how this conditional works. Please comment to explain.
+    #I used () brackets, but should be {} I believe.
+    { printf '%s\n' "${FUNCNAME[0]}, input not defined" && return 1 ;} #JAMES-Not clear how this conditional works. Please comment to explain.
+    #JK: added some comments to the function
 
     #Determine qform-orientation to properly reorient file to RPI (MNI) orientation
   xorient=`fslhd ${infile} | grep "^qform_xorient" | awk '{print $2}' | cut -c1`
@@ -372,7 +381,11 @@ function RPI_orient() {
 ##################
 function ConvertToNifti()
 {
-  #I am overwiting a variable name in the main script, so I need to a global variable, I think this is the way to do it. #JAMES-What variable are you overwriting? Unclear
+  #I am overwiting a variable name in the functions, so I need to a global variable, I think this is the way to do it. #JAMES-What variable are you overwriting? Unclear
+  #JK: I am overwriting whatever variable is passed into __input. for example if ${t1head} is passed into __input
+  #and t1head used to equal /some/path/to/dicoms/*dcm, then this function would overwrite what t1head points to, making it a nifti file instead
+  # such as t1head=/some/path/to/dicoms/t1head.nii.gz or something like that.
+  # I am not married to this method and I am open to just giving the nifti file a different variable name such as t1headnii.
   __input=$1
   #local variables mean they do not interfere with the main script.
   local inputDir=$(dirname ${__input})
@@ -381,7 +394,7 @@ function ConvertToNifti()
   local inputSuffix=${inputBase#*.}
 case "${inputSuffix}" in
   'dcm')
-      echo "code not implemented (needs to reset epi variable)" && return 1 #JAMES-assuming this is temporary/placeholder?
+      echo "code not implemented (needs to reset epi variable)" && return 1 #JAMES-assuming this is temporary/placeholder #JK: you are correct, idk what type of dicom processing is wanted/necessary.
       #reconstruct
       #eval __input="'nifti_output'"
       ;;
@@ -421,7 +434,10 @@ printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 function SoftwareCheck()
 {
   local missing_command=0
-  declare com #JAMES-what does declare/com mean?
+  local com #JAMES-what does declare/com mean?
+              #JK: in this context declare makes the variable local.
+              #I was under the impression if I used 'local' I would have to set the variable
+              #in the same line. I was wrong. corrected
   for com in $@; do
     local command_check=$(which ${com})
     if [[ "${command_check}" == "" ]]; then
@@ -462,6 +478,16 @@ function T1Head_prep()
   { printf "%s\n" "cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;} ;} #JAMES print error statements"
 
   #JAMES-I appreciate the detailed explanation below, but I guess coming from MATLAB or other usage of logical operators, I see && and assume it's an AND conditional, likewise || implies an OR conditional to me. I kinda get how that holds here, but the 1/0 status of the clobber operation on the first line relative to the rest of the statement REALLY confuses things for me. If i had to debug this, how would i know if my error was because clobber was set wrong, or because there isn't a file to copy, or because there's an error with copy? Is there any way to separate the clobber operation from the rest of this? I think it would help a lot with readability.
+  #JK: good comment, and drives an important underlying structure to all bash commands. 
+  #Namely, all bash commands either return a 0 or non-zero (one in my case) status. 
+  #so the cp command will return either a zero (it ran successfully, equivalent to a true status), or a non-zero number (equivalent to a false status)
+  #the && and || conditionals only care about whether each command was run successfully (returned a zero) or not successfully (returned a non-zero)
+  #I updated to the clobber function to not run any commands if clob is not set. 
+  #to get at your question on how to tell whether the clobber function failed, or if the cp function failed:
+  #the clobber function will return the error message (updated) and a one, meaning the cp command will not be run.
+  #you will be able to tell it was the clobber function because of the error message clobber gives.
+  #I am unaware of other ways clobber could fail.
+  #if clobber runs successfully, then I can tell whether cp runs successfully by seeing if a error message saying cp failed appears.
 
   #^^^^the logic:
   #if the file exists and clob=false, don't run the next two commands.
@@ -587,6 +613,8 @@ function epi_prep()
   ConvertToNifti ${epi}
 
   #this does the copying, orienting and renaming, I don't think a temporary file is necessary #JAMES-okay, but the logic of four && conditionals in a row need to be better clarified
+  #JK: each && statement is saying that if the previous command returned a 0, run the next command.
+  #if one of the commands fails within the daisy chain of &&, then jump to the || and print the error message
   clobber ${epi_outDir}/RestingStateRaw.nii.nii.gz &&\
   { cp ${epi} ${epi_outDir}/tmpRestingStateRaw.nii.gz &&\
   RPI_orient ${epi_outDir}/tmpRestingStateRaw.nii.gz &&\
@@ -864,7 +892,7 @@ if [[ $fieldMapFlag == 1 ]]; then
   { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMap_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; }
 fi
 #JAMES -this all looks fine. Do you know if the tee command is standard across Linux distros? I've never encountered this function before.
-
+#JK: good question, tee, while not as popular as mv or cp, is a core linux function and should be available on most instances of linux
 #^^^^logic of command format
 #The function is called and the function's output is printed out to the screen (stout) and into the log file (appending, not overwrite) via the "tee" command
 #Since the tee command will always return 0 unless something is wrong with bash, we need to do a separate check to see if the function failed
