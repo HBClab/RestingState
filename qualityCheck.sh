@@ -148,7 +148,10 @@ if [[ $fieldMapFlag == 1 ]]; then
 fi
 
 #echo experimental variables to log
-printf "%s\n" "$0 $@" > ${outDir}/log/qualityCheck.log
+printf "%s\n" "------------------------" | tee -a ${outDir}/log/qualityCheck.log
+date >> ${outDir}/log/qualityCheck.log
+printf "%s\t" "$0 $@" | tee -a ${outDir}/log/DataPrep.log
+printf "%s\ " "$0 $@" | tee -a ${outDir}/log/qualityCheck.log
 
 
 #Setting variable for FSL base directory
@@ -247,12 +250,12 @@ function motion_correction()
   -dfile ${outDir}/func/mcImg.nii.gzmcImg_raw.par \
   -1Dmatrix_save ${outDir}/func/mcImg.nii.gzmcImg.mat \
   $epi ||\
-  printf "%s\n" "3dvolreg failed, exiting ${FUNCNAME}" && return 1; }
+  { printf "%s\n" "3dvolreg failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Create a mean volume
   clobber ${outDir}/func/mcImgMean.nii.gz &&\
   { fslmaths ${outDir}/func/mcImg.nii.gz -Tmean ${outDir}/func/mcImgMean.nii.gz ||\
-  printf "%s\n" "fslmaths failed, exiting ${FUNCNAME}" && return 1; }
+  { printf "%s\n" "fslmaths failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Save out mcImg.par (like fsl) with only the translations and rotations
   #mcflirt appears to have a different rotation/translation order.  Reorder 3dvolreg output to match "RPI" FSL ordering
@@ -354,19 +357,19 @@ function lesionMaskPrep()
 
   #Create a temporaray binary lesion mask (in case it's not char, binary format)
   clobber ${outDir}/func/T1forWarp/T1_lesionmask.nii.gz &&\
-  fslmaths ${T1_mask} -bin ${outDir}/func/T1forWarp/T1_lesionmask.nii.gz -odt char ||\
-  { printf "%s\n" "creation of ${outDir}/func/T1forWarp/T1_mask.nii.gz failed, exiting ${FUNCNAME}" && return 1; }
+  { fslmaths ${T1_mask} -bin ${outDir}/func/T1forWarp/T1_lesionmask.nii.gz -odt char ||\
+  { printf "%s\n" "creation of ${outDir}/func/T1forWarp/T1_mask.nii.gz failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Orient lesion mask to RPI
   clobber ${outDir}/func/T1forWarp/T1_lesionmask_RPI.nii.gz &&\
-  RPI_Orient ${outDir}/func/T1forWarp/T1_lesionmask.nii.gz ||\
-  { printf "%s\n" "creation of ${outDir}/func/T1forWarp/T1_lesionmask_RPI.nii.gz failed, exiting ${FUNCNAME}" && return 1; }
+  { RPI_Orient ${outDir}/func/T1forWarp/T1_lesionmask.nii.gz ||\
+  { printf "%s\n" "creation of ${outDir}/func/T1forWarp/T1_lesionmask_RPI.nii.gz failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
 
   #Invert the lesion mask
   clobber ${outDir}/func/T1forWarp/LesionWeight.nii.gz &&\
-  fslmaths  -mul -1 -add 1 -thr 0.5 -bin $t1WarpDir/LesionWeight.nii.gz ||\
-  { printf "%s\n" "creation of ${outDir}/func/T1forWarp/LesionWeight.nii.gz failed, exiting ${FUNCNAME}" && return 1; }
+  { fslmaths  -mul -1 -add 1 -thr 0.5 -bin ${outDir}/func/T1forWarp/LesionWeight.nii.gz ||\
+  { printf "%s\n" "creation of ${outDir}/func/T1forWarp/LesionWeight.nii.gz failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   printf "%s\n" "${FUNCNAME} completed successfully"
 
@@ -395,49 +398,49 @@ function T1ToStd()
 
   #T1 to MNI, affine (skull-stripped data)
   clobber ${outDir}/func/T1forWarp/T1_to_MNIaff.nii.gz ${outDir}/func/T1forWarp/T1_to_MNIaff.mat &&\
-  flirt -in $t1Data \
+  { flirt -in $t1Data \
   -ref $fslDir/data/standard/MNI152_T1_2mm_brain.nii.gz \
   -out ${outDir}/func/T1forWarp/T1_to_MNIaff.nii.gz \
   -omat ${outDir}/func/T1forWarp/T1_to_MNIaff.mat ${flirt_transform_option} ||\
-   { printf "%s\n" "flirt failed, exiting ${FUNCNAME}" && return 1; }
+  { printf "%s\n" "flirt failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #T1 to MNI, nonlinear (T1 with skull)
   clobber ${outDir}/func/T1forWarp/coef_T1_to_MNI152.nii.gz ${outDir}/func/T1forWarp/T1_to_MNI152.nii.gz ${outDir}/func/T1forWarp/jac_T1_to_MNI152.nii.gz &&\
-  fnirt --in=${T1_head} \
+  { fnirt --in=${T1_head} \
   --aff=${outDir}/func/T1forWarp/T1_to_MNIaff.mat \
   --config=T1_2_MNI152_2mm.cnf \
   --cout=${outDir}/func/T1forWarp/coef_T1_to_MNI152 \
   --iout=${outDir}/func/T1forWarp/T1_to_MNI152.nii.gz \
   --jout=${outDir}/func/T1forWarp/jac_T1_to_MNI152 \
   --jacrange=0.1,10 ${fnirt_transform_option} ||\
-  { printf "%s\n" "fnirt failed, exiting ${FUNCNAME}" && return 1; }
+  { printf "%s\n" "fnirt failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Apply the warp to the skull-stripped T1
   clobber ${outDir}/func/T1forWarp/T1_brain_to_MNI152.nii.gz &&\
-  applywarp \
+  { applywarp \
   --ref=$fslDir/data/standard/MNI152_T1_2mm_brain.nii.gz \
   --in=$T1_brain \
   --out=${outDir}/func/T1forWarp/T1_brain_to_MNI152.nii.gz \
   --warp=${outDir}/func/T1forWarp/coef_T1_to_MNI152.nii.gz ||\
-  { printf "%s\n" "applywarp failed, exiting ${FUNCNAME}" && return 1;}
+  { printf "%s\n" "applywarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Apply the warp to the lesion mask or to the T1 mask
   clobber ${outDir}/func/T1forWarp/${maskname}MasktoMNI.nii.gz &&\
-  applywarp \
+  { applywarp \
   --ref=$fslDir/data/standard/MNI152_T1_2mm_brain.nii.gz \
   --in=$T1_mask \
   --out=${outDir}/func/T1forWarp/${maskname}MasktoMNI.nii.gz \
   --warp=${outDir}/func/T1forWarp/coef_T1_to_MNI152.nii.gz \
   --interp=nn ||\
-  { printf "%s\n" "applywarp failed, exiting ${FUNCNAME}" && return 1;}
+  { printf "%s\n" "applywarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Invert the warp (to get MNItoT1)
   clobber ${outDir}/func/T1forWarp/MNItoT1_warp.nii.gz &&\
-  invwarp \
+  { invwarp \
   -w ${outDir}/func/T1forWarp/coef_T1_to_MNI152.nii.gz \
   -r $T1_brain \
   -o ${outDir}/func/T1forWarp/MNItoT1_warp.nii.gz ||\
-  { printf "%s\n" "invwarp failed, exiting ${FUNCNAME}" && return 1;}
+  { printf "%s\n" "invwarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   printf "%s\n" "${FUNCNAME} completed successfully"
 }
@@ -451,13 +454,14 @@ function EPItoT1Master()
   local epi=$1
   local T1_brain=$2
   local T1_head=$3
-  local outDir=$4
+  local T1_mask=$4
+  local outDir=$5
   #additional arguments for fieldmap processing
-  local fieldmap=$5
-  local fieldmapMagHead=$6
-  local fieldmapMagBrain=$7
-  local dwellTime=$8
-  local peDir=$9
+  local fieldmap=$6
+  local fieldmapMagHead=$7
+  local fieldmapMagBrain=$8
+  local dwellTime=$9
+  local peDir=$10
   #number of arguments to decide which processing stream.
   local num_args=$#
 
@@ -467,15 +471,15 @@ function EPItoT1Master()
   { printf "%s\n" "creation of ${outDir}/func/EPItoT1 failed, exiting ${FUNCNAME}" && return 1; }
 
   case ${num_args} in
-    4)
+    5)
       clobber something &&\
-      EPItoT1FieldMap ${epi} ${T1_brain} ${outDir}/func/EPItoT1 ||\
-      { printf "%s\n"  "Generic Error Statement" && return 1; }
+      { EPItoT1FieldMap ${epi} ${T1_brain} ${outDir}/func/EPItoT1 ||\
+      { printf "%s\n"  "Generic Error Statement" && return 1 ;} ;}
       ;;
-    9)
+    10)
       clobber something &&\
-      EPItoT1 ${epi} ${outDir}/func/EPItoT1 ||\
-      { printf "%s\n" "Generic Error Statement"&& return 1; }
+      { EPItoT1 ${epi} ${outDir}/func/EPItoT1 ||\
+      { printf "%s\n" "Generic Error Statement"&& return 1 ;} ;}
       ;;
     *)
       printf "%s\n" "Error, the number of arguments does not match the number required for normal or fieldmap EPItoT1 processing" &&\
@@ -490,15 +494,17 @@ function EPItoT1FieldMap()
 {
   #basic args (without fieldmap)
   local epi=$1
+  local epiDir=$(basename ${epi})
   local T1_brain=$2
   local T1_head=$3
-  local outDir=$4
+  local T1_mask=$4
+  local EPItoT1outDir=$5
   #additional arguments for fieldmap processing
-  local fieldmap=$5
-  local fieldmapMagHead=$6
-  local fieldmapMagBrain=$7
-  local dwellTime=$8
-  local peDir=$9
+  local fieldmap=$6
+  local fieldmapMagHead=$7
+  local fieldmapMagBrain=$8
+  local dwellTime=$9
+  local peDir=$10
 
   printf "%s\n" "......Registration With FieldMap Correction."
 
@@ -506,44 +512,115 @@ function EPItoT1FieldMap()
   #Output will be a (warp) .nii.gz file
   #epi_reg --epi=${indir}/mcImgMean.nii.gz --t1=${t1SkullData} --t1brain=${t1Data} --wmseg=$epiWarpDir/T1_MNI_brain_wmseg.nii.gz --out=$epiWarpDir/EPItoT1 --fmap=${fieldMap} --fmapmag=${fieldMapMagSkull} --fmapmagbrain=${fieldMapMag} --echospacing=${dwellTime} --pedir=${peDir}
 
-  #clobber IDK? &&\
-  epi_reg --epi=${epi} \
+  clobber ${outDir}/func/EPItoT1/EPItoT1_warp.nii.gz &&\
+  { epi_reg --epi=${epi} \
   --t1=${T1_head} \
   --t1brain=${T1_brain} \
-  --out=${outDir} \
+  --out=${EPItoT1outDir} \
   --fmap=${fieldMap} \
   --fmapmag=${fieldMapMagHead} \
   --fmapmagbrain=${fieldMapMagBrain} \
   --echospacing=${dwellTime} \
   --pedir=${peDir} --noclean ||\
-  { printf "epi_reg failed, exiting ${FUNCNAME}" && return 1; }
+  { printf "%s\n" "epi_reg failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Invert the affine registration (to get T1toEPI)
-  clobber $epiWarpDir/T1toEPI.mat
-  convert_xfm -omat $epiWarpDir/T1toEPI.mat -inverse $epiWarpDir/EPItoT1.mat
+  clobber ${EPItoT1outDir}/T1toEPI.mat &&\
+  { convert_xfm -omat ${EPItoT1outDir}/T1toEPI.mat -inverse ${EPItoT1outDir}/EPItoT1.mat ||\
+  { printf "%s\n" "convert_xfm failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Invert the nonlinear warp (to get T1toEPI)
-  invwarp -w $epiWarpDir/EPItoT1_warp.nii.gz -r ${indir}/mcImgMean.nii.gz -o $epiWarpDir/T1toEPI_warp.nii.gz
+  clobber ${EPItoT1outDir}/T1toEPI_warp.nii.gz &&\
+  { invwarp -w ${EPItoT1outDir}/EPItoT1_warp.nii.gz -r ${epi} -o ${EPItoT1outDir}/T1toEPI_warp.nii.gz ||\
+  { printf "%s\n" "invwarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Apply the inverted (T1toEPI) warp to the brain mask
-  applywarp --ref=${indir}/mcImgMean.nii.gz --in=${T1mask} --out=${indir}/mcImgMean_mask.nii.gz --warp=${epiWarpDir}/T1toEPI_warp.nii.gz --datatype=char --interp=nn
+  clobber ${epiDir}/mcImgMean_mask.nii.gz &&\
+  { applywarp --ref=${epiDir}/mcImgMean.nii.gz --in=${T1mask} --out=${epiDir}/mcImgMean_mask.nii.gz --warp=${EPItoT1outDir}/T1toEPI_warp.nii.gz --datatype=char --interp=nn ||\
+  { printf "%s\n" "applywarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
    #Create a stripped version of the EPI (mcImg) file, apply the warp
-  fslmaths ${indir}/mcImgMean.nii.gz -mas ${indir}/mcImgMean_mask.nii.gz ${indir}/mcImgMean_stripped.nii.gz
-  applywarp --ref=${t1Data} --in=${indir}/mcImgMean_stripped.nii.gz --out=$epiWarpDir/EPIstrippedtoT1.nii.gz --warp=$epiWarpDir/EPItoT1_warp.nii.gz
+  clobber ${epiDir}/mcImgMean_stripped.nii.gz &&\
+  { fslmaths ${epiDir}/mcImgMean.nii.gz -mas ${epiDir}/mcImgMean_mask.nii.gz ${epiDir}/mcImgMean_stripped.nii.gz ||\
+  { printf "%s\n" "fslmaths failed, exiting ${FUNCNAME}" && return 1 ;} ;}
+
+  clobber ${EPItoT1outDir}/EPIstrippedtoT1.nii.gz &&\
+  { applywarp --ref=${T1_brain} --in=${epiDir}/mcImgMean_stripped.nii.gz --out=${EPItoT1outDir}/EPIstrippedtoT1.nii.gz --warp=${EPItoT1outDir}/EPItoT1_warp.nii.gz ||\
+  { printf "%s\n" "applywarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Sum the nonlinear warp (MNItoT1_warp.nii.gz) with the second nonlinear warp (T1toEPI_warp.nii.gz) to get a warp from MNI to EPI
-  convertwarp --ref=${indir}/mcImgMean.nii.gz --warp1=${t1WarpDir}/MNItoT1_warp.nii.gz --warp2=${epiWarpDir}/T1toEPI_warp.nii.gz --out=${epiWarpDir}/MNItoEPI_warp.nii.gz --relout
+  clobber ${EPItoT1outDir}/MNItoEPI_warp.nii.gz &&\
+  { convertwarp \
+  --ref=${epiDir}/mcImgMean.nii.gz \
+  --warp1=${outDir}/func/T1forWarp/MNItoT1_warp.nii.gz \
+  --warp2=${EPItoT1outDir}/T1toEPI_warp.nii.gz \
+  --out=${epiWarpDir}/MNItoEPI_warp.nii.gz --relout ||\
+  { printf "%s\n" "convertwarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Invert the warp to get EPItoMNI_warp.nii.gz
-  invwarp -w ${epiWarpDir}/MNItoEPI_warp.nii.gz -r $fslDir/data/standard/MNI152_T1_2mm.nii.gz -o ${epiWarpDir}/EPItoMNI_warp.nii.gz
+  clobber ${epiWarpDir}/EPItoMNI_warp.nii.gz &&\
+  { invwarp -w ${epiWarpDir}/MNItoEPI_warp.nii.gz -r $fslDir/data/standard/MNI152_T1_2mm.nii.gz -o ${epiWarpDir}/EPItoMNI_warp.nii.gz ||\
+  { printf "%s\n" "invwarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Apply EPItoMNI warp to EPI file
-  applywarp --ref=$fslDir/data/standard/MNI152_T1_2mm.nii.gz --in=${indir}/mcImgMean_stripped.nii.gz --out=$epiWarpDir/EPItoMNI.nii.gz --warp=${epiWarpDir}/EPItoMNI_warp.nii.gz
+  clobber $epiWarpDir/EPItoMNI.nii.gz &&\
+  { applywarp --ref=$fslDir/data/standard/MNI152_T1_2mm.nii.gz --in=${indir}/mcImgMean_stripped.nii.gz --out=$epiWarpDir/EPItoMNI.nii.gz --warp=${epiWarpDir}/EPItoMNI_warp.nii.gz ||\
+  { printf "%s\n" "applywarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
+  printf "%s\n ${FUNCNAME} successful" && return 0
+}
 
+function EPItoT1()
+{
+  #local variables here
+  #
+  #
+  #
+  printf "%s\n" "......Registration Without FieldMap Correction." 
+  #Warp without FieldMap correction
+  #Ouput will be a .mat file
+  #epi_reg --epi=${indir}/mcImgMean.nii.gz --t1=${t1SkullData} --t1brain=${t1Data} --wmseg=$epiWarpDir/T1_MNI_brain_wmseg.nii.gz --out=$epiWarpDir/EPItoT1
+  clobber $epiWarpDir/EPItoT1 &&\
+  { epi_reg --epi=${indir}/mcImgMean.nii.gz --t1=${t1SkullData} --t1brain=${t1Data} --out=$epiWarpDir/EPItoT1 --noclean ||\
+  { printf "%s\n" "epi_reg failed, exiting ${FUNCNAME}" && return 1 ;} ;}
+
+  #Invert the affine registration (to get T1toEPI)
+  clobber $epiWarpDir/T1toEPI.mat &&\
+  { convert_xfm -omat $epiWarpDir/T1toEPI.mat -inverse $epiWarpDir/EPItoT1.mat ||\
+  { printf "%s\n" "convert_xfm failed, exiting ${FUNCNAME}" && return 1 ;} ;}
+
+  #Apply the inverted (T1toEPI) mat file to the brain mask
+  clobber ${indir}/mcImgMean_mask.nii.gz &&\
+  { flirt -in $T1mask -ref ${indir}/mcImgMean.nii.gz -applyxfm -init $epiWarpDir/T1toEPI.mat -out ${indir}/mcImgMean_mask.nii.gz -interp nearestneighbour -datatype char ||\
+  { printf "%s\n" "flirt failed, exiting ${FUNCNAME}" && return 1 ;} ;}
+
+  #Create a stripped version of the EPI (mcImg) file, apply the mat file
+  clobber ${indir}/mcImgMean_stripped.nii.gz &&\
+  { fslmaths ${indir}/mcImgMean.nii.gz -mas ${indir}/mcImgMean_mask.nii.gz ${indir}/mcImgMean_stripped.nii.gz ||\
+  { printf "%s\n" "fslmaths failed, exiting ${FUNCNAME}" && return 1 ;} ;}
+
+  clobber $epiWarpDir/EPIstrippedtoT1.nii.gz &&\
+  { flirt -in ${indir}/mcImgMean_stripped.nii.gz -ref ${t1Data} -applyxfm -init $epiWarpDir/EPItoT1.mat -out $epiWarpDir/EPIstrippedtoT1.nii.gz ||\
+  { printf "%s\n" "flirt failed, exiting ${FUNCNAME}" && return 1 ;} ;}
+
+  #Sum the nonlinear warp (MNItoT1_warp.nii.gz) with the affine transform (T1toEPI.mat) to get a warp from MNI to EPI
+  clobber ${epiWarpDir}/MNItoEPI_warp.nii.gz &&\
+  { convertwarp --ref=${indir}/mcImgMean.nii.gz --warp1=${t1WarpDir}/MNItoT1_warp.nii.gz --postmat=${epiWarpDir}/T1toEPI.mat --out=${epiWarpDir}/MNItoEPI_warp.nii.gz --relout ||\
+  { printf "%s\n" "convertwarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
+
+  #Invert the warp to get EPItoMNI_warp.nii.gz
+  clobber ${epiWarpDir}/EPItoMNI_warp.nii.gz &&\
+  { invwarp -w ${epiWarpDir}/MNItoEPI_warp.nii.gz -r $fslDir/data/standard/MNI152_T1_2mm.nii.gz -o ${epiWarpDir}/EPItoMNI_warp.nii.gz ||\
+  { printf "%s\n" "invwarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
+
+  #Apply EPItoMNI warp to EPI file
+  clobber $epiWarpDir/EPItoMNI.nii.gz &&\
+  applywarp --ref=$fslDir/data/standard/MNI152_T1_2mm.nii.gz --in=${indir}/mcImgMean_stripped.nii.gz --out=$epiWarpDir/EPItoMNI.nii.gz --warp=${epiWarpDir}/EPItoMNI_warp.nii.gz ||\
+  { printf "%s\n" "invwarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
 }
+
+
 #Do we need to run fast if epi_reg runs fast?
 ########## Tissue class segmentation ###########
 echo "...Creating Tissue class segmentations."
@@ -562,125 +639,34 @@ fast -t 1 -n 3 -g -o $segDir/T1 $t1Data &&\
 cp $segDir/T1_seg_2.nii.gz $t1Dir/T1_MNI_brain_wmseg.nii.gz 
 
 
-################################################################
-
-
-
-########## EPI to T1 (BBR) w/wo FieldMap #######
-echo "...Optimizing EPI (func) to T1 (highres) registration."
-
-#Look for output directory for EPI to T1 (create if necessary).
-if [[ ! -e EPItoT1optimized ]]; then
-  mkdir EPItoT1optimized
-fi
-
-epiWarpDir=${indir}/EPItoT1optimized
-cp $t1Dir/T1_MNI_brain_wmseg.nii.gz ${epiWarpDir}/T1_MNI_brain_wmseg.nii.gz
-#epi_reg will not link to this file well, have epi_reg create it from T1_brain
-
-#Source the T1 brain mask (to warp and apply to the EPI image)
-T1mask=`cat $logDir/rsParams | grep "t1Mask=" | tail -1 | awk -F"=" '{print $2}'`
-
-#Check for use of a FieldMap correction
-
-if [[ $fieldMapFlag == 1 ]]; then  ########## Process WITH field map ##########
-  echo "......Registration With FieldMap Correction."
-  #Warp using FieldMap correction
-#Output will be a (warp) .nii.gz file
-  #epi_reg --epi=${indir}/mcImgMean.nii.gz --t1=${t1SkullData} --t1brain=${t1Data} --wmseg=$epiWarpDir/T1_MNI_brain_wmseg.nii.gz --out=$epiWarpDir/EPItoT1 --fmap=${fieldMap} --fmapmag=${fieldMapMagSkull} --fmapmagbrain=${fieldMapMag} --echospacing=${dwellTime} --pedir=${peDir}
-  epi_reg --epi=${indir}/mcImgMean.nii.gz --t1=${t1SkullData} --t1brain=${t1Data} --out=$epiWarpDir/EPItoT1 --fmap=${fieldMap} --fmapmag=${fieldMapMagSkull} --fmapmagbrain=${fieldMapMag} --echospacing=${dwellTime} --pedir=${peDir} --noclean
-
-  #Invert the affine registration (to get T1toEPI)
-  convert_xfm -omat $epiWarpDir/T1toEPI.mat -inverse $epiWarpDir/EPItoT1.mat
-
-  #Invert the nonlinear warp (to get T1toEPI)
-  invwarp -w $epiWarpDir/EPItoT1_warp.nii.gz -r ${indir}/mcImgMean.nii.gz -o $epiWarpDir/T1toEPI_warp.nii.gz
-
-  #Apply the inverted (T1toEPI) warp to the brain mask
-  applywarp --ref=${indir}/mcImgMean.nii.gz --in=${T1mask} --out=${indir}/mcImgMean_mask.nii.gz --warp=${epiWarpDir}/T1toEPI_warp.nii.gz --datatype=char --interp=nn
-
-   #Create a stripped version of the EPI (mcImg) file, apply the warp
-  fslmaths ${indir}/mcImgMean.nii.gz -mas ${indir}/mcImgMean_mask.nii.gz ${indir}/mcImgMean_stripped.nii.gz
-  applywarp --ref=${t1Data} --in=${indir}/mcImgMean_stripped.nii.gz --out=$epiWarpDir/EPIstrippedtoT1.nii.gz --warp=$epiWarpDir/EPItoT1_warp.nii.gz
-
-  #Sum the nonlinear warp (MNItoT1_warp.nii.gz) with the second nonlinear warp (T1toEPI_warp.nii.gz) to get a warp from MNI to EPI
-  convertwarp --ref=${indir}/mcImgMean.nii.gz --warp1=${t1WarpDir}/MNItoT1_warp.nii.gz --warp2=${epiWarpDir}/T1toEPI_warp.nii.gz --out=${epiWarpDir}/MNItoEPI_warp.nii.gz --relout
-
-  #Invert the warp to get EPItoMNI_warp.nii.gz
-  invwarp -w ${epiWarpDir}/MNItoEPI_warp.nii.gz -r $fslDir/data/standard/MNI152_T1_2mm.nii.gz -o ${epiWarpDir}/EPItoMNI_warp.nii.gz
-
-  #Apply EPItoMNI warp to EPI file
-  applywarp --ref=$fslDir/data/standard/MNI152_T1_2mm.nii.gz --in=${indir}/mcImgMean_stripped.nii.gz --out=$epiWarpDir/EPItoMNI.nii.gz --warp=${epiWarpDir}/EPItoMNI_warp.nii.gz
-
-  #Echo out warp files, wmedge to log
-  echo "epiMask=${indir}/mcImgMean_mask.nii.gz" >> $logDir/rsParams
-  echo "t1WMedge=${epiWarpDir}/EPItoT1_fast_wmedge.nii.gz" >> $logDir/rsParams
-  echo "T1toEPIWarp=${epiWarpDir}/T1toEPI_warp.nii.gz" >> $logDir/rsParams
-  echo "EPItoT1=${epiWarpDir}/EPIstrippedtoT1.nii.gz" >> $logDir/rsParams
-  echo "EPItoT1Warp=${epiWarpDir}/EPItoT1_warp.nii.gz" >> $logDir/rsParams
-  echo "MNItoEPIWarp=${epiWarpDir}/MNItoEPI_warp.nii.gz" >> $logDir/rsParams
-  echo "EPItoMNI=${epiWarpDir}/EPItoMNI.nii.gz" >> $logDir/rsParams
-  echo "EPItoMNIWarp=${epiWarpDir}/EPItoMNI_warp.nii.gz" >> $logDir/rsParams
-
-else
-  echo "......Registration Without FieldMap Correction."  ########## Process WITHOUT field map ##########
-  #Warp without FieldMap correction
-#Ouput will be a .mat file
-  #epi_reg --epi=${indir}/mcImgMean.nii.gz --t1=${t1SkullData} --t1brain=${t1Data} --wmseg=$epiWarpDir/T1_MNI_brain_wmseg.nii.gz --out=$epiWarpDir/EPItoT1
-  clobber $epiWarpDir/EPItoMNI.nii.gz &&\
-  epi_reg --epi=${indir}/mcImgMean.nii.gz --t1=${t1SkullData} --t1brain=${t1Data} --out=$epiWarpDir/EPItoT1 --noclean &&\
-\
-  #Invert the affine registration (to get T1toEPI)
-  convert_xfm -omat $epiWarpDir/T1toEPI.mat -inverse $epiWarpDir/EPItoT1.mat &&\
-\
-  #Apply the inverted (T1toEPI) mat file to the brain mask
-  flirt -in $T1mask -ref ${indir}/mcImgMean.nii.gz -applyxfm -init $epiWarpDir/T1toEPI.mat -out ${indir}/mcImgMean_mask.nii.gz -interp nearestneighbour -datatype char &&\
-\
-  #Create a stripped version of the EPI (mcImg) file, apply the mat file
-  fslmaths ${indir}/mcImgMean.nii.gz -mas ${indir}/mcImgMean_mask.nii.gz ${indir}/mcImgMean_stripped.nii.gz &&\
-  flirt -in ${indir}/mcImgMean_stripped.nii.gz -ref ${t1Data} -applyxfm -init $epiWarpDir/EPItoT1.mat -out $epiWarpDir/EPIstrippedtoT1.nii.gz &&\
-\
-  #Sum the nonlinear warp (MNItoT1_warp.nii.gz) with the affine transform (T1toEPI.mat) to get a warp from MNI to EPI
-  convertwarp --ref=${indir}/mcImgMean.nii.gz --warp1=${t1WarpDir}/MNItoT1_warp.nii.gz --postmat=${epiWarpDir}/T1toEPI.mat --out=${epiWarpDir}/MNItoEPI_warp.nii.gz --relout &&\
-\
-  #Invert the warp to get EPItoMNI_warp.nii.gz
-  invwarp -w ${epiWarpDir}/MNItoEPI_warp.nii.gz -r $fslDir/data/standard/MNI152_T1_2mm.nii.gz -o ${epiWarpDir}/EPItoMNI_warp.nii.gz &&\
-\
-  #Apply EPItoMNI warp to EPI file
-  applywarp --ref=$fslDir/data/standard/MNI152_T1_2mm.nii.gz --in=${indir}/mcImgMean_stripped.nii.gz --out=$epiWarpDir/EPItoMNI.nii.gz --warp=${epiWarpDir}/EPItoMNI_warp.nii.gz
-
-  #Echo out warp files, wmedge to log
-  echo "epiMask=${indir}/mcImgMean_mask.nii.gz" >> $logDir/rsParams
-  echo "t1WMedge=${epiWarpDir}/EPItoT1_fast_wmedge.nii.gz" >> $logDir/rsParams
-  echo "T1toEPIWarp=${epiWarpDir}/T1toEPI.mat" >> $logDir/rsParams
-  echo "EPItoT1=${epiWarpDir}/EPIstrippedtoT1.nii.gz" >> $logDir/rsParams
-  echo "EPItoT1Warp=${epiWarpDir}/EPItoT1.mat" >> $logDir/rsParams
-  echo "MNItoEPIWarp=${epiWarpDir}/MNItoEPI_warp.nii.gz" >> $logDir/rsParams
-  echo "EPItoMNI=${epiWarpDir}/EPItoMNI.nii.gz" >> $logDir/rsParams
-  echo "EPItoMNIWarp=${epiWarpDir}/EPItoMNI_warp.nii.gz" >> $logDir/rsParams
-fi
-
-################################################################
-
-
-
 ########## Skullstrip the EPI data ######################
 
+#ENTER FUNCTION FOR SKULLSTRIPPING
 #skull-strip mcImgMean volume, write output to rsParams file
-mcMask=`cat $logDir/rsParams | grep "epiMask=" | awk -F"=" '{print $2}' | tail -1`
 fslmaths mcImg.nii.gz -mas $mcMask mcImg_stripped.nii.gz
 
 #Leftover section from dataPrep (to create "RestingState.nii.gz")
 fslmaths RestingStateRaw.nii.gz -mas $mcMask RestingState.nii.gz
 
-echo "epiStripped=$indir/RestingState.nii.gz" >> $indir/rsParams
-echo "epiMC=$indir/mcImg_stripped.nii.gz" >> $indir/rsParams
-
-################################################################
 
 
 
 ########## SNR Estimation ######################
+function Estimate_SNR()
+{
+  #putting a sticky note here until I figure out where this code flows the best
+########## In vs. Out of Brain SNR Calculation #
+echo "...SNR mask creation."
+
+#Calculate a few dimensions
+xdim=$(fslhd mcImg.nii.gz | grep ^dim1 | awk '{print $2}')
+ydim=$(fslhd mcImg.nii.gz | grep ^dim2 | awk '{print $2}')
+zdim=$(fslhd mcImg.nii.gz | grep ^dim3 | awk '{print $2}')
+tdim=$(fslhd mcImg.nii.gz | grep ^dim4 | awk '{print $2}')
+xydimTenth=$(echo $xdim 0.06 | awk '{print int($1*$2)}')
+ydimMaskAnt=$(echo $ydim 0.93 | awk '{print int($1*$2)}')
+ydimMaskPost=$(echo $ydim 0.07 | awk '{print int($1*$2)}')
+
 echo "...Estimating SNR."
 
 #Create a folder to dump temp data into
@@ -949,11 +935,6 @@ echo "<br>" >> analysisResults.html
 
 #Cleanup
 rm -rf tmpLesionMask
+} #end function
 
-
-echo "$0 Complete"
-echo ""
-echo ""
-
-
-
+printf "%s\n\n\n" "$0 Complete"
