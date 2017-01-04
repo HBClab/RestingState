@@ -77,7 +77,7 @@ function printCommandLine()
   echo ""
   echo ""
   echo "     A few notes:"
-  echo "       *If fieldMap correction is to be run, you must ALSO run the '-f' flag & '-S' flag"  #-s or -S? #JK: -S capital S is the correct term. 
+  echo "       *If fieldMap correction is to be run, you must ALSO run the '-f' flag & '-S' flag"  #-s or -S? #JK: -S capital S is the correct term.
   echo "       *The T1 files MUST be in NIFTI format"
   echo "         ** The skull-stripped file will be renamed T1_MNI_brain.  The image with skull will be renamed T1_MNI."
   echo "       *If EPI is in DICOM format, it will be converted to NIFTI.  If already NIFTI, it will be checked for"
@@ -117,9 +117,8 @@ function clobber()
     elif [ ! -e "${arg}" ]; then #if the file does not exist...
       continue #don't need to do anything, move on to the next file
     else #catch everything else, if you didn't set clob, you can get here.
-      echo "clobber is not set, did you set the variable clob?" #JAMES-would it be better to change this to something like "clobber not set"? "How did you get here?" isn't a helpful error message
+      echo "clobber is not set, did you set the variable clob?"
       return 1 #don't run the command
-      #JK: good point, when I made this function, I actually didn't know how to get here, but subsequent testing has shown that not setting clob gets you here.
     fi
   done
 
@@ -154,12 +153,11 @@ function RPI_orient() {
     #JK: probably overkill to check the variable was set without error.
     local infile=$1 &&\
     #-z tests if a string is null, so what I'm saying here is:
-    #if the variable ${infile} is not an empty string (return 0) then don't run the following command 
+    #if the variable ${infile} is not an empty string (return 0) then don't run the following command
     #if the variable ${infile} is an empty string (return 1), then do run the next command.
     [ ! -z  "${infile}" ] ||\
     #I used () brackets, but should be {} I believe.
-    { printf '%s\n' "${FUNCNAME[0]}, input not defined" && return 1 ;} #JAMES-Not clear how this conditional works. Please comment to explain.
-    #JK: added some comments to the function
+    { printf '%s\n' "${FUNCNAME[0]}, input not defined" && return 1 ;}
 
     #Determine qform-orientation to properly reorient file to RPI (MNI) orientation
   xorient=`fslhd ${infile} | grep "^qform_xorient" | awk '{print $2}' | cut -c1`
@@ -390,11 +388,11 @@ function ConvertToNifti()
   #local variables mean they do not interfere with the main script.
   local inputDir=$(dirname ${__input})
   local inputBase=$(basename ${__input})
-  #this gets rid of anything before the first ".", please don't put "." in the name of the file. #JAMES-if that's the case, this should be documented in the helper call for dataPrep.sh
+  #this gets rid of anything before the first ".", please don't put "." in the name of the file.
   local inputSuffix=${inputBase#*.}
 case "${inputSuffix}" in
   'dcm')
-      echo "code not implemented (needs to reset epi variable)" && return 1 #JAMES-assuming this is temporary/placeholder #JK: you are correct, idk what type of dicom processing is wanted/necessary.
+      echo "code not implemented (needs to reset epi variable)" && return 1 # idk what type of dicom processing is wanted/necessary.
       #reconstruct
       #eval __input="'nifti_output'"
       ;;
@@ -434,10 +432,7 @@ printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 function SoftwareCheck()
 {
   local missing_command=0
-  local com #JAMES-what does declare/com mean?
-              #JK: in this context declare makes the variable local.
-              #I was under the impression if I used 'local' I would have to set the variable
-              #in the same line. I was wrong. corrected
+  local com
   for com in $@; do
     local command_check=$(which ${com})
     if [[ "${command_check}" == "" ]]; then
@@ -473,16 +468,17 @@ function T1Head_prep()
   ConvertToNifti ${t1Head}
 
   #copy the nifti file to the processing directory
-  clobber ${t1Head_outDir}/T1_head.nii.gz &&\ #JAMES so this reads to me as "run clobber on T1_head.nii.gz AND..."
-  { cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz ||\ #JAMES Copy T1 head to the directory OR...
-  { printf "%s\n" "cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;} ;} #JAMES print error statements"
+  clobber ${t1Head_outDir}/T1_head.nii.gz &&\ #Run clobber function (either remove file or don't, based on -c setting) on T1_head (in T1 head out directory), THEN"
+  { cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz ||\ # If clobber is on or first run, copy T1 head to the directory, don't run if clobber is off and file exists...
+  { printf "%s\n" "cp ${t1Head} ${t1Head_outDir}/T1_head.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;} ;} # OR print error message and exit of copy fails"
 
   #JAMES-I appreciate the detailed explanation below, but I guess coming from MATLAB or other usage of logical operators, I see && and assume it's an AND conditional, likewise || implies an OR conditional to me. I kinda get how that holds here, but the 1/0 status of the clobber operation on the first line relative to the rest of the statement REALLY confuses things for me. If i had to debug this, how would i know if my error was because clobber was set wrong, or because there isn't a file to copy, or because there's an error with copy? Is there any way to separate the clobber operation from the rest of this? I think it would help a lot with readability.
-  #JK: good comment, and drives an important underlying structure to all bash commands. 
-  #Namely, all bash commands either return a 0 or non-zero (one in my case) status. 
+
+  #JK: good comment, and drives an important underlying structure to all bash commands.
+  #Namely, all bash commands either return a 0 or non-zero (one in my case) status.
   #so the cp command will return either a zero (it ran successfully, equivalent to a true status), or a non-zero number (equivalent to a false status)
   #the && and || conditionals only care about whether each command was run successfully (returned a zero) or not successfully (returned a non-zero)
-  #I updated to the clobber function to not run any commands if clob is not set. 
+  #I updated to the clobber function to not run any commands if clob is not set.
   #to get at your question on how to tell whether the clobber function failed, or if the cp function failed:
   #the clobber function will return the error message (updated) and a one, meaning the cp command will not be run.
   #you will be able to tell it was the clobber function because of the error message clobber gives.
@@ -537,9 +533,9 @@ function T1Head_prep()
 
   #reorient the nifti file in the processing directory
   printf "%s\n" "Reorienting T1Head to RPI"
-  clobber ${t1Head_outDir}/T1_head_RPI.nii.gz &&\
-  { RPI_orient ${t1Head_outDir}/T1_head.nii.gz ||\
-  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
+  clobber ${t1Head_outDir}/T1_head_RPI.nii.gz &&\ #run clobber function on T1_head_RPI (either remove if -c is set, or don't), THEN,
+  { RPI_orient ${t1Head_outDir}/T1_head.nii.gz ||\ #If clobber is on or first run, run RPI_orient on T1_head, don't run if clobber is off and file exists
+  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;} ;} #OR print error message if RPI_orient fails
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
@@ -569,21 +565,21 @@ function T1Brain_prep()
   ConvertToNifti ${t1Brain}
 
   #copy the nifti file to the processing directory
-  clobber ${t1Brain_outDir}/T1_brain.nii.gz &&\
-  { cp ${t1Brain} ${t1Brain_outDir}/T1_brain.nii.gz ||\
-  { printf "%s\n" "cp ${t1Brain} ${t1Brain_outDir}/T1_brain.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;} ;}
+  clobber ${t1Brain_outDir}/T1_brain.nii.gz &&\ #run clobber function on T1_brain (either remove if -c is set, or don't), THEN,
+  { cp ${t1Brain} ${t1Brain_outDir}/T1_brain.nii.gz ||\ #If clobber is on or first run, copy T1 brain to t1Brain_outDir/T1_brain, don't run if clobber is off and file exists
+  { printf "%s\n" "cp ${t1Brain} ${t1Brain_outDir}/T1_brain.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;} ;} #OR print error message if copy fails
 
   #reorient the nifti file in the processing directory
   printf "%s\n" "Reorienting T1Brain to RPI"
-  clobber ${t1Brain_outDir}/T1_brain_RPI.nii.gz &&\
-  { RPI_orient ${t1Brain_outDir}/T1_brain.nii.gz ||\
-  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
+  clobber ${t1Brain_outDir}/T1_brain_RPI.nii.gz &&\ #run clobber function on T1_brain_RPI (either remove if -c is set, or don't), THEN,
+  { RPI_orient ${t1Brain_outDir}/T1_brain.nii.gz ||\ #If clobber is on or first run, run RPI_orient on T1_brain, don't run if clobber is off and file exists
+  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;} ;} #OR print error message if RPI_orient fails
 
   #make a binary brainmask from the reoriented T1
   printf "%s\n" "Making a T1 brain Mask"
-  clobber ${t1Brain_outDir}/brainMask.nii.gz &&\
-  { fslmaths ${t1Brain_outDir}/T1_brain_RPI.nii.gz -bin ${t1Brain_outDir}//brainMask.nii.gz -odt char ||\
-  { printf "%s\n" "Brain Masking failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
+  clobber ${t1Brain_outDir}/brainMask.nii.gz &&\ # run clobber function on brainMask (either remove if -c is set, or don't), THEN,
+  { fslmaths ${t1Brain_outDir}/T1_brain_RPI.nii.gz -bin ${t1Brain_outDir}//brainMask.nii.gz -odt char ||\ #If clobber is on or first run, run fslmaths on T1_brain_RPI to binnarize to brain mask, don't run if clobber is off and file exists
+  { printf "%s\n" "Brain Masking failed, exiting ${FUNCNAME} function" && return 1 ;} ;} #OR print error message if fslmaths fails
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
@@ -612,15 +608,14 @@ function epi_prep()
   #convert whatever image that was passed in to a nifti file (Not Implemented)
   ConvertToNifti ${epi}
 
-  #this does the copying, orienting and renaming, I don't think a temporary file is necessary #JAMES-okay, but the logic of four && conditionals in a row need to be better clarified
   #JK: each && statement is saying that if the previous command returned a 0, run the next command.
   #if one of the commands fails within the daisy chain of &&, then jump to the || and print the error message
-  clobber ${epi_outDir}/RestingStateRaw.nii.nii.gz &&\
-  { cp ${epi} ${epi_outDir}/tmpRestingStateRaw.nii.gz &&\
-  RPI_orient ${epi_outDir}/tmpRestingStateRaw.nii.gz &&\
-  mv ${epi_outDir}/tmpRestingStateRaw_RPI.nii.gz ${epi_outDir}/RestingStateRaw.nii.gz &&\
-  rm ${epi_outDir}/tmpRestingStateRaw.nii.gz ||\
-  { printf "%s\n" "Re-Orientation failed" "exiting ${FUNCNAME} function" && return 1 ;} ;}
+  clobber ${epi_outDir}/RestingStateRaw.nii.nii.gz &&\ #run clobber function on RestingStateRaw (either remove if -c is set, or don't), THEN,
+  { cp ${epi} ${epi_outDir}/tmpRestingStateRaw.nii.gz &&\ #If clobber is on or first run, copy epi input to tmpRestingStateRaw, don't run if clobber is off and file exists, THEN,
+  RPI_orient ${epi_outDir}/tmpRestingStateRaw.nii.gz &&\ #If copy completed, run RPI_orient function on tmpRestingStateRaw, don't run if copy didn't complete, THEN,
+  mv ${epi_outDir}/tmpRestingStateRaw_RPI.nii.gz ${epi_outDir}/RestingStateRaw.nii.gz &&\ #IF RPI_orient ran, move tmpRestingStateRaw_RPI to RestingStateRaw, don't move if RPI_orient did not run, THEN,
+  rm ${epi_outDir}/tmpRestingStateRaw.nii.gz ||\ #If move command completed, delete tmpRestingStateRaw, don't delete if move command did not run
+  { printf "%s\n" "Re-Orientation failed" "exiting ${FUNCNAME} function" && return 1 ;} ;} #OR print error message if any of the above commands fail.
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
@@ -650,15 +645,15 @@ function FieldMapPhase_prep()
   ConvertToNifti ${FieldMapPhase}
 
   #copy the nifti file to the processing directory
-  clobber ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz &&\
-  { cp ${FieldMapPhase} ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz ||\
-  { printf "%s\n" "cp ${FieldMapPhase} ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;} ;}
+  clobber ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz &&\ #run clobber function on FieldMapPhase (either remove if -c is set, or don't), THEN,
+  { cp ${FieldMapPhase} ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz ||\ #If clobber is on or first run, copy fieldMapPhase to FieldMapPhase_outDir, don't run if clobber is off and file exists
+  { printf "%s\n" "cp ${FieldMapPhase} ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;} ;} #OR print error message if cp fails
 
   #reorient the nifti file in the processing directory
   printf "%s\n" "Reorienting FieldMapPhase to RPI"
-  clobber ${FieldMapPhase_outDir}/FieldMapPhase_RPI.nii.gz &&\
-  { RPI_orient ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz ||\
-  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
+  clobber ${FieldMapPhase_outDir}/FieldMapPhase_RPI.nii.gz &&\ #run clobber function on FieldMapPhase_RPI (either remove if -c is set or don't), THEN,
+  { RPI_orient ${FieldMapPhase_outDir}/FieldMapPhase.nii.gz ||\ #If clobber is on or first run, run RPI_orient function on FieldMapPhase, don't run if clobber is off and file exists
+  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;} ;} #OR print error message if RPI_orient fails
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
@@ -689,30 +684,30 @@ function FieldMapMag_prep()
   ConvertToNifti ${FieldMapMag}
 
   #copy the nifti file to the processing directory
-  clobber ${FieldMapMag_outDir}/FieldMapMag.nii.gz &&\
-  { cp ${FieldMapMag} ${FieldMapMag_outDir}/FieldMapMag.nii.gz ||\
-  { printf "%s\n" "cp ${FieldMapMag} ${FieldMapMag_outDir}/FieldMapMag.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;} ;}
+  clobber ${FieldMapMag_outDir}/FieldMapMag.nii.gz &&\ #run clobber function on FieldMapMag (either remove if -c is set or don't), THEN,
+  { cp ${FieldMapMag} ${FieldMapMag_outDir}/FieldMapMag.nii.gz ||\ #If clobber is on or first run, copy FieldMapMag to FieldMapMag_outDir, don't if clobber is off
+  { printf "%s\n" "cp ${FieldMapMag} ${FieldMapMag_outDir}/FieldMapMag.nii.gz failed" "exiting ${FUNCNAME} function" && return 1 ;} ;} #OR print error message if cp fails
 
   #reorient the nifti file in the processing directory to RPI.
   printf "%s\n" "Reorienting FieldMapMag to RPI"
-  clobber ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz &&\
-  { RPI_orient ${FieldMapMag_outDir}/FieldMapMag.nii.gz ||\
-  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
+  clobber ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz &&\ #run clobber function on FieldMapMag_RPI (either remove if -c is set or don't), THEN,
+  { RPI_orient ${FieldMapMag_outDir}/FieldMapMag.nii.gz ||\ #If clobber is on or first run, run RPI_orient on FieldMapMag, don't if clobber is off
+  { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;} ;} #OR print error message if RPI_orient fails
 
   #make a brain mask for the image using FSL's bet.
-  clobber ${FieldMapMag_outDir}/fieldMapMag_mask.nii.gz &&\
-  { bet ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz ${FieldMapMag_outDir}/fieldMapMag -m -n ||\
-  { printf "%s\n" "bet failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
+  clobber ${FieldMapMag_outDir}/fieldMapMag_mask.nii.gz &&\ #run clobber function on fieldMapMag_mask (either remove if -c is set or don't), THEN,
+  { bet ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz ${FieldMapMag_outDir}/fieldMapMag -m -n ||\ #If clobber is on or first run, run fsl brain extraction on FieldMapMag_RPI, output as fieldMapMag, don't run if clobber is off and file exists
+  { printf "%s\n" "bet failed, exiting ${FUNCNAME} function" && return 1 ;} ;} #OR print error message if bet fails
 
   #make the brainmask smaller: reason: ???
-  clobber ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz &&\
-  { fslmaths ${FieldMapMag_outDir}/fieldMapMag_mask.nii.gz -ero ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ||\
-  { printf "%s\n" "erosion failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
+  clobber ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz &&\ #run clobber function on fieldMapMag_mask_eroded (either remove if -c is set or don't), THEN,
+  { fslmaths ${FieldMapMag_outDir}/fieldMapMag_mask.nii.gz -ero ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ||\ # run fslmaths on fieldMapMag_mask to errode
+  { printf "%s\n" "erosion failed, exiting ${FUNCNAME} function" && return 1 ;} ;} #OR print error message if fslmaths command fails
 
   #multiply the brainmask with the fieldmap to get a brain masked fieldmap.
-  clobber ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz &&\
-  { fslmaths ${FieldMapMag_outDir}/fieldMapMag_RPI.nii.gz -mul ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz ||\
-  { printf "%s\n" "masking failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
+  clobber ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz &&\ #run clobber function on fieldMapMag_RPI_stripped (either remove if -c is set or don't), THEN,
+  { fslmaths ${FieldMapMag_outDir}/fieldMapMag_RPI.nii.gz -mul ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz ||\ #run fslmaths to create skull-stripped fieldMap
+  { printf "%s\n" "masking failed, exiting ${FUNCNAME} function" && return 1 ;} ;} #OR print error message if fslmaths fails
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
@@ -746,9 +741,9 @@ function FieldMap_prep()
 
   case "${scannertype}" in
     'SEIMENS')
-        clobber ${outDir}/func/EPItoT1optimized/fieldMap_prepped.nii.gz &&\
-        { fsl_prepare_fieldmap SIEMENS ${phase} ${mag} ${outDir}/func/EPItoT1optimized/fieldMap_prepped.nii.gz $dTE ||\
-         printf "%s\n" "SIEMENS: FieldMap_prep failed, exiting ${FUNCNAME} function" && return 1 ;}
+        clobber ${outDir}/func/EPItoT1optimized/fieldMap_prepped.nii.gz &&\ #run clobber function on fieldMap_prepped (either remove if -c is set, or don't), THEN,
+        { fsl_prepare_fieldmap SIEMENS ${phase} ${mag} ${outDir}/func/EPItoT1optimized/fieldMap_prepped.nii.gz $dTE ||\ #if clobber is on or first run, run fsl_prepare_fieldmap on phase and mag images (for SEIMENS data), don't run if clobber is on and file exists
+         printf "%s\n" "SIEMENS: FieldMap_prep failed, exiting ${FUNCNAME} function" && return 1 ;} #OR print error message if fsl_prepare fieldmap fails
         ;;
     'GE')
         echo "this code is not implemented, exiting ${FUNCNAME} with error" && return 1
@@ -871,28 +866,27 @@ SoftwareCheck fsl afni ||\
 { printf "%s\n" "Prerequisite software doesn't exist, exiting script with errors" && exit 1 ;}
 
 #Processing T1Skull
-T1Head_prep ${t1Head} ${outDir}/anat | tee -a ${outDir}/log/DataPrep.log &&\
-{ [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "T1Head_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; }
+T1Head_prep ${t1Head} ${outDir}/anat | tee -a ${outDir}/log/DataPrep.log &&\ #run T1Head_prep on t1Head image, write output to outDir/anat, append output to DataPrep.log, THEN
+{ [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "T1Head_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; } #if an error occurs, print error message, append to log, and exit script
 #Processing T1brain
-T1Brain_prep ${t1Brain} ${outDir}/anat | tee -a ${outDir}/log/DataPrep.log &&\
-{ [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "T1Brain_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; }
+T1Brain_prep ${t1Brain} ${outDir}/anat | tee -a ${outDir}/log/DataPrep.log &&\ #run T1Brain_prep on t1Brain image, write output to outDir/anat, append output to DataPrep.log, THEN
+{ [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "T1Brain_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; } #if an error occurs, print error message, append to log, and exit script
 #processing EPI
-epi_prep ${epi} ${outDir}/func | tee -a ${outDir}/log/DataPrep.log &&\
-{ [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "epi_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; }
+epi_prep ${epi} ${outDir}/func | tee -a ${outDir}/log/DataPrep.log &&\ #run epi_prep on epi image, write output to outDir/func, append output to DataPrep.log, THEN
+{ [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "epi_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; } #if an error occurs, print error message, append to log, and exit script
 
 if [[ $fieldMapFlag == 1 ]]; then
   #Processing FieldMap (Phase)
-  FieldMapPhase_prep ${fieldMapPhase} ${outDir}/fieldMap | tee -a ${outDir}/log/DataPrep.log &&\
-  { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMapPhase_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; }
+  FieldMapPhase_prep ${fieldMapPhase} ${outDir}/fieldMap | tee -a ${outDir}/log/DataPrep.log &&\ #run FieldMapPhase_prep, write output to outDir/fieldMap, append output to DataPrep.log, THEN
+  { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMapPhase_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; } #if an error occurs, print error message, append to log, and exit script
   #Processing FieldMap (Magnitude)
-  FieldMapMag_prep ${fieldMapMag} ${outDir}/fieldMap | tee -a ${outDir}/log/DataPrep.log ||\
-  { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMapMag_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; }
+  FieldMapMag_prep ${fieldMapMag} ${outDir}/fieldMap | tee -a ${outDir}/log/DataPrep.log ||\ #run FieldMapPhase_prep, write output to outDir/fieldMap, append output to DataPrep.log, THEN
+  { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMapMag_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; } #if an error occurs, print error message, append to log, and exit script
   #Processing FieldMap (Prepped)
-  FieldMap_prep ${outDir}/fieldMap/FieldMapPhase_RPI.nii.gz ${outDir}/fieldMap/fieldMapMag_RPI_stripped.nii.gz | tee -a ${outDir}/log/DataPrep.log ||\
-  { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMap_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; }
+  FieldMap_prep ${outDir}/fieldMap/FieldMapPhase_RPI.nii.gz ${outDir}/fieldMap/fieldMapMag_RPI_stripped.nii.gz | tee -a ${outDir}/log/DataPrep.log ||\ #run FieldMap_prep, write output to outDir/fieldMap/FieldMapPhase_RPI and fieldMapMag_RPI_stripped, append output to DataPrep.log, THEN
+  { [[ ${PIPESTATUS[0]} -ne 0 ]] && printf "%s\n" "FieldMap_prep failed, exiting script" | tee -a ${outDir}/log/DataPrep.log && exit 1; } #if an error occurs, print error message, append to log, and exit script
 fi
-#JAMES -this all looks fine. Do you know if the tee command is standard across Linux distros? I've never encountered this function before.
-#JK: good question, tee, while not as popular as mv or cp, is a core linux function and should be available on most instances of linux
+#tee, while not as popular as mv or cp, is a core linux function and should be available on most instances of linux
 #^^^^logic of command format
 #The function is called and the function's output is printed out to the screen (stout) and into the log file (appending, not overwrite) via the "tee" command
 #Since the tee command will always return 0 unless something is wrong with bash, we need to do a separate check to see if the function failed
