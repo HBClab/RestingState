@@ -695,19 +695,20 @@ function FieldMapMag_prep()
   { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;} ;} #OR print error message if RPI_orient fails
 
   #make a brain mask for the image using FSL's bet.
-  clobber ${FieldMapMag_outDir}/fieldMapMag_mask.nii.gz &&\ #run clobber function on fieldMapMag_mask (either remove if -c is set or don't), THEN,
-  { bet ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz ${FieldMapMag_outDir}/fieldMapMag -m -n ||\ #If clobber is on or first run, run fsl brain extraction on FieldMapMag_RPI, output as fieldMapMag, don't run if clobber is off and file exists
+  clobber ${FieldMapMag_outDir}/FieldMapMag_mask.nii.gz &&\ #run clobber function on fieldMapMag_mask (either remove if -c is set or don't), THEN,
+  { bet ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz ${FieldMapMag_outDir}/FieldMapMag -m -n ||\ #If clobber is on or first run, run fsl brain extraction on FieldMapMag_RPI, output as fieldMapMag, don't run if clobber is off and file exists
   { printf "%s\n" "bet failed, exiting ${FUNCNAME} function" && return 1 ;} ;} #OR print error message if bet fails
 
   #make the brainmask smaller: reason: ???
-  clobber ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz &&\ #run clobber function on fieldMapMag_mask_eroded (either remove if -c is set or don't), THEN,
-  { fslmaths ${FieldMapMag_outDir}/fieldMapMag_mask.nii.gz -ero ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ||\ # run fslmaths on fieldMapMag_mask to errode
+  clobber ${FieldMapMag_outDir}/FieldMapMag_mask_eroded.nii.gz &&\ #run clobber function on fieldMapMag_mask_eroded (either remove if -c is set or don't), THEN,
+  { fslmaths ${FieldMapMag_outDir}/FieldMapMag_mask.nii.gz -ero ${FieldMapMag_outDir}/FieldMapMag_mask_eroded.nii.gz ||\ # run fslmaths on fieldMapMag_mask to errode
   { printf "%s\n" "erosion failed, exiting ${FUNCNAME} function" && return 1 ;} ;} #OR print error message if fslmaths command fails
 
   #multiply the brainmask with the fieldmap to get a brain masked fieldmap.
-  clobber ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz &&\ #run clobber function on fieldMapMag_RPI_stripped (either remove if -c is set or don't), THEN,
-  { fslmaths ${FieldMapMag_outDir}/fieldMapMag_RPI.nii.gz -mul ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz ||\ #run fslmaths to create skull-stripped fieldMap
+  clobber ${FieldMapMag_outDir}/FieldMapMag_RPI_stripped.nii.gz &&\ #run clobber function on fieldMapMag_RPI_stripped (either remove if -c is set or don't), THEN,
+  { fslmaths ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz -mul ${FieldMapMag_outDir}/FieldMapMag_mask_eroded.nii.gz ${FieldMapMag_outDir}/FieldMapMag_RPI_stripped.nii.gz ||\ #run fslmaths to create skull-stripped fieldMap
   { printf "%s\n" "masking failed, exiting ${FUNCNAME} function" && return 1 ;} ;} #OR print error message if fslmaths fails
+
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
 }
