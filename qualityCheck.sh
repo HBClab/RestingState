@@ -240,21 +240,21 @@ function motion_correction()
 
   #Run 3dvolreg, save matrices and parameters
   #Saving "raw" AFNI output for possible use later (motionscrubbing?)
-  clobber ${outDir}/func/mcImg.nii.gz &&\
+  clobber ${outDir}/func/mc/mcImg.nii.gz &&\
   { 3dvolreg -verbose \
   -tshift 0 \
   -Fourier \
   -zpad 4 \
-  -prefix ${outDir}/func/mcImg.nii.gz \
+  -prefix ${outDir}/func/mc/mcImg.nii.gz \
   -base $halfPoint \
-  -dfile ${outDir}/func/mcImg.nii.gzmcImg_raw.par \
-  -1Dmatrix_save ${outDir}/func/mcImg.nii.gzmcImg.mat \
+  -dfile ${outDir}/func/mc/mcImg_raw.par \
+  -1Dmatrix_save ${outDir}/func/mc/mcImg.mat \
   $epi ||\
   { printf "%s\n" "3dvolreg failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Create a mean volume
-  clobber ${outDir}/func/mcImgMean.nii.gz &&\
-  { fslmaths ${outDir}/func/mcImg.nii.gz -Tmean ${outDir}/func/mcImgMean.nii.gz ||\
+  clobber ${outDir}/func/mc/mcImgMean.nii.gz &&\
+  { fslmaths ${outDir}/func/mc/mcImg.nii.gz -Tmean ${outDir}/func/mc/mcImgMean.nii.gz ||\
   { printf "%s\n" "fslmaths failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Save out mcImg.par (like fsl) with only the translations and rotations
@@ -267,14 +267,14 @@ function motion_correction()
   #dL  = displacement in the Left direction      } mm
   #dP  = displacement in the Posterior direction }
 
-  awk '{print ($3 " " $4 " " $2 " " $6 " " $7 " " $5)}' ${outDir}/func/mcImg_raw.par > ${outDir}/func/mcImg_deg.par ||\
+  awk '{print ($3 " " $4 " " $2 " " $6 " " $7 " " $5)}' ${outDir}/func/mc/mcImg_raw.par > ${outDir}/func/mc/mcImg_deg.par ||\
   { printf "%s\n" "creation of mcImg_deg.par failed, exiting ${FUNCNAME}" && return 1; }
 
   #Need to convert rotational parameters from degrees to radians
   #rotRad= (rotDeg*pi)/180
   #pi=3.14159
 
-  awk -v pi=3.14159 '{print (($1*pi)/180) " " (($2*pi)/180) " " (($3*pi)/180) " " $4 " " $5 " " $6}' ${outDir}/func/mcImg_deg.par > ${outDir}/func/mcImg.par ||\
+  awk -v pi=3.14159 '{print (($1*pi)/180) " " (($2*pi)/180) " " (($3*pi)/180) " " $4 " " $5 " " $6}' ${outDir}/func/mc/mcImg_deg.par > ${outDir}/func/mc/mcImg.par ||\
   { printf "%s\n" "creation of mcImg.par failed, exiting ${FUNCNAME}" && return 1; }
 
   #Need to create a version where ALL (rotations and translations) measurements are in mm.  Going by Power 2012 Neuroimage paper, radius of 50mm.
@@ -283,12 +283,12 @@ function motion_correction()
   #d=2r=2*50=100
   #pi=3.14159
 
-  awk -v pi=3.14159 -v d=100 '{print (((d*pi)/360)*$1) " " (((d*pi)/360)*$2) " " (((d*pi)/360)*$3) " " $4 " " $5 " " $6}' ${outDir}/func/mcImg_deg.par > ${outDir}/func/mcImg_mm.par ||\
+  awk -v pi=3.14159 -v d=100 '{print (((d*pi)/360)*$1) " " (((d*pi)/360)*$2) " " (((d*pi)/360)*$3) " " $4 " " $5 " " $6}' ${outDir}/func/mc/mcImg_deg.par > ${outDir}/func/mc/mcImg_mm.par ||\
   { printf "%s\n" "creation of mcImg_mm.par failed, exiting ${FUNCNAME}" && return 1; }
 
   #Cut motion parameter file into 6 distinct TR parameter files
   for i in {1..6}; do
-    awk -v var=${i} '{print $var}' ${outDir}/func/mcImg.par > ${outDir}/func/mc${i}.par ||\
+    awk -v var=${i} '{print $var}' ${outDir}/func/mc/mcImg.par > ${outDir}/func/mc/mc${i}.par ||\
     { printf "%s\n" "creation of mc{$1}.par failed, exiting ${FUNCNAME}" && return 1; }
   done
 
@@ -298,29 +298,29 @@ function motion_correction()
   #where R=radius of spherical ROI = 80mm used in rmsdiff; theta_x, theta_y, theta_z are the three rotation angles from the .par file; and transx, transy, transz are the three translations from the .par file.
 
   #Absolute Displacement
-  awk '{print (sqrt(0.2*80^2*((cos($1)-1)^2+(sin($1))^2 + (cos($2)-1)^2 + (sin($2))^2 + (cos($3)-1)^2 + (sin($3)^2)) + $4^2+$5^2+$6^2))}' ${outDir}/func/mcImg.par > ${outDir}/func/mcImg_abs.rms ||\
+  awk '{print (sqrt(0.2*80^2*((cos($1)-1)^2+(sin($1))^2 + (cos($2)-1)^2 + (sin($2))^2 + (cos($3)-1)^2 + (sin($3)^2)) + $4^2+$5^2+$6^2))}' ${outDir}/func/mc/mcImg.par > ${outDir}/func/mc/mcImg_abs.rms ||\
   { printf "%s\n" "creation of mcImg_abs.rms failed, exiting ${FUNCNAME}" && return 1; }
 
   #Relative Displacement
   #Create the relative displacement .par file from the input using AFNI's 1d_tool.py to first calculate the derivatives
-  1d_tool.py -infile ${outDir}/func/mcImg.par -set_nruns 1 -derivative -write ${outDir}/func/mcImg_deriv.par ||\
+  1d_tool.py -infile ${outDir}/func/mc/mcImg.par -set_nruns 1 -derivative -write ${outDir}/func/mc/mcImg_deriv.par ||\
   { printf "%s\n" "creation of mcImg_deriv.par failed, exiting ${FUNCNAME}" && return 1; }
 
-  awk '{print (sqrt(0.2*80^2*((cos($1)-1)^2+(sin($1))^2 + (cos($2)-1)^2 + (sin($2))^2 + (cos($3)-1)^2 + (sin($3)^2)) + $4^2+$5^2+$6^2))}' ${outDir}/func/mcImg_deriv.par > ${outDir}/func/mcImg_rel.rms ||\
+  awk '{print (sqrt(0.2*80^2*((cos($1)-1)^2+(sin($1))^2 + (cos($2)-1)^2 + (sin($2))^2 + (cos($3)-1)^2 + (sin($3)^2)) + $4^2+$5^2+$6^2))}' ${outDir}/func/mc/mcImg_deriv.par > ${outDir}/func/mc/mcImg_rel.rms ||\
   { printf "%s\n" "creation of mcImg_rel.rms failed, exiting ${FUNCNAME}" && return 1; }
 
 
   #Create images of the motion correction (translation, rotations, displacement), mm and radians
     #switched from "MCFLIRT estimated...." title
-  fsl_tsplot -i ${outDir}/func/mcImg.par -t '3dvolreg estimated rotations (radians)' -u 1 --start=1 --finish=3 -a x,y,z -w 800 -h 300 -o ${outDir}/func/rot.png ||\
+  fsl_tsplot -i ${outDir}/func/mc/mcImg.par -t '3dvolreg estimated rotations (radians)' -u 1 --start=1 --finish=3 -a x,y,z -w 800 -h 300 -o ${outDir}/func/mc/rot.png ||\
   { printf "%s\n" "creation of rot.png failed, exiting ${FUNCNAME}" && return 1; }
-  fsl_tsplot -i ${outDir}/func/mcImg.par -t '3dvolreg estimated translations (mm)' -u 1 --start=4 --finish=6 -a x,y,z -w 800 -h 300 -o ${outDir}/func/trans.png ||\
+  fsl_tsplot -i ${outDir}/func/mc/mcImg.par -t '3dvolreg estimated translations (mm)' -u 1 --start=4 --finish=6 -a x,y,z -w 800 -h 300 -o ${outDir}/func/mc/trans.png ||\
   { printf "%s\n" "creation of trans.png failed, exiting ${FUNCNAME}" && return 1; }
-  fsl_tsplot -i ${outDir}/func/mcImg_mm.par -t '3dvolreg estimated rotations (mm)' -u 1 --start=1 --finish=3 -a x,y,z -w 800 -h 300 -o ${outDir}/func/rot_mm.png ||\
+  fsl_tsplot -i ${outDir}/func/mc/mcImg_mm.par -t '3dvolreg estimated rotations (mm)' -u 1 --start=1 --finish=3 -a x,y,z -w 800 -h 300 -o ${outDir}/func/mc/rot_mm.png ||\
   { printf "%s\n" "creation of rot_mm.png failed, exiting ${FUNCNAME}" && return 1; }
-  fsl_tsplot -i ${outDir}/func/mcImg_mm.par -t '3dvolreg estimated rotations and translations (mm)' -u 1 --start=1 --finish=6 -a "x(rot),y(rot),z(rot),x(trans),y(trans),z(trans)" -w 800 -h 300 -o ${outDir}/func/rot_trans.png ||\
+  fsl_tsplot -i ${outDir}/func/mc/mcImg_mm.par -t '3dvolreg estimated rotations and translations (mm)' -u 1 --start=1 --finish=6 -a "x(rot),y(rot),z(rot),x(trans),y(trans),z(trans)" -w 800 -h 300 -o ${outDir}/func/mc/rot_trans.png ||\
   { printf "%s\n" "creation of rot_trans.png failed, exiting ${FUNCNAME}" && return 1; }
-  fsl_tsplot -i ${outDir}/func/mcImg_abs.rms,mcImg_rel.rms -t '3dvolreg estimated mean displacement (mm)' -u 1 -w 800 -h 300 -a absolute,relative -o ${outDir}/func/disp.png ||\
+  fsl_tsplot -i ${outDir}/func/mc/mcImg_abs.rms,mcImg_rel.rms -t '3dvolreg estimated mean displacement (mm)' -u 1 -w 800 -h 300 -a absolute,relative -o ${outDir}/func/mc/disp.png ||\
   { printf "%s\n" "creation of dip.png failed, exiting ${FUNCNAME}" && return 1; }
 
   printf "%s\n" "${FUNCNAME} completed successfully" && return 0
@@ -332,10 +332,10 @@ function motion_correction()
 echo "...SNR mask creation."
 
 #Calculate a few dimensions
-xdim=$(fslhd mcImg.nii.gz | grep ^dim1 | awk '{print $2}')
-ydim=$(fslhd mcImg.nii.gz | grep ^dim2 | awk '{print $2}')
-zdim=$(fslhd mcImg.nii.gz | grep ^dim3 | awk '{print $2}')
-tdim=$(fslhd mcImg.nii.gz | grep ^dim4 | awk '{print $2}')
+xdim=$(fslhd ${outDir}/func/mc/mcImg.nii.gz | grep ^dim1 | awk '{print $2}')
+ydim=$(fslhd ${outDir}/func/mc/mcImg.nii.gz | grep ^dim2 | awk '{print $2}')
+zdim=$(fslhd ${outDir}/func/mc/mcImg.nii.gz | grep ^dim3 | awk '{print $2}')
+tdim=$(fslhd ${outDir}/func/mc/mcImg.nii.gz | grep ^dim4 | awk '{print $2}')
 xydimTenth=$(echo $xdim 0.06 | awk '{print int($1*$2)}')
 ydimMaskAnt=$(echo $ydim 0.93 | awk '{print int($1*$2)}')
 ydimMaskPost=$(echo $ydim 0.07 | awk '{print int($1*$2)}')
@@ -385,7 +385,6 @@ function T1ToStd()
 
 
   printf "%s\n" "...Optimizing T1 (highres) to MNI (standard) registration."
-  local maskname="T1"
   if [ ${lesion} -eq 1 ]; then
     lesionMaskprep ${T1_mask} ${outDir}
     local flirt_transform_option="-inweight ${outDir}/func/T1forWarp/LesionWeight.nii.gz"
@@ -425,7 +424,7 @@ function T1ToStd()
   { printf "%s\n" "applywarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Apply the warp to the lesion mask or to the T1 mask
-  clobber ${outDir}/func/T1forWarp/${maskname}MasktoMNI.nii.gz &&\
+  clobber ${outDir}/func/T1forWarp/LesionMasktoMNI.nii.gz &&\
   { applywarp \
   --ref=$fslDir/data/standard/MNI152_T1_2mm_brain.nii.gz \
   --in=$T1_mask \
@@ -451,7 +450,7 @@ function T1ToStd()
 function EPItoT1Master()
 { 
   #basic args (without fieldmap)
-  local epi=$1
+  local mcImgMean=$1
   local T1_brain=$2
   local T1_head=$3
   local T1_mask=$4
@@ -471,14 +470,14 @@ function EPItoT1Master()
   { printf "%s\n" "creation of ${outDir}/func/EPItoT1 failed, exiting ${FUNCNAME}" && return 1; }
 
   case ${num_args} in
-    5)
-      clobber something &&\
-      { EPItoT1FieldMap ${epi} ${T1_brain} ${outDir}/func/EPItoT1 ||\
-      { printf "%s\n"  "Generic Error Statement" && return 1 ;} ;}
-      ;;
     10)
       clobber something &&\
-      { EPItoT1 ${epi} ${outDir}/func/EPItoT1 ||\
+      { EPItoT1FieldMap $@ ||\
+      { printf "%s\n"  "Generic Error Statement" && return 1 ;} ;}
+      ;;
+    5)
+      clobber something &&\
+      { EPItoT1 $@ ||\
       { printf "%s\n" "Generic Error Statement"&& return 1 ;} ;}
       ;;
     *)
@@ -493,12 +492,11 @@ function EPItoT1Master()
 function EPItoT1FieldMap()
 {
   #basic args (without fieldmap)
-  local epi=$1
-  local epiDir=$(basename ${epi})
+  local mcImgMean=$1
   local T1_brain=$2
   local T1_head=$3
   local T1_mask=$4
-  local EPItoT1outDir=$5
+  local outDir=$5
   #additional arguments for fieldmap processing
   local fieldmap=$6
   local fieldmapMagHead=$7
@@ -513,10 +511,10 @@ function EPItoT1FieldMap()
   #epi_reg --epi=${indir}/mcImgMean.nii.gz --t1=${t1SkullData} --t1brain=${t1Data} --wmseg=$epiWarpDir/T1_MNI_brain_wmseg.nii.gz --out=$epiWarpDir/EPItoT1 --fmap=${fieldMap} --fmapmag=${fieldMapMagSkull} --fmapmagbrain=${fieldMapMag} --echospacing=${dwellTime} --pedir=${peDir}
 
   clobber ${outDir}/func/EPItoT1/EPItoT1_warp.nii.gz &&\
-  { epi_reg --epi=${epi} \
+  { epi_reg --epi=${mcImgMean} \
   --t1=${T1_head} \
   --t1brain=${T1_brain} \
-  --out=${EPItoT1outDir} \
+  --out=${outDir}/func/EPItoT1/ \
   --fmap=${fieldMap} \
   --fmapmag=${fieldMapMagHead} \
   --fmapmagbrain=${fieldMapMagBrain} \
@@ -525,46 +523,46 @@ function EPItoT1FieldMap()
   { printf "%s\n" "epi_reg failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Invert the affine registration (to get T1toEPI)
-  clobber ${EPItoT1outDir}/T1toEPI.mat &&\
-  { convert_xfm -omat ${EPItoT1outDir}/T1toEPI.mat -inverse ${EPItoT1outDir}/EPItoT1.mat ||\
+  clobber ${outDir}/func/EPItoT1/T1toEPI.mat &&\
+  { convert_xfm -omat ${outDir}/func/EPItoT1/T1toEPI.mat -inverse ${outDir}/func/EPItoT1/EPItoT1.mat ||\
   { printf "%s\n" "convert_xfm failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Invert the nonlinear warp (to get T1toEPI)
-  clobber ${EPItoT1outDir}/T1toEPI_warp.nii.gz &&\
-  { invwarp -w ${EPItoT1outDir}/EPItoT1_warp.nii.gz -r ${epi} -o ${EPItoT1outDir}/T1toEPI_warp.nii.gz ||\
+  clobber ${outDir}/func/EPItoT1/T1toEPI_warp.nii.gz &&\
+  { invwarp -w ${outDir}/func/EPItoT1/EPItoT1_warp.nii.gz -r ${mcImgMean} -o ${outDir}/func/EPItoT1/T1toEPI_warp.nii.gz ||\
   { printf "%s\n" "invwarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Apply the inverted (T1toEPI) warp to the brain mask
-  clobber ${epiDir}/mcImgMean_mask.nii.gz &&\
-  { applywarp --ref=${epiDir}/mcImgMean.nii.gz --in=${T1mask} --out=${epiDir}/mcImgMean_mask.nii.gz --warp=${EPItoT1outDir}/T1toEPI_warp.nii.gz --datatype=char --interp=nn ||\
+  clobber ${outDir}/func/EPItoT1/mcImgMean_mask.nii.gz &&\
+  { applywarp --ref=${mcImgMean} --in=${T1_mask} --out=${outDir}/func/EPItoT1/mcImgMean_mask.nii.gz --warp=${outDir}/func/EPItoT1/T1toEPI_warp.nii.gz --datatype=char --interp=nn ||\
   { printf "%s\n" "applywarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
    #Create a stripped version of the EPI (mcImg) file, apply the warp
-  clobber ${epiDir}/mcImgMean_stripped.nii.gz &&\
-  { fslmaths ${epiDir}/mcImgMean.nii.gz -mas ${epiDir}/mcImgMean_mask.nii.gz ${epiDir}/mcImgMean_stripped.nii.gz ||\
+  clobber ${outDir}/func/EPItoT1/mcImgMean_stripped.nii.gz &&\
+  { fslmaths ${mcImgMean} -mas ${outDir}/func/EPItoT1/mcImgMean_mask.nii.gz ${outDir}/func/EPItoT1/mcImgMean_stripped.nii.gz ||\
   { printf "%s\n" "fslmaths failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
-  clobber ${EPItoT1outDir}/EPIstrippedtoT1.nii.gz &&\
-  { applywarp --ref=${T1_brain} --in=${epiDir}/mcImgMean_stripped.nii.gz --out=${EPItoT1outDir}/EPIstrippedtoT1.nii.gz --warp=${EPItoT1outDir}/EPItoT1_warp.nii.gz ||\
+  clobber ${outDir}/func/EPItoT1/EPIstrippedtoT1.nii.gz &&\
+  { applywarp --ref=${T1_brain} --in=${outDir}/func/EPItoT1/mcImgMean_stripped.nii.gz --out=${outDir}/func/EPItoT1/EPIstrippedtoT1.nii.gz --warp=${outDir}/func/EPItoT1/EPItoT1_warp.nii.gz ||\
   { printf "%s\n" "applywarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Sum the nonlinear warp (MNItoT1_warp.nii.gz) with the second nonlinear warp (T1toEPI_warp.nii.gz) to get a warp from MNI to EPI
-  clobber ${EPItoT1outDir}/MNItoEPI_warp.nii.gz &&\
+  clobber ${outDir}/func/EPItoT1/MNItoEPI_warp.nii.gz &&\
   { convertwarp \
   --ref=${epiDir}/mcImgMean.nii.gz \
   --warp1=${outDir}/func/T1forWarp/MNItoT1_warp.nii.gz \
-  --warp2=${EPItoT1outDir}/T1toEPI_warp.nii.gz \
+  --warp2=${outDir}/func/EPItoT1//T1toEPI_warp.nii.gz \
   --out=${epiWarpDir}/MNItoEPI_warp.nii.gz --relout ||\
   { printf "%s\n" "convertwarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Invert the warp to get EPItoMNI_warp.nii.gz
-  clobber ${epiWarpDir}/EPItoMNI_warp.nii.gz &&\
-  { invwarp -w ${epiWarpDir}/MNItoEPI_warp.nii.gz -r $fslDir/data/standard/MNI152_T1_2mm.nii.gz -o ${epiWarpDir}/EPItoMNI_warp.nii.gz ||\
+  clobber ${outDir}/func/EPItoT1/EPItoMNI_warp.nii.gz &&\
+  { invwarp -w ${outDir}/func/EPItoT1/MNItoEPI_warp.nii.gz -r $fslDir/data/standard/MNI152_T1_2mm.nii.gz -o ${outDir}/func/EPItoT1/EPItoMNI_warp.nii.gz ||\
   { printf "%s\n" "invwarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Apply EPItoMNI warp to EPI file
-  clobber $epiWarpDir/EPItoMNI.nii.gz &&\
-  { applywarp --ref=$fslDir/data/standard/MNI152_T1_2mm.nii.gz --in=${indir}/mcImgMean_stripped.nii.gz --out=$epiWarpDir/EPItoMNI.nii.gz --warp=${epiWarpDir}/EPItoMNI_warp.nii.gz ||\
+  clobber ${outDir}/func/EPItoT1/EPItoMNI.nii.gz &&\
+  { applywarp --ref=$fslDir/data/standard/MNI152_T1_2mm.nii.gz --in=${outDir}/func/EPItoT1/mcImgMean_stripped.nii.gz --out=${outDir}/func/EPItoT1/EPItoMNI.nii.gz --warp=${outDir}/func/EPItoT1/EPItoMNI_warp.nii.gz ||\
   { printf "%s\n" "applywarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   printf "%s\n ${FUNCNAME} successful" && return 0
@@ -573,72 +571,82 @@ function EPItoT1FieldMap()
 function EPItoT1()
 {
   #local variables here
-  #
-  #
-  #
+  local mcImgMean=$1 #epi is mcImgMean
+  local T1_brain=$2
+  local T1_head=$3
+  local T1_mask=$4
+  local outDir=$5
   printf "%s\n" "......Registration Without FieldMap Correction." 
   #Warp without FieldMap correction
   #Ouput will be a .mat file
   #epi_reg --epi=${indir}/mcImgMean.nii.gz --t1=${t1SkullData} --t1brain=${t1Data} --wmseg=$epiWarpDir/T1_MNI_brain_wmseg.nii.gz --out=$epiWarpDir/EPItoT1
-  clobber $epiWarpDir/EPItoT1 &&\
-  { epi_reg --epi=${indir}/mcImgMean.nii.gz --t1=${t1SkullData} --t1brain=${t1Data} --out=$epiWarpDir/EPItoT1 --noclean ||\
+  clobber ${outDir}/func/EPItoT1/EPItoT1_warp.nii.gz &&\
+  { epi_reg --epi=${mcImgMean} \
+  --t1=${T1_head} \
+  --t1brain=${T1_brain} \
+  --out=${outDir}/func/EPItoT1/ --noclean ||\
   { printf "%s\n" "epi_reg failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Invert the affine registration (to get T1toEPI)
-  clobber $epiWarpDir/T1toEPI.mat &&\
+  clobber ${outDir}/func/EPItoT1/T1toEPI.mat &&\
   { convert_xfm -omat $epiWarpDir/T1toEPI.mat -inverse $epiWarpDir/EPItoT1.mat ||\
   { printf "%s\n" "convert_xfm failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Apply the inverted (T1toEPI) mat file to the brain mask
-  clobber ${indir}/mcImgMean_mask.nii.gz &&\
-  { flirt -in $T1mask -ref ${indir}/mcImgMean.nii.gz -applyxfm -init $epiWarpDir/T1toEPI.mat -out ${indir}/mcImgMean_mask.nii.gz -interp nearestneighbour -datatype char ||\
+  clobber ${outDir}/func/EPItoT1/mcImgMean_mask.nii.gz &&\
+  { flirt -in ${T1_mask} -ref ${mcImgMean} -applyxfm -init ${outDir}/func/EPItoT1/T1toEPI.mat -out ${outDir}/func/EPItoT1/mcImgMean_mask.nii.gz -interp nearestneighbour -datatype char ||\
   { printf "%s\n" "flirt failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Create a stripped version of the EPI (mcImg) file, apply the mat file
-  clobber ${indir}/mcImgMean_stripped.nii.gz &&\
-  { fslmaths ${indir}/mcImgMean.nii.gz -mas ${indir}/mcImgMean_mask.nii.gz ${indir}/mcImgMean_stripped.nii.gz ||\
+  clobber ${outDir}/func/EPItoT1/mcImgMean_stripped.nii.gz &&\
+  { fslmaths ${mcImgMean} -mas ${outDir}/func/EPItoT1/mcImgMean_mask.nii.gz ${outDir}/func/EPItoT1/mcImgMean_stripped.nii.gz ||\
   { printf "%s\n" "fslmaths failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
-  clobber $epiWarpDir/EPIstrippedtoT1.nii.gz &&\
-  { flirt -in ${indir}/mcImgMean_stripped.nii.gz -ref ${t1Data} -applyxfm -init $epiWarpDir/EPItoT1.mat -out $epiWarpDir/EPIstrippedtoT1.nii.gz ||\
+  clobber ${outDir}/func/EPItoT1/EPIstrippedtoT1.nii.gz &&\
+  { flirt -in ${outDir}/func/EPItoT1/mcImgMean_stripped.nii.gz -ref ${T1_brain} -applyxfm -init ${outDir}/func/EPItoT1/EPItoT1.mat -out ${outDir}/func/EPItoT1/EPIstrippedtoT1.nii.gz ||\
   { printf "%s\n" "flirt failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Sum the nonlinear warp (MNItoT1_warp.nii.gz) with the affine transform (T1toEPI.mat) to get a warp from MNI to EPI
-  clobber ${epiWarpDir}/MNItoEPI_warp.nii.gz &&\
-  { convertwarp --ref=${indir}/mcImgMean.nii.gz --warp1=${t1WarpDir}/MNItoT1_warp.nii.gz --postmat=${epiWarpDir}/T1toEPI.mat --out=${epiWarpDir}/MNItoEPI_warp.nii.gz --relout ||\
+  clobber ${outDir}/func/EPItoT1/MNItoEPI_warp.nii.gz &&\
+  { convertwarp --ref=${mcImgMean} --warp1=${outDir}/func/T1forWarp/MNItoT1_warp.nii.gz --postmat=${outDir}/func/EPItoT1/T1toEPI.mat --out=${outDir}/func/EPItoT1/MNItoEPI_warp.nii.gz --relout ||\
   { printf "%s\n" "convertwarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Invert the warp to get EPItoMNI_warp.nii.gz
-  clobber ${epiWarpDir}/EPItoMNI_warp.nii.gz &&\
-  { invwarp -w ${epiWarpDir}/MNItoEPI_warp.nii.gz -r $fslDir/data/standard/MNI152_T1_2mm.nii.gz -o ${epiWarpDir}/EPItoMNI_warp.nii.gz ||\
+  clobber ${outDir}/func/EPItoT1/EPItoMNI_warp.nii.gz &&\
+  { invwarp -w ${outDir}/func/EPItoT1/MNItoEPI_warp.nii.gz -r $fslDir/data/standard/MNI152_T1_2mm.nii.gz -o ${outDir}/func/EPItoT1/EPItoMNI_warp.nii.gz ||\
   { printf "%s\n" "invwarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Apply EPItoMNI warp to EPI file
-  clobber $epiWarpDir/EPItoMNI.nii.gz &&\
-  applywarp --ref=$fslDir/data/standard/MNI152_T1_2mm.nii.gz --in=${indir}/mcImgMean_stripped.nii.gz --out=$epiWarpDir/EPItoMNI.nii.gz --warp=${epiWarpDir}/EPItoMNI_warp.nii.gz ||\
+  clobber ${outDir}/func/EPItoT1/EPItoMNI.nii.gz &&\
+  { applywarp --ref=$fslDir/data/standard/MNI152_T1_2mm.nii.gz --in=${outDir}/func/EPItoT1/mcImgMean_stripped.nii.gz --out=${outDir}/func/EPItoT1/EPItoMNI.nii.gz --warp=${outDir}/func/EPItoT1/EPItoMNI_warp.nii.gz ||\
   { printf "%s\n" "invwarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
+  printf "%s\n ${FUNCNAME} successful" && return 0
+}
+
+function TissueSeg() 
+{
+  local T1_brain=$1
+  local outDir=$2
+
+  #Do we need to run fast if epi_reg runs fast?
+  ########## Tissue class segmentation ###########
+  echo "...Creating Tissue class segmentations."
+  mkdir -p ${outDir}/func/T1forWarp/tissueSeg
+
+
+  #Tissue segment the skull-stripped T1
+  echo "......Starting FAST segmentation"
+  clobber ${outDir}/func/T1forWarp/T1_MNI_brain_wmseg.nii.gz &&\
+  { fast -t 1 -n 3 -g -o $segDir/T1 $t1Data &&\
+  cp ${outDir}/func/T1forWarp/tissueSeg/T1_seg_2.nii.gz ${outDir}/func/T1forWarp/T1_MNI_brain_wmseg.nii.gz ||\
+  { printf "%s\n" "fast failed, exiting ${FUNCNAME}" && return 1 ;} ;}
+
+  printf "%s\n ${FUNCNAME} successful" && return 0
 }
 
 
-#Do we need to run fast if epi_reg runs fast?
-########## Tissue class segmentation ###########
-echo "...Creating Tissue class segmentations."
-
-t1Dir=`dirname $t1Data`
-segDir=$t1Dir/tissueSeg
-
-if [[ ! -e $segDir ]]; then
-  mkdir $segDir
-fi
-
-#Tissue segment the skull-stripped T1
-echo "......Starting FAST segmentation"
-clobber $t1Dir/T1_MNI_brain_wmseg.nii.gz &&\
-fast -t 1 -n 3 -g -o $segDir/T1 $t1Data &&\
-cp $segDir/T1_seg_2.nii.gz $t1Dir/T1_MNI_brain_wmseg.nii.gz 
-
-
+#JK put a pin in this, may fit in another function better
 ########## Skullstrip the EPI data ######################
 
 #ENTER FUNCTION FOR SKULLSTRIPPING
@@ -654,287 +662,325 @@ fslmaths RestingStateRaw.nii.gz -mas $mcMask RestingState.nii.gz
 ########## SNR Estimation ######################
 function Estimate_SNR()
 {
+  local mcImg=$1
+  local outDir=$2
+  local T1_GM=$3
+  local mcImgMean=$4
+  local mcImgMean_mask=$5
+  local T1toEPI_transform=$6
+  local segDir=$7
+  local fieldMapFlag=$8
   #putting a sticky note here until I figure out where this code flows the best
-########## In vs. Out of Brain SNR Calculation #
-echo "...SNR mask creation."
 
-#Calculate a few dimensions
-xdim=$(fslhd mcImg.nii.gz | grep ^dim1 | awk '{print $2}')
-ydim=$(fslhd mcImg.nii.gz | grep ^dim2 | awk '{print $2}')
-zdim=$(fslhd mcImg.nii.gz | grep ^dim3 | awk '{print $2}')
-tdim=$(fslhd mcImg.nii.gz | grep ^dim4 | awk '{print $2}')
-xydimTenth=$(echo $xdim 0.06 | awk '{print int($1*$2)}')
-ydimMaskAnt=$(echo $ydim 0.93 | awk '{print int($1*$2)}')
-ydimMaskPost=$(echo $ydim 0.07 | awk '{print int($1*$2)}')
+  ########## In vs. Out of Brain SNR Calculation #
+  echo "...SNR mask creation."
 
-echo "...Estimating SNR."
+  #Calculate a few dimensions
+  xdim=$(fslhd ${mcImg} | grep ^dim1 | awk '{print $2}')
+  ydim=$(fslhd ${mcImg} | grep ^dim2 | awk '{print $2}')
+  zdim=$(fslhd ${mcImg} | grep ^dim3 | awk '{print $2}')
+  tdim=$(fslhd ${mcImg} | grep ^dim4 | awk '{print $2}')
+  xydimTenth=$(echo $xdim 0.06 | awk '{print int($1*$2)}')
+  ydimMaskAnt=$(echo $ydim 0.93 | awk '{print int($1*$2)}')
+  ydimMaskPost=$(echo $ydim 0.07 | awk '{print int($1*$2)}')
 
-#Create a folder to dump temp data into
-if [ ! -e SNR ]; then
-  mkdir SNR
-fi
+  echo "...Estimating SNR."
 
-snrDir=${indir}/SNR
+  #Create a folder to dump temp data into
+  mkdir -p ${outDir}/func/SNR
 
 
-#Create a GM segmentation mask (copy data from FAST processing)
-fslmaths $segDir/T1_seg_1.nii.gz -bin $snrDir/T1_GM.nii.gz -odt char
+  echo "...Warping GM/WM/CSF mask to EPI space"
+    #Warp GM, WM and CSF to EPI space
+  ##WM/CSF will be used in MELODIC s/n determination
+  clobber ${outDir}/func/SNR/T1_GM.nii.gz &&\
+  { fslmaths $segDir/T1_seg_1.nii.gz -bin ${outDir}/func/SNR/T1_GM.nii.gz -odt char ||\
+  { printf "fslmaths failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
+  #Check for FieldMap correction.  If used, will have to applywarp, othewise use flirt with the .mat file
+  if [[ $fieldMapFlag == 1 ]]; then
+    #Apply the warp file
+    clobber ${outDir}/func/SNR/RestingState_GM.nii.gz &&\
+    { applywarp -i ${T1_GM} -o ${outDir}/func/SNR/RestingState_GM.nii.gz -r ${mcImgMean} -w ${T1toEPI_warp} --interp=nn --datatype=char ||\
+    { printf "applywarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
-echo "...Warping GM/WM/CSF mask to EPI space"
-  #Warp GM, WM and CSF to EPI space
-##WM/CSF will be used in MELODIC s/n determination
+    #Transfer over GM/WM/CSF from original segmentation, without binarizing/conversion to 8bit
+    clobber ${outDir}/func/SNR/CSF_to_RS.nii.gz &&\
+    { applywarp -i $segDir/T1_seg_0.nii.gz -o ${outDir}/func/SNR/CSF_to_RS.nii.gz -r ${mcImgMean} -w ${T1toEPI_transform} --interp=nn ||\
+    { printf "applywarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
+    clobber ${outDir}/func/SNR/GM_to_RS.nii.gz &&\
+    { applywarp -i $segDir/T1_seg_1.nii.gz -o ${outDir}/func/SNR/GM_to_RS.nii.gz -r ${mcImgMean} -w ${T1toEPI_transform} --interp=nn ||\
+    { printf "applywarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
-#Check for FieldMap correction.  If used, will have to applywarp, othewise use flirt with the .mat file
-if [[ $fieldMapFlag == 1 ]]; then
-  #Apply the warp file  
-  applywarp -i $snrDir/T1_GM.nii.gz -o $snrDir/RestingState_GM.nii.gz -r ${indir}/mcImgMean.nii.gz -w ${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn --datatype=char
+    clobber ${outDir}/func/SNR/WM_to_RS.nii.gz &&\
+    { applywarp -i $segDir/T1_seg_2.nii.gz -o ${outDir}/func/SNR/WM_to_RS.nii.gz -r ${mcImgMean} -w ${T1toEPI_transform} --interp=nn ||\
+    { printf "applywarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
-  #Transfer over GM/WM/CSF from original segmentation, without binarizing/conversion to 8bit
-  applywarp -i $segDir/T1_seg_0.nii.gz -o $snrDir/CSF_to_RS.nii.gz -r ${indir}/mcImgMean.nii.gz -w ${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn
-  applywarp -i $segDir/T1_seg_1.nii.gz -o $snrDir/GM_to_RS.nii.gz -r ${indir}/mcImgMean.nii.gz -w ${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn
-  applywarp -i $segDir/T1_seg_2.nii.gz -o $snrDir/WM_to_RS.nii.gz -r ${indir}/mcImgMean.nii.gz -w ${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn
-
-  #Echo out location of GM/WM/CSF (EPI) to rsParams file
-  echo "epiCSF=${snrDir}/CSF_to_RS.nii.gz" >> $indir/rsParams
-  echo "epiGM=${snrDir}/GM_to_RS.nii.gz" >> $indir/rsParams
-  echo "epiWM=${snrDir}/WM_to_RS.nii.gz" >> $indir/rsParams
-
-else
-  #Apply the affine .mat file
-  flirt -in $snrDir/T1_GM.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/RestingState_GM.nii.gz -interp nearestneighbour -datatype char
-
-  #Transfer over GM/WM/CSF from original segmentation, without binarizing/conversion to 8bit
-  flirt -in $segDir/T1_seg_0.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/CSF_to_RS.nii.gz -interp nearestneighbour
-  flirt -in $segDir/T1_seg_1.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/GM_to_RS.nii.gz -interp nearestneighbour
-  flirt -in $segDir/T1_seg_2.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/WM_to_RS.nii.gz -interp nearestneighbour
-
-  #Echo out location of GM/WM/CSF (EPI) to rsParams file
-  echo "epiCSF=${snrDir}/CSF_to_RS.nii.gz" >> $indir/rsParams
-  echo "epiGM=${snrDir}/GM_to_RS.nii.gz" >> $indir/rsParams
-  echo "epiWM=${snrDir}/WM_to_RS.nii.gz" >> $indir/rsParams
-fi
-
-
-#smooth output to get rid of pixellation
-3dmerge -doall -prefix RestingState_GMsmooth.nii.gz -session $snrDir -1blur_fwhm 5 $snrDir/RestingState_GM.nii.gz -overwrite
-fslmaths $snrDir/RestingState_GMsmooth.nii.gz -add $snrDir/RestingState_GM.nii.gz -bin $snrDir/RestingState_GMfinal.nii.gz -odt char
-
-#Strip out GM from EPI
-fslmaths mcImg.nii.gz -mul $snrDir/RestingState_GMfinal.nii.gz $snrDir/RestingState_GM4d.nii.gz
-
-
-echo "...Calculating SNR measurements per TR."
-#Split 4D into separate files (for calculating mean of each TR)
-if [ ! -e $snrDir/GMtsplit ]; then
-  mkdir -p $snrDir/GMtsplit
-fi
-fslsplit $snrDir/RestingState_GM4d.nii.gz $snrDir/GMtsplit/RestingState_GM -t
-
-#Calculate Mean value of signal per TR
-for data in `ls -1tv $snrDir/GMtsplit/RestingState_GM*gz`
-do
-  fslstats $data -M  >> GM_Mean.par
-done
-
-#Create ROIs for calculating anterior and posterior noise (on Raw EPI) - based on 6% of xydimensions
-$scriptDir/makeROI_Noise.sh $ydimMaskAnt $xydimTenth mcImgMean.nii.gz $snrDir/NoiseAntMask
-$scriptDir/makeROI_Noise.sh $ydimMaskPost $xydimTenth mcImgMean.nii.gz $snrDir/NoisePostMask
-
-#Strip out Anterior/Posterior Noise from EPI
-fslmaths mcImg.nii.gz -mul $snrDir/NoiseAntMask.nii.gz $snrDir/RestingState_NoiseAntMask.nii.gz
-fslmaths mcImg.nii.gz -mul $snrDir/NoisePostMask.nii.gz $snrDir/RestingState_NoisePostMask.nii.gz
-
-#Split 4D (Anterior/Posterior Noise) into separate files (for calculating mean of each TR)
-if [ ! -e $snrDir/Noisetsplit ]; then
-  mkdir -p $snrDir/Noisetsplit
-fi
-
-tsplitDir=$snrDir/Noisetsplit
-
-fslsplit $snrDir/RestingState_NoiseAntMask.nii.gz $tsplitDir/RestingState_AntNoise -t
-fslsplit $snrDir/RestingState_NoisePostMask.nii.gz $tsplitDir/RestingState_PostNoise -t
-
-#Calculate Mean value of Noise (Anterior and Posterior) per TR
-for data in `ls -1tv $tsplitDir/RestingState_AntNoise*gz`
-do
-  fslstats $data -M  >> AntNoise_Mean.par
-done
-
-for data in `ls -1tv $tsplitDir/RestingState_PostNoise*gz`
-do
-  fslstats $data -M  >> PostNoise_Mean.par
-done
-
-#Calculate Noise (signal mean), signal to noise for each TR
-i="1"
-while [ $i -lt $tdim ]
-do
-  AntNoise=`cat AntNoise_Mean.par | head -$i | tail -1`
-  #Controlling for 0.0000 to be read as 0 (to avoid division by zero awk errors)
-  AntNoisebin=`echo $AntNoise | awk '{print int($1)}'`
-  PostNoise=`cat PostNoise_Mean.par | head -$i | tail -1`
-  #Controlling for 0.0000 to be read as 0 (to avoid division by zero awk errors)
-  PostNoisebin=`echo $PostNoise | awk '{print int($1)}'`
-  echo "antnoise${i} = $AntNoise" >> testNoise.txt
-  echo "postnoise${i} = $PostNoise" >> testNoise.txt
-  NoiseAvg=`echo $AntNoise $PostNoise | awk '{print (($1+$2)/2)}'`
-  NoiseAvgbin=`echo $NoiseAvg | awk '{print int($1)}'`
-  echo "noiseavg${i} = $NoiseAvg" >> testNoise.txt
-  GMMean=`cat GM_Mean.par | head -$i | tail -1`
-  echo "gmmean${i} = $GMMean" >> testNoise.txt
-
-  #Avoid division by zero awk errors
-  if [ $AntNoisebin == 0 ]; then
-AntSigNoise=0
   else
-AntSigNoise=`echo $GMMean $AntNoise | awk '{print $1/$2}'`
-  fi
-  echo "antsignoise${i} = $AntSigNoise" >> testNoise.txt
+    #Apply the affine .mat file
+    clobber ${outDir}/func/SNR/RestingState_GM.nii.gz &&\
+    { flirt -in ${T1_GM} -ref ${mcImgMean} -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out ${outDir}/func/SNR/RestingState_GM.nii.gz -interp nearestneighbour -datatype char ||\
+    { printf "applywarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
-  #Avoid division by zero awk errors
-  if [ $PostNoisebin == 0 ]; then
-PostSigNoise=0
-  else
-PostSigNoise=`echo $GMMean $PostNoise | awk '{print $1/$2}'`
-  fi
-  echo "postsignoise${i} = $PostSigNoise" >> testNoise.txt
+    #Transfer over GM/WM/CSF from original segmentation, without binarizing/conversion to 8bit
+    clobber ${outDir}/func/SNR/RestingState_GM.nii.gz &&\
+    { flirt -in $segDir/T1_seg_0.nii.gz -ref ${mcImgMean} -applyxfm -init ${T1toEPI_transform} -out ${outDir}/func/SNR/CSF_to_RS.nii.gz -interp nearestneighbour ||\
+    { printf "applywarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
-  #Avoid division by zero awk errors
-  if [ $NoiseAvgbin == 0 ]; then
-SigNoiseAvg=0
-  else
-SigNoiseAvg=`echo $GMMean $NoiseAvg | awk '{print $1/$2}'`
-  fi
-  echo "$AntSigNoise $PostSigNoise $SigNoiseAvg" >> SigNoise.par
-  echo "$NoiseAvg" >> NoiseAvg.par
+    clobber ${outDir}/func/SNR/GM_to_RS.nii.gz &&\
+    { flirt -in $segDir/T1_seg_1.nii.gz -ref ${mcImgMean} -applyxfm -init ${T1toEPI_transform} -out ${outDir}/func/SNR/GM_to_RS.nii.gz -interp nearestneighbour ||\
+    { printf "applywarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
-i=$[$i+1]
-done
-################################################################
-
-
-
-########## Plot out Ant/Post Noise, Global SNR #
-
-fsl_tsplot -i SigNoise.par -o SigNoisePlot.png -t 'Signal to Noise Ratio per TR' -a Anterior,Posterior,Average -u 1 --start=1 --finish=3 -w 800 -h 300
-fsl_tsplot -i AntNoise_Mean.par,PostNoise_Mean.par,NoiseAvg.par -o NoisePlot.png -t 'Noise (Mean Intensity) per TR' -a Anterior,Posterior,Average -u 1 -w 800 -h 300
-
-################################################################
-
-
-
-########## Temporal filtering (legacy option) ##
-  #NOT suggested to run until just before nuisance regression
-  #To maintain consistency with previous naming, motion-corrected image is just renamed
-#Updating to call file "nonfiltered" to avoid any confusion down the road
-cp $indir/mcImg.nii.gz $indir/nonfilteredImg.nii.gz
-
-################################################################
-
-
-
-########## Global SNR Estimation ###############
-echo "...Calculating signal to noise measurements"
-
-fslmaths $indir/nonfilteredImg -Tmean $indir/nonfilteredMeanImg
-fslmaths $indir/nonfilteredImg -Tstd $indir/nonfilteredStdImg 
-fslmaths $indir/nonfilteredMeanImg -div $indir/nonfilteredStdImg $indir/nonfilteredSNRImg
-fslmaths $indir/nonfilteredSNRImg -mas $indir/mcImgMean_mask $indir/nonfilteredSNRImg
-SNRout=`fslstats $indir/nonfilteredSNRImg -M`
-
-#Get information for timecourse 
-echo "$indir rest $SNRout" >> ${indir}/SNRcalc.txt
-
-################################################################
-
-
-
-########## Spike Detection #####################
-echo "...Detecting time series spikes"
-
-  if [ -e ${indir}/SPIKES.txt ]; then
-rm ${indir}/SPIKES.txt
+    clobber ${outDir}/func/SNR/WM_to_RS.nii.gz &&\
+    { flirt -in $segDir/T1_seg_2.nii.gz -ref ${mcImgMean} -applyxfm -init ${T1toEPI_transform} -out ${outDir}/func/SNR/WM_to_RS.nii.gz -interp nearestneighbour ||\
+    { printf "applywarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
   fi
 
-  if [ -e ${indir}/evspikes.txt ]; then
-rm ${indir}/evspikes.txt
-  fi
-
-  if [ -e ${indir}/tmp ]; then
-rm -rf ${indir}/tmp
-  fi
-
-####  CALCULATE SPIKES BASED ON NORMALIZED TIMECOURSE OF GLOBAL MEAN ####
-fslstats -t nonfilteredImg.nii.gz -M >> ${indir}/global_mean_ts.dat
-ImgMean=`fslstats $indir/nonfilteredImg.nii.gz -M`
-echo "Image mean is $ImgMean"
-meanvolsd=`$scriptDir/sd.sh ${indir}/global_mean_ts.dat`
-echo "Image standard deviation is $meanvolsd"
-
-vols=`cat ${indir}/global_mean_ts.dat`
-
-for vol in $vols
-do
-  Diffval=`echo "scale=6; ${vol}-${ImgMean}" | bc`
-  Normscore=`echo "scale=6; ${Diffval}/${meanvolsd}" | bc`
-  echo "$Normscore" >>  ${indir}/Normscore.par
-
-  echo $Normscore | awk '{if ($1 < 0) $1 = -$1; if ($1 > 3) print 1; else print 0}' >> ${indir}/evspikes.txt
-done
-
-fsl_tsplot -i Normscore.par -t 'Normalized global mean timecourse' -u 1 --start=1 -a normedts -w 800 -h 300 -o normscore.png
-
-################################################################
+   #use other reporting mechanism
+    #Echo out location of GM/WM/CSF (EPI) to rsParams file
+    #echo "epiCSF=${snrDir}/CSF_to_RS.nii.gz" >> $indir/rsParams
+    #echo "epiGM=${snrDir}/GM_to_RS.nii.gz" >> $indir/rsParams
+    #echo "epiWM=${snrDir}/WM_to_RS.nii.gz" >> $indir/rsParams
 
 
+  #smooth output to get rid of pixellation
+  clobber ${outDir}/func/SNR/RestingState_GMsmooth.nii.gz &&\
+  { 3dmerge -doall -prefix ${outDir}/func/SNR/RestingState_GMsmooth.nii.gz -session ${outDir}/func/SNR -1blur_fwhm 5 ${outDir}/func/SNR/RestingState_GM.nii.gz -overwrite ||\
+  { printf "3dmerge failed, exiting ${FUNCNAME}" && return 1 ;} ;}
+
+  clobber ${outDir}/func/SNR/RestingState_GMfinal.nii.gz &&\
+  { fslmaths ${outDir}/func/SNR/RestingState_GMsmooth.nii.gz -add ${outDir}/func/SNR/RestingState_GM.nii.gz -bin ${outDir}/func/SNR/RestingState_GMfinal.nii.gz -odt char ||\
+  { printf "fslmaths failed, exiting ${FUNCNAME}" && return 1 ;} ;}
+
+  #Strip out GM from EPI
+  clobber ${outDir}/func/SNR/RestingState_GM4d.nii.gz &&\
+  { fslmaths ${mcImg} -mul ${outDir}/func/SNR/RestingState_GMfinal.nii.gz ${outDir}/func/SNR/RestingState_GM4d.nii.gz ||\
+  { printf "fslmaths failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
 
-########## AFNI QC tool ########################
-  #AFNI graphing tool is fugly.  Replacing with FSL
-
-3dTqual -range -automask nonfilteredImg.nii.gz >> tmpPlot
-fsl_tsplot -i tmpPlot -t '3dTqual Results (Difference From Norm)' -u 1 --start=1 -a quality_index -w 800 -h 300 -o 3dTqual.png
-rm tmpPlot
-
-################################################################
+  echo "...Calculating SNR measurements per TR."
+  
+  #This error test won't work, but I'm too lazy rn (it checks the outcome of redirection not fslstats)
+  clobber ${outDir}/func/SNR/GM_Mean.par &&\
+  { fslstats -t ${outDir}/func/SNR/RestingState_GM4d.nii.gz -M >> ${outDir}/func/SNR/GM_Mean.par ||\
+  { printf "making GM_Mean.par failed, exiting ${FUNCNAME}" ;} ;}
 
 
+  #Create ROIs for calculating anterior and posterior noise (on Raw EPI) - based on 6% of xydimensions
+  clobber ${outDir}/func/SNR/NoiseAntMask &&\
+  { makeROI_Noise $ydimMaskAnt $xydimTenth ${mcImgMean} ${outDir}/func/SNR/NoiseAntMask ||\
+  { printf "makeROI_Noise failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
-########## Spike Report ########################
+  clobber ${outDir}/func/SNR/NoisePostMask &&\
+  { makeROI_Noise $ydimMaskPost $xydimTenth ${mcImgMean} ${outDir}/func/SNR/NoisePostMask ||\
+  { printf "makeROI_Noise failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
-spikeCount=`cat ${indir}/evspikes.txt | awk '/1/{n++}; END {print n+0}'`
+  #Strip out Anterior/Posterior Noise from EPI
+  clobber ${outDir}/func/SNR/RestingState_NoiseAntMask.nii.gz &&\
+  { fslmaths ${mcImg} -mul ${outDir}/func/SNR/NoiseAntMask.nii.gz ${outDir}/func/SNR/RestingState_NoiseAntMask.nii.gz ||\
+  { printf "fslmaths failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
-cd ${indir}
+  clobber ${outDir}/func/SNR/RestingState_NoisePostMask.nii.gz &&\
+  { fslmaths ${mcImg} -mul ${outDir}/func/SNR/NoisePostMask.nii.gz ${outDir}/func/SNR/RestingState_NoisePostMask.nii.gz ||\
+  { printf "fslmaths failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
-################################################################
+  #Calculate Mean value of Noise (Anterior and Posterior) per TR
+
+  clobber ${outDir}/func/SNR/AntNoise_Mean.par &&\
+  { fslstats -t ${outDir}/func/SNR/RestingState_NoiseAntMask.nii.gz -M >> ${outDir}/func/SNR/AntNoise_Mean.par ||\
+  { printf "fslstats failed, exiting ${FUNCNAME}", && return 1 ;} ;}
+
+  clobber ${outDir}/func/SNR/PostNoise_Mean.par &&\
+  { fslstats -t ${outDir}/func/SNR/RestingState_NoisePostMask.nii.gz -M  >> ${outDir}/func/SNR/PostNoise_Mean.par ||\
+  { printf "fslstats failed, exiting ${FUNCNAME}", && return 1 ;} ;}
+  
+
+  #make arrays from the .par lists
+  local PostNoise=($(cat ${outDir}/func/SNR/PostNoise_Mean.par))
+  local AntNoise=($(cat ${outDir}/func/SNR/AntNoise_Mean.par))
+  local GM=($(cat ${outDir}/func/SNR/GM_Mean.par))
+  #Calculate Noise (signal mean), signal to noise for each TR
+  
+  #JK: not going to error check this, if I do, I'm going to revamp this code.
+  for i in $(seq 0 $((${tdim}-1)) ); do
+    #AntNoise=`cat AntNoise_Mean.par | head -$i | tail -1`
+    #Controlling for 0.0000 to be read as 0 (to avoid division by zero awk errors)
+    AntNoisebin=$(echo ${AntNoise[$i]} | awk '{print int($1)}')
+    #PostNoise=`cat PostNoise_Mean.par | head -$i | tail -1`
+    #Controlling for 0.0000 to be read as 0 (to avoid division by zero awk errors)
+    PostNoisebin=$(echo ${PostNoise[$i]} | awk '{print int($1)}')
+    echo "antnoise${i} = ${AntNoise[$i]}" >> ${outDir}/func/SNR/testNoise.txt
+    echo "postnoise${i} = ${PostNoise[$i]}" >> ${outDir}/func/SNR/testNoise.txt
+    NoiseAvg=$(echo ${AntNoise[$i]} ${PostNoise[$i]} | awk '{print (($1+$2)/2)}')
+    NoiseAvgbin=$(echo $NoiseAvg | awk '{print int($1)}')
+    echo "noiseavg${i} = $NoiseAvg" >> ${outDir}/func/SNR/testNoise.txt
+    echo "gmmean${i} = ${GM[$i]}" >> ${outDir}/func/SNR/testNoise.txt
+
+    #Avoid division by zero awk errors
+    if [ $AntNoisebin == 0 ]; then
+  AntSigNoise=0
+    else
+  AntSigNoise=`echo ${GM[$i]} ${AntNoise[$i]} | awk '{print $1/$2}'`
+    fi
+    echo "antsignoise${i} = $AntSigNoise" >> ${outDir}/func/SNR/testNoise.txt
+
+    #Avoid division by zero awk errors
+    if [ $PostNoisebin == 0 ]; then
+  PostSigNoise=0
+    else
+  PostSigNoise=`echo ${GM[$i]} ${PostNoise[$i]} | awk '{print $1/$2}'`
+    fi
+    echo "postsignoise${i} = $PostSigNoise" >> ${outDir}/func/SNR/testNoise.txt
+
+    #Avoid division by zero awk errors
+    if [ $NoiseAvgbin == 0 ]; then
+  SigNoiseAvg=0
+    else
+  SigNoiseAvg=`echo $GM[$1] $NoiseAvg | awk '{print $1/$2}'`
+    fi
+    echo "$AntSigNoise $PostSigNoise $SigNoiseAvg" >> ${outDir}/func/SNR/SigNoise.par
+    echo "$NoiseAvg" >> ${outDir}/func/SNR/NoiseAvg.par
+
+  done
+  ################################################################
 
 
 
-########## Report Output to HTML File ##########
+  ########## Plot out Ant/Post Noise, Global SNR #
 
-echo "<h1>Resting State Analysis</h1>" > analysisResults.html
-echo "<br><b>Directory: </b>$indir" >> analysisResults.html
-analysisDate=`date`
-echo "<br><b>Date: </b>$analysisDate" >> analysisResults.html
-user=`whoami`
-echo "<br><b>User: </b>$user<br><hr>" >> analysisResults.html
-echo "<h2>Motion Results</h2>" >> analysisResults.html
-echo "<br><img src="rot.png" alt="rotations"><br><br><img src="rot_mm.png" alt="rotations_mm"><br><br><img src="trans.png" alt="translations"><br><br><img src="rot_trans.png" alt="rotations_translations"><br><br><img src="disp.png" alt="displacement"><hr>" >> analysisResults.html
-echo "<h2>SNR Results</h2>" >> analysisResults.html
-echo "<br><b>Scan SNR: </b>$SNRout" >> analysisResults.html
-echo "<br>$spikeCount spikes detected at ${spikeThresh} standard deviation threshold" >> analysisResults.html
-echo "<br><br><img src="normscore.png"" >> analysisResults.html
-echo "<br>" >> analysisResults.html
-echo "<br><b>AFNI 3dTqual Results</b><br><br>" >> analysisResults.html
-echo "<br><img src="3dTqual.png"" >> analysisResults.html
-echo "<br>" >> analysisResults.html
+  fsl_tsplot -i ${outDir}/func/SNR/SigNoise.par -o ${outDir}/func/SNR/SigNoisePlot.png -t 'Signal to Noise Ratio per TR' -a Anterior,Posterior,Average -u 1 --start=1 --finish=3 -w 800 -h 300
+  fsl_tsplot -i ${outDir}/func/SNR/AntNoise_Mean.par,${outDir}/func/SNR/PostNoise_Mean.par,${outDir}/func/SNR/NoiseAvg.par -o NoisePlot.png -t 'Noise (Mean Intensity) per TR' -a Anterior,Posterior,Average -u 1 -w 800 -h 300
 
-################################################################
+  ################################################################
 
-#Cleanup
-rm -rf tmpLesionMask
+
+
+  ########## Temporal filtering (legacy option) ##
+    #NOT suggested to run until just before nuisance regression
+    #To maintain consistency with previous naming, motion-corrected image is just renamed
+  #Updating to call file "nonfiltered" to avoid any confusion down the road
+  cp ${mcImg} ${mcImg/.nii.gz/_nonfiltered.nii.gz}
+
+  ################################################################
+
+
+
+  ########## Global SNR Estimation ###############
+  echo "...Calculating signal to noise measurements"
+
+  fslmaths ${mcImg/.nii.gz/_nonfiltered.nii.gz} -Tmean ${mcImg/.nii.gz/_nonfilteredMean.nii.gz}
+  fslmaths ${mcImg/.nii.gz/_nonfiltered.nii.gz} -Tstd ${mcImg/.nii.gz/_nonfilteredSTD.nii.gz}
+  fslmaths ${mcImg/.nii.gz/_nonfilteredMean.nii.gz} -div ${mcImg/.nii.gz/_nonfilteredSTD.nii.gz} ${mcImg/.nii.gz/_nonfilteredSNR.nii.gz}
+  fslmaths ${mcImg/.nii.gz/_nonfilteredSNR.nii.gz} -mas ${mcImgMean_mask} ${mcImg/.nii.gz/_nonfilteredSNR.nii.gz}
+  SNRout=$(fslstats ${mcImg/.nii.gz/_nonfilteredSNR.nii.gz} -M)
+
+  #Get information for timecourse 
+  echo "$indir rest $SNRout" >> ${outDir}/func/SNR/SNRcalc.txt
+
+  ################################################################
+
+
+
+  ########## Spike Detection #####################
+  echo "...Detecting time series spikes"
+
+
+  ####  CALCULATE SPIKES BASED ON NORMALIZED TIMECOURSE OF GLOBAL MEAN ####
+  fslstats -t ${mcImg/.nii.gz/_nonfiltered.nii.gz} -M > ${outDir}/func/SNR/global_mean_ts.dat
+  ImgMean=$(fslstats ${mcImg/.nii.gz/_nonfiltered.nii.gz} -M)
+  echo "Image mean is $ImgMean"
+  meanvolsd=$(${mcImg/.nii.gz/_nonfiltered.nii.gz} -S)
+  echo "Image standard deviation is $meanvolsd"
+
+  vols=$(cat ${outDir}/func/SNR/global_mean_ts.dat)
+
+  for vol in $vols
+  do
+    Diffval=`echo "scale=6; ${vol}-${ImgMean}" | bc`
+    Normscore=`echo "scale=6; ${Diffval}/${meanvolsd}" | bc`
+    echo "$Normscore" >>  ${outDir}/func/SNR/Normscore.par
+
+    echo $Normscore | awk '{if ($1 < 0) $1 = -$1; if ($1 > 3) print 1; else print 0}' >> ${outDir}/func/SNR/evspikes.txt
+  done
+
+  fsl_tsplot -i ${outDir}/func/SNR/Normscore.par -t 'Normalized global mean timecourse' -u 1 --start=1 -a normedts -w 800 -h 300 -o normscore.png
+
+  ################################################################
+
+
+
+
+  ########## AFNI QC tool ########################
+    #AFNI graphing tool is fugly.  Replacing with FSL
+
+  3dTqual -range -automask ${mcImg/.nii.gz/_nonfiltered.nii.gz} >> ${outDir}/func/SNR/tmpPlot
+  fsl_tsplot -i ${outDir}/func/SNR/tmpPlot -t '3dTqual Results (Difference From Norm)' -u 1 --start=1 -a quality_index -w 800 -h 300 -o 3dTqual.png
+  rm tmpPlot
+
+  ################################################################
+
+
+
+  ########## Spike Report ########################
+
+  spikeCount=$(cat ${outDir}/func/SNR/evspikes.txt | awk '/1/{n++}; END {print n+0}')
+
+
+
+  ################################################################
+
+
+
+  ########## Report Output to HTML File ##########
+
+  echo "<h1>Resting State Analysis</h1>" > analysisResults.html
+  echo "<br><b>Directory: </b>$indir" >> analysisResults.html
+  analysisDate=`date`
+  echo "<br><b>Date: </b>$analysisDate" >> analysisResults.html
+  user=`whoami`
+  echo "<br><b>User: </b>$user<br><hr>" >> analysisResults.html
+  echo "<h2>Motion Results</h2>" >> analysisResults.html
+  echo "<br><img src="rot.png" alt="rotations"><br><br><img src="rot_mm.png" alt="rotations_mm"><br><br><img src="trans.png" alt="translations"><br><br><img src="rot_trans.png" alt="rotations_translations"><br><br><img src="disp.png" alt="displacement"><hr>" >> analysisResults.html
+  echo "<h2>SNR Results</h2>" >> analysisResults.html
+  echo "<br><b>Scan SNR: </b>$SNRout" >> analysisResults.html
+  echo "<br>$spikeCount spikes detected at ${spikeThresh} standard deviation threshold" >> analysisResults.html
+  echo "<br><br><img src="normscore.png"" >> analysisResults.html
+  echo "<br>" >> analysisResults.html
+  echo "<br><b>AFNI 3dTqual Results</b><br><br>" >> analysisResults.html
+  echo "<br><img src="3dTqual.png"" >> analysisResults.html
+  echo "<br>" >> analysisResults.html
+
+  ################################################################
+
+  #Cleanup
+  rm -rf tmpLesionMask
 } #end function
 
+
+
+########################################################################
+# Creates an Anterior and Posterior ROI centered around user-supplied y-coordinates.  Used for SNR calculations.
+#  Input is an RPI-oriented motion-corrected RestingState EPI set.
+########################################################################
+function makeROI_Noise()
+{
+  local ydim=$1 
+  local xydim=$2
+  #Set input/output images
+  local inputImage=$3
+  local outputImage=$4
+
+  #ROI is arbitrarily set to %age of xy voxel dimensions ($2)
+  { fslmaths $inputImage -mul 0 -add 1 -roi 0 -1 ${ydim} 1 0 -1 0 1 $outputImage -odt float ||\
+  { printf "fslmaths failed, exiting ${FUNCNAME}" && return 1 ;} ;}
+
+  { fslmaths $outputImage -kernel sphere ${xydim} -fmean $outputImage -odt float ||\
+  { printf "fslmaths failed, exiting ${FUNCNAME}" && return 1 ;} ;}
+
+  { fslmaths $outputImage -bin $outputImage ||\
+  { printf "fslmaths failed, exiting ${FUNCNAME}" && return 1 ;} ;}
+
+  printf "%s\n ${FUNCNAME} successful" && return 0
+}
 printf "%s\n\n\n" "$0 Complete"

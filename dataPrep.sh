@@ -700,18 +700,18 @@ function FieldMapMag_prep()
   { printf "%s\n" "Re-Orientation failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
 
   #make a brain mask for the image using FSL's bet.
-  clobber ${FieldMapMag_outDir}/fieldMapMag_mask.nii.gz &&\
-  { bet ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz ${FieldMapMag_outDir}/fieldMapMag -m -n ||\
+  clobber ${FieldMapMag_outDir}/FieldMapMag_mask.nii.gz &&\
+  { bet ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz ${FieldMapMag_outDir}/FieldMapMag -m -n ||\
   { printf "%s\n" "bet failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
 
   #make the brainmask smaller: reason: ???
-  clobber ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz &&\
-  { fslmaths ${FieldMapMag_outDir}/fieldMapMag_mask.nii.gz -ero ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ||\
+  clobber ${FieldMapMag_outDir}/FieldMapMag_mask_eroded.nii.gz &&\
+  { fslmaths ${FieldMapMag_outDir}/FieldMapMag_mask.nii.gz -ero ${FieldMapMag_outDir}/FieldMapMag_mask_eroded.nii.gz ||\
   { printf "%s\n" "erosion failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
 
   #multiply the brainmask with the fieldmap to get a brain masked fieldmap.
-  clobber ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz &&\
-  { fslmaths ${FieldMapMag_outDir}/fieldMapMag_RPI.nii.gz -mul ${FieldMapMag_outDir}/fieldMapMag_mask_eroded.nii.gz ${FieldMapMag_outDir}/fieldMapMag_RPI_stripped.nii.gz ||\
+  clobber ${FieldMapMag_outDir}/FieldMapMag_RPI_stripped.nii.gz &&\
+  { fslmaths ${FieldMapMag_outDir}/FieldMapMag_RPI.nii.gz -mul ${FieldMapMag_outDir}/FieldMapMag_mask_eroded.nii.gz ${FieldMapMag_outDir}/FieldMapMag_RPI_stripped.nii.gz ||\
   { printf "%s\n" "masking failed, exiting ${FUNCNAME} function" && return 1 ;} ;}
 
   printf "%s\n" "${FUNCNAME} ran successfully." && return 0
