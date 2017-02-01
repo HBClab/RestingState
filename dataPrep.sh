@@ -452,6 +452,7 @@ function SoftwareCheck()
 #       An output directory
 ##################
 #output: A T1Head nifti file in RPI orientation
+#		 basedir/anat/T1_head.nii.gz,T1_head_RPI.nii.gz		 
 ##################
 #dependencies: FSL, clobber
 ##################
@@ -550,6 +551,9 @@ function T1Head_prep()
 ##################
 #output: A T1Brain nifti file in RPI orientation
 #        Brain Mask
+#		basedir/anat/T1_brain.nii.gz
+#					 T1_brain_RPI.nii.gz
+#					 brainMask.nii.gz
 ##################
 #dependencies: FSL, clobber
 ##################
@@ -593,6 +597,7 @@ function T1Brain_prep()
 #       An output directory
 ##################
 #output: EPI nifti file in RPI orientation
+#		 basedir/func/RestingStateRaw.nii.gz
 ##################
 #dependencies: FSL, clobber
 ##################
@@ -627,6 +632,8 @@ function epi_prep()
 ##################
 #input: Fieldmap Phase image
 #       An output directory
+#		basedir/fieldmap/FieldMapPhase.nii.gz
+#						 FieldMapPhase_RPI.nii.gz
 ##################
 #output: Fieldmapphase nifti file in RPI orientation
 ##################
@@ -668,6 +675,11 @@ function FieldMapPhase_prep()
 ##################
 #output: FieldMap Magnitude nifti file in RPI orientation
 #        Brain Mask
+#		 basedir/fieldmap/FieldMapMag.nii.gz
+#						  FieldMapMag_RPI.nii.gz
+#						  FieldMapMag_mask.nii.gz
+#						  FieldMapMag_mask_eroded.nii.gz
+#						  FieldMapMag_RPI_stripped.nii.gz
 ##################
 #dependencies: FSL, clobber
 ##################
