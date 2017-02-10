@@ -364,6 +364,10 @@ if [[ -e ${nuisancefeat} ]]; then
       echo "......Mapping nuisance regressor $roi"
 
       ###Need to use warp from MNI to EPI from qualityCheck
+      #make a standard zscore: (averaging across zscores makes the stdev less than 1)
+      #3dTstat -prefix  'MeanMcImg.nii.gz' -mean mcImg.nii.gz 
+      #3dTstat -prefix  'STDMcImg.nii.gz' -stdev mcImg.nii.gz
+      #3dcalc -a STDMcImg.nii.gz -b MeanMcImg.nii.gz -c mcImg.nii.gz -expr '(c-b)/a' -prefix z_scored_mcImg.nii.gz
       MNItoEPIwarp=`cat $logDir/rsParams | grep "MNItoEPIWarp=" | tail -1 | awk -F"=" '{print $2}'`
       applywarp --ref=$indir/mcImgMean_stripped.nii.gz --in=${scriptDir}/ROIs/${roi}.nii.gz --out=rois/${roi}_native.nii.gz --warp=$MNItoEPIwarp --datatype=float
       fslmaths rois/${roi}_native.nii.gz -thr 0.5 rois/${roi}_native.nii.gz
@@ -420,7 +424,7 @@ if [[ -e ${nuisancefeat} ]]; then
 
 
     #### Calculate Nuisance Regressor time-series ############
-
+#can this be accomplished with fslstats and 3dcalc?
 # Create Regressors using Octave
 echo "...Creating Regressors"
 filename=run_normseedregressors.m;

@@ -516,10 +516,10 @@ function EPItoT1FieldMap()
   #Sum the nonlinear warp (MNItoT1_warp.nii.gz) with the second nonlinear warp (T1toEPI_warp.nii.gz) to get a warp from MNI to EPI
   clobber ${outDir}/func/EPItoT1/MNItoEPI_warp.nii.gz &&\
   { convertwarp \
-  --ref=${epiDir}/mcImgMean.nii.gz \
+  --ref=${mcImgMean} \
   --warp1=${outDir}/func/T1forWarp/MNItoT1_warp.nii.gz \
-  --warp2=${outDir}/func/EPItoT1//T1toEPI_warp.nii.gz \
-  --out=${epiWarpDir}/MNItoEPI_warp.nii.gz --relout ||\
+  --warp2=${outDir}/func/EPItoT1/T1toEPI_warp.nii.gz \
+  --out=${outDir}/func/EPItoT1/MNItoEPI_warp.nii.gz --relout ||\
   { printf "%s\n" "convertwarp failed, exiting ${FUNCNAME}" && return 1 ;} ;}
 
   #Invert the warp to get EPItoMNI_warp.nii.gz
