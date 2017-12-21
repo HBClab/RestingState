@@ -1,9 +1,12 @@
 #!/bin/bash
 # wrapper script for calling legacy resting state scripts
+
 function printCommandLine {
   echo ""
-  echo "Usage: processRestingState_wrapper.sh -r path/to/rsOut"
-  echo "e.g., processRestingState_wrapper.sh -r path/to/BIDS/derivatives/rsOut_legacy/sub-GEA161/ses-activepost"
+  echo "Usage: processRestingState_wrapper.sh -o path/to/rsOut -R roilist "
+  echo "-o path/to/BIDS/derivatives/rsOut_legacy/sub-GEA161/ses-activepost"
+  echo "-R file with list of rois. must include path to roi file."
+
   exit 1
 }
 
@@ -67,11 +70,14 @@ function clobber()
 clob=false
 export -f clobber
 
-while getopts “r:h” OPTION
+while getopts “o:R:h” OPTION
 do
   case $OPTION in
-    r)
-      rsOut=$OPTARG
+    o)
+      rsOut=$OPTARG  # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/derivatives/rsOut_legacy/sub-GEA161/ses-activepre
+      ;;
+    R)
+      roilist=$OPTARG
       ;;
     h)
       printCommandLine
@@ -83,6 +89,8 @@ do
       esac
  done
 
+scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
 printf "${rsOut}" 1>&2
 
 if [ "${rsOut}" == "" ]; then
@@ -90,15 +98,20 @@ if [ "${rsOut}" == "" ]; then
   exit 1
 fi
 
-server_mount=$(mount | grep vosslabhpc | awk '{print $3}')
-bidsDir=${rsOut//\/derivatives\/rsOut_legacy}
-subDir="$(dirname ${bidsDir})"
-subID="$(echo ${rsOut} | cut -d "-" -f 2 | sed 's|/.*||g')"
+# if no user-defined roilist, default to first .nii.gz file found in ROIs dir
+if [[ "${roilist}" == "" ]]; then
+  echo "$(find ${scriptdir}/ROIs -type f -name "*.nii.gz" -print -quit)" > ${scriptdir}/roiList_tmp.txt
+  roilist=${scriptdir}/roiList_tmp.txt
+fi
+
+bidsDir=${rsOut//\/derivatives\/rsOut_legacy} # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161/ses-activepre
+subDir="$(dirname ${bidsDir})" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161
+subID="$(echo ${rsOut} | cut -d "-" -f 2 | sed 's|/.*||g')" # gets subID from rsOut path
 c_bal="$(echo ${subID} | cut -c 3)"
 ses=$(echo ${rsOut} | sed 's|.*/||')
 scanner="$(echo ${subID} | cut -c -2)"
 
-# find dayone condition
+# find dayone condition (Bike_ATrain: for determining where MBA-stripped T1 live)
 if [ "${c_bal}" == "A" ]; then
   dayone="active"
   daytwo="passive"
@@ -107,12 +120,20 @@ else
   daytwo="active"
 fi
 
-MBA_dir="${server_mount}/Projects/Bike_ATrain/Imaging/BIDS/derivatives/MBA/sub-${subID}/ses-${dayone}pre"
-# load variables
-T1_RPI="${subDir}/ses-${dayone}pre/anat/sub-${subID}_ses-${dayone}pre_T1w.nii.gz"
-T1_RPI_brain="${MBA_dir}/sub-${subID}_ses-${dayone}pre_T1w_brain.nii.gz"
-T1_brain_mask="${MBA_dir}/sub-${subID}_ses-${dayone}pre_T1w_mask_60_smooth.nii.gz"
+# load variables needed for processing
+
+MBA_dir="$(dirname ${subDir})/derivatives/MBA/sub-${subID}/ses-${dayone}pre"
+if [[ ! -d "${MBA_dir}" ]]; then
+  echo "ERROR: MBA directory not found in derivatives. Exiting."
+  exit 1
+else
+  T1_RPI="${subDir}/ses-${dayone}pre/anat/sub-${subID}_ses-${dayone}pre_T1w.nii.gz"
+  T1_RPI_brain="${MBA_dir}/sub-${subID}_ses-${dayone}pre_T1w_brain.nii.gz"
+  T1_brain_mask="${MBA_dir}/sub-${subID}_ses-${dayone}pre_T1w_mask_60_smooth.nii.gz"
+fi
+
 rawRest="$(find ${bidsDir}/func -type f -name "*rest_bold.nii.gz")"
+
 if [ "${scanner}" == "GE" ]; then
   fmap_prepped="$(find ${bidsDir}/fmap -type f -name "*fieldmap.nii.gz")"
   fmap_mag="$(find ${bidsDir}/fmap -type f -name "*magnitude.nii.gz")"
@@ -126,15 +147,12 @@ elif [ "${scanner}" == "SE" ]; then
 fi
 
 
-
-
-
 if [ -z "${T1_RPI}" ] || [ -z "${T1_RPI_brain}" ] || [ -z "${rawRest}" ]; then
   printf "\n$(date)\nERROR: at least one prerequisite scan is missing. Exiting.\n" 1>&2
   exit 1
 else
 
-  softwareCheck
+  softwareCheck # check dependencies
 
   printf "\n$(date)\nBeginning preprocesssing (classic mode)...\n"
 
@@ -146,7 +164,6 @@ else
   echo "epiTR=2" >> ${rsOut}/rsParams
   echo "epiTE=30" >> ${rsOut}/rsParams
 
-  scriptdir=${server_mount}/UniversalSoftware
 
   # copy raw rest image from BIDS to derivatives/rsOut_legacy/subID/sesID/
   cp ${rawRest} ${rsOut}
@@ -163,7 +180,7 @@ else
       fmap_mag_stripped="$(find ${bidsDir}/fmap -type f -name "*magnitude_stripped.nii.gz")"
     fi
 
-    ${scriptdir}/RestingState2014a/qualityCheck.sh -E "$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold.nii.gz")" \
+    ${scriptdir}/qualityCheck.sh -E "$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold.nii.gz")" \
       -A ${T1_RPI_brain} \
       -a ${T1_RPI} -f \
       -b ${fmap_prepped} \
@@ -172,14 +189,14 @@ else
       -D ${dwellTime} \
       -d -y -c
 
-    ${scriptdir}/RestingState2014a/restingStatePreprocess.sh -E ${rsOut}/mcImg_stripped.nii.gz \
+    ${scriptdir}/restingStatePreprocess.sh -E ${rsOut}/mcImg_stripped.nii.gz \
       -A ${T1_RPI_brain} \
       -t 2 \
       -T 30 \
       -s 6 \
       -f -c
 
-    ${scriptdir}/RestingState2014a/removeNuisanceRegressor.sh -E $rsOut/preproc.feat/nonfiltered_smooth_data.nii.gz \
+    ${scriptdir}/removeNuisanceRegressor.sh -E $rsOut/preproc.feat/nonfiltered_smooth_data.nii.gz \
       -A ${T1_RPI_brain} \
       -n wmroi -n latvent -n global \
       -L .08 \
@@ -187,30 +204,28 @@ else
       -t 2 \
       -T 30 -c
 
-    ${scriptdir}/RestingState2014a/motionScrub.sh -E $rsOut/RestingState.nii.gz
+    ${scriptdir}/motionScrub.sh -E $rsOut/RestingState.nii.gz
 
-    ${scriptdir}/RestingState2014a/seedVoxelCorrelation.sh -E $rsOut/RestingState.nii.gz \
+    ${scriptdir}/seedVoxelCorrelation.sh -E $rsOut/RestingState.nii.gz \
       -m 2 \
-      -r BamHippo_Blessing_14mm \
-      -r acute_DMN_core \
-      -r acute_gICA_affect_wAmyg \
+      -R ${roilist} \
       -f -V
   else
     printf "no fieldmap found."
-    ${scriptdir}/RestingState2014a/qualityCheck.sh -E "$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold.nii.gz")" \
+    ${scriptdir}/qualityCheck.sh -E "$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold.nii.gz")" \
       -A ${T1_RPI_brain} \
-      -a ${T1_RPI} -f \
+      -a ${T1_RPI} \
       -D ${dwellTime} \
       -d -y -c
 
-    ${scriptdir}/RestingState2014a/restingStatePreprocess.sh -E ${rsOut}/mcImg_stripped.nii.gz \
+    ${scriptdir}/restingStatePreprocess.sh -E ${rsOut}/mcImg_stripped.nii.gz \
       -A ${T1_RPI_brain} \
       -t 2 \
       -T 30 \
       -s 6 \
       -c
 
-    ${scriptdir}/RestingState2014a/removeNuisanceRegressor.sh -E $rsOut/preproc.feat/nonfiltered_smooth_data.nii.gz \
+    ${scriptdir}/removeNuisanceRegressor.sh -E $rsOut/preproc.feat/nonfiltered_smooth_data.nii.gz \
       -A ${T1_RPI_brain} \
       -n wmroi -n latvent -n global \
       -L .08 \
@@ -218,15 +233,13 @@ else
       -t 2 \
       -T 30 -c
 
-    ${scriptdir}/RestingState2014a/motionScrub.sh -E $rsOut/RestingState.nii.gz
+    ${scriptdir}/motionScrub.sh -E $rsOut/RestingState.nii.gz
 
-    ${scriptdir}/RestingState2014a/seedVoxelCorrelation.sh -E $rsOut/RestingState.nii.gz \
+    ${scriptdir}/seedVoxelCorrelation.sh -E $rsOut/RestingState.nii.gz \
       -m 2 \
-      -r BamHippo_Blessing_14mm \
-      -r acute_DMN_core \
-      -r acute_gICA_affect_wAmyg \
+      -R ${roilist} \
       -V
   fi
   printf "\n$(date)\nBeginning reproc nuisance regression (ica_aroma + compcor)...\n"
-  ${scriptdir}/RestingState2017a/reproc_2016/reproc_2016.sh -i ${rsOut} -A "${MBA_dir}"
+  ${scriptdir}/reproc_2016.sh -i ${rsOut} -R ${roilist} -A "${MBA_dir}"
 fi

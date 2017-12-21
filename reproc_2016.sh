@@ -125,7 +125,7 @@ function feat_regFix()
 
   #NUISANCEDIR
   nuisanceDir=$epiDir/${nuisancefeat}
-  local fsf_regFix="dummy_$(basename ${fsf} .fsf | sed 's/reg//')_regFix_5.0.10_argon.fsf"
+  local fsf_regFix="dummy_$(basename ${fsf} .fsf | sed 's/reg//')_regFix_5.0.10.fsf"
   if [ -e ${scriptDir}/${fsf_regFix} ]; then
     #Backup original design file
     rsync -a $epiDir/${nuisancefeat}/design.fsf $epiDir/${nuisancefeat}/designORIG.fsf
@@ -321,7 +321,7 @@ function SNRcalc() {
 
 }
 
-while getopts “hi:A:c” OPTION
+while getopts “hi:A:R:c” OPTION
 do
     case $OPTION in
   i)
@@ -330,6 +330,9 @@ do
   A)
       t1Dir=$OPTARG
       ;;
+	R)
+			roilist=$OPTARG
+			;;
   c)
       clob=true
       ;;
@@ -342,6 +345,8 @@ do
       ;;
     esac
 done
+
+
 
 if [ "${epiDir}" == "" ]; then
   >&2 echo "no input dir detected. exiting"
@@ -364,10 +369,8 @@ fsf=${analysis}.fsf
 fsf2=${analysis2}.fsf
 fsf3=${analysis3}.fsf
 
-scriptPath=`perl -e 'use Cwd "abs_path";print abs_path(shift)' $0`
-scriptDir=`dirname $scriptPath`
-# VossLabMount=$(mount | grep $(whoami)@itf-rs-store13.hpc.uiowa.edu/vosslablss* | awk -F' ' '{print $3}')
-VossLabMount="$(mount | grep vosslabhpc | awk '{print $3}')"
+
+scriptDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # if [ "$(which parallel)" == "" ]; then
 #     echo "GNU parallel is either not downloaded or not defined in your path, exiting script"
@@ -478,16 +481,16 @@ fslmeants -i $epiDataFilt -m $snrDir/GM_mask_final.nii.gz -o $preprocDir/rois/GM
 
 
 clobber $epiDir/powplot_mcImg_WM_mask.png &&\
-${VossLabMount}/UniversalSoftware/RestingState2014a/PlotPow.sh -tr 2 $epiDataFilt $snrDir/WM_pve_to_RS_thresh_ero.nii.gz $epiDir/powplot_mcImg_WM_mask
+${scriptDir}/PlotPow.sh -tr 2 $epiDataFilt $snrDir/WM_pve_to_RS_thresh_ero.nii.gz $epiDir/powplot_mcImg_WM_mask
 
 clobber $epiDir/powplot_mcImg_CSF_mask.png &&\
-${VossLabMount}/UniversalSoftware/RestingState2014a/PlotPow.sh -tr 2 $epiDataFilt $snrDir/CSF_pve_to_RS_thresh.nii.gz $epiDir/powplot_mcImg_CSF_mask
+${scriptDir}/PlotPow.sh -tr 2 $epiDataFilt $snrDir/CSF_pve_to_RS_thresh.nii.gz $epiDir/powplot_mcImg_CSF_mask
 
 clobber $epiDir/powplot_mcImg_GM_FAST_mask.png &&\
-${VossLabMount}/UniversalSoftware/RestingState2014a/PlotPow.sh -tr 2 $epiDataFilt $snrDir/GM_pve_to_RS_thresh.nii.gz $epiDir/powplot_mcImg_GM_FAST_mask
+${scriptDir}/PlotPow.sh -tr 2 $epiDataFilt $snrDir/GM_pve_to_RS_thresh.nii.gz $epiDir/powplot_mcImg_GM_FAST_mask
 
 clobber $epiDir/powplot_mcImg_GM_mask_final.png &&\
-${VossLabMount}/UniversalSoftware/RestingState2014a/PlotPow.sh -tr 2 $epiDataFilt $snrDir/GM_mask_final.nii.gz $epiDir/powplot_mcImg_GM_mask_final
+${scriptDir}/PlotPow.sh -tr 2 $epiDataFilt $snrDir/GM_mask_final.nii.gz $epiDir/powplot_mcImg_GM_mask_final
 
 #separate 5 eigenvectors into single files
 for i in {1..5}; do
@@ -611,7 +614,7 @@ tr=`cat $logDir/rsParams | grep "epiTR=" | tail -1 | awk -F"=" '{print $2}'`
 #                                     sed 's|PEDIR|\'${peDirNEW}'|g' | \
 #                                     sed 's|FSLDIR|'${FSLDIR}'|g' > ${epiDir}/${fsf}
 
-cat $scriptDir/dummy_nuisance_compcor_5.0.10_argon.fsf | sed 's|SUBJECTPATH|'${epiDir}'|g' | \
+cat $scriptDir/dummy_nuisance_compcor_5.0.10.fsf | sed 's|SUBJECTPATH|'${epiDir}'|g' | \
                                     sed 's|SUBJECTEPIPATH|'${epiDataFilt}'|g' | \
                                     sed 's|SUBJECTT1PATH|'${t1Data}'|g' | \
                                     sed 's|SCANTE|'${te}'|g' | \
@@ -655,6 +658,7 @@ cat $scriptDir/dummy_nuisance_compcor_5.0.10_argon.fsf | sed 's|SUBJECTPATH|'${e
 clobber ${epiDir}/nuisancereg_compcor.feat/stats/res4d.nii.gz &&\
 feat ${epiDir}/nuisancereg_compcor.fsf
 #################################
+
 #parallel --link --header : feat_regFix {in} $scriptDir $epiDir $epiVoxTot $te $numtimepoint $tr $dwellTime $peDirNEW {fsf} ::: in "${nuisancefeat}" "${nuisancefeat2}" "${nuisancefeat3}" ::: fsf "${epiDir}/${fsf}" "${epiDir}/${fsf2}" "${epiDir}/${fsf3}"
 #parallel --header : dataScale {in} ::: in $epiDir/${nuisancefeat} $epiDir/${nuisancefeat2} $epiDir/${nuisancefeat3}
 
@@ -665,36 +669,20 @@ feat_regFix nuisancereg_compcor.feat $scriptDir $epiDir $epiVoxTot $te $numtimep
 dataScale $epiDir/nuisancereg_compcor.feat
 
 
-
 # clobber $epiDir/nuisancereg_classic_aroma.feat/stats/res4d_normandscaled_motionscrubbed.nii &&\
 # motionScrub $epiDir/RestingState.nii.gz nuisancereg_classic_aroma.feat
 
 clobber $epiDir/nuisancereg_compcor.feat/stats/res4d_normandscaled_motionscrubbed.nii &&\
 motionScrub $epiDir/RestingState.nii.gz nuisancereg_compcor.feat
 
-roiDir=${VossLabMount}/UniversalSoftware/RestingState2014a/ROIs
 
-# 1=compcor, 2=compcor_wGMR, 3=compcor_wGMRv1, 4=classic_aroma, ""=classic
-for i in 1; do
+for i in 1; do # 1=compcor, 2=compcor_wGMR, 3=compcor_wGMRv1, 4=classic_aroma, ""=classic
+
   ${scriptDir}/seedVoxelCorrelation.sh -E $epiDir/RestingState.nii.gz \
     -m 0 \
-    -r ${roiDir}/BamHippo_Blessing_14mm.nii.gz \
-    -r ${roiDir}/acute_DMN_core.nii.gz \
-    -r ${roiDir}/acute_gICA_affect_wAmyg.nii.gz \
-		-r /Shared/vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/derivatives/seeds/BIKE_ATRAIN_vmPFC_NAcc_amyg.nii.gz \
-		-r /Shared/vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/derivatives/seeds/BIKE_ATRAIN_vmPFC_NAcc.nii.gz \
+    -R ${roilist} \
     -f -n ${i}
 done
 
 #${scriptDir}/seedVoxelCorrelation.sh -E $epiDir/RestingState.nii.gz -m 0 \
 #-R ${VossLabMount}/Projects/FAST/PreprocData/scripts/fast_crossx_seedlist_reproc.txt -n 4 -f
-
-
-
-# for i in $(find $epiDir -type d -maxdepth 1 -name "seedCorrelation*"); do
-#   cd $i
-#   overlay 1 0 $FSLDIR/data/standard/avg152T1_brain.nii.gz -A pcc_frontiers_standard_zmap.nii.gz .2 .8 pcc_frontiers_overlay.nii.gz
-#   slicer pcc_frontiers_overlay.nii.gz -S 8 1200 pcc_frontiers_sliced8.png
-# done
-
-# pngappend $epiDir/seedCorrelation/pcc_frontiers_sliced8.png - $epiDir/seedCorrelation_classic_aroma/pcc_frontiers_sliced8.png - $epiDir/seedCorrelation_compcor/pcc_frontiers_sliced8.png - $epiDir/seedCorrelation_compcor_wGMR/pcc_frontiers_sliced8.png - $epiDir/seedCorrelation_compcor_wGMRv1/pcc_frontiers_sliced8.png $epiDir/pcc_frontiers_appended.png
