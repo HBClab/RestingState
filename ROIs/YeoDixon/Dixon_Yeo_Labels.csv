@@ -1,0 +1,33 @@
+Number,Region,Network
+14,aMT_L,DAN
+15,aIPS/SPL_L,DAN
+16,FEF_L,DAN
+17,PrCv_L,DAN
+71,aMT_R,DAN
+72,aIPS/SPL_R,DAN
+73,FEF_R,DAN
+74,PrCv_R,DAN
+45,pIPL_L,DN Core
+46,SFS_L,DN Core
+47,PCC_L,DN Core
+48,RMPFC_L,DN Core
+102,STS_R,DN Core
+103,pIPL_R,DN Core
+104,SFS_R,DN Core
+105,PCC_R,DN Core
+106,RMPFC_R,DN Core
+49,LTC_TP_L,DN dorsomedial
+50,TPJ_L,DN dorsomedial
+51,DMPFC_L,DN dorsomedial
+52,pDLPFC_L,DN dorsomedial
+53,IFG_L,DN dorsomedial
+107,LTC_R,DN dorsomedial
+108,TP_R,DN dorsomedial
+109,DMPFC_R,DN dorsomedial
+110,IFG_R,DN dorsomedial
+54,vpIPL_L,DN MTL
+55,RSC_L,DN MTL
+56,MTL_L,DN MTL
+111,vpIPL_R,DN MTL
+112,RSC_R,DN MTL
+113,MTL_R,DN MTL

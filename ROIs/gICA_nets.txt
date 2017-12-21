@@ -1,8 +1,0 @@
-UIUC_DAN_net
-UIUC_DMN_net
-UIUC_ECN_net
-UIUC_SAL_net
-UIUC_DAN_multi
-UIUC_DMN_multi
-UIUC_ECN_multi
-UIUC_SAL_multi

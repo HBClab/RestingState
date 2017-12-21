@@ -1,6 +1,0 @@
-Lhipp_acute
-vmpfc_acute
-mpfc_acute
-dacc_acute
-Rhipp_vandjik
-Lhipp_vandjik

@@ -4,7 +4,7 @@
 # Removal of Nuisance Signal, Filtering
 #     1. Filtering
 #       a. High or Lowpass filtering via AFNI's 3dBandpass
-#       b. If High/Lowpass set to 0, the 0 and Nyquist Frequencies will still be removed	
+#       b. If High/Lowpass set to 0, the 0 and Nyquist Frequencies will still be removed
 #     2. Removal or Nuisance signal (FEAT)
 #       a. ROI based (e.g. wmroi, global, latvent)
 #       b. Motion Parameters (mclfirt/3dvolreg)
@@ -23,6 +23,7 @@ scriptPath=`perl -e 'use Cwd "abs_path";print abs_path(shift)' $0`
 scriptDir=`dirname $scriptPath`
 knownNuisanceRois=`ls -1 $scriptDir/ROIs/*nii* | awk -F"/" '{print $NF}' | awk -F"." '{print $1}'`
 
+SGE_ROOT='';export SGE_ROOT
 
 function printCommandLine {
   echo "Usage: removeNuisanceRegressor.sh -E restingStateImage -A T1Image -n nuisanceROI -t tr -T te -H highpass -L lowpass -c"
@@ -50,10 +51,47 @@ function printCommandLine {
   echo "  -c clobber/overwrite previous results"
   echo ""
   echo "Existing nuisance ROIs:"
-  echo "$knownNuisanceRois"  
+  echo "$knownNuisanceRois"
   exit 1
 }
 
+#Overwrites material or skips
+function clobber()
+{
+	#Tracking Variables
+	local -i num_existing_files=0
+	local -i num_args=$#
+
+	#Tally all existing outputs
+	for arg in $@; do
+		if [ -s "${arg}" ] && [ "${clob}" == true ]; then
+			rm -rf "${arg}"
+		elif [ -s "${arg}" ] && [ "${clob}" == false ]; then
+			num_existing_files=$(( ${num_existing_files} + 1 ))
+			continue
+		elif [ ! -s "${arg}" ]; then
+			continue
+		else
+			echo "How did you get here?"
+		fi
+	done
+
+	#see if the command should be run by seeing if the requisite files exist.
+	#0=true
+	#1=false
+	if [ ${num_existing_files} -lt ${num_args} ]; then
+		return 0
+	else
+		return 1
+	fi
+
+	#example usage
+	#clobber test.nii.gz &&\
+	#fslmaths input.nii.gz -mul 10 test.nii.gz
+}
+#default
+clob=false
+export -f clobber
 
 # Parse Command line arguments
 while getopts “hE:A:n:N:L:H:Mt:T:c” OPTION
@@ -260,7 +298,7 @@ cd $indir
 if [[ -e ${nuisancefeat} ]]; then
   if [[ $overwriteFlag == 1 ]]; then
     #Cleanup of old files
-    rm *_norm.png run_normseedregressors.m 
+    rm *_norm.png run_normseedregressors.m
     rm -rf nuisancereg.*
     rm -rf tsregressorslp
 
@@ -290,7 +328,7 @@ if [[ -e ${nuisancefeat} ]]; then
         fslmaths $indir/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
         fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
         epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
- 
+
         #Log filtered file
         echo "lowpassFilt=$lowpassArg" >> $logDir/rsParams
         echo "_allpassFilt" >> $logDir/rsParams
@@ -329,7 +367,7 @@ if [[ -e ${nuisancefeat} ]]; then
         fslmaths $indir/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
         fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
         epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
- 
+
        #Log filtered file
         echo "lowpassFilt=$lowpassArg" >> $logDir/rsParams
         echo "highpassFilt=$highpassArg" >> $logDir/rsParams
@@ -364,10 +402,6 @@ if [[ -e ${nuisancefeat} ]]; then
       echo "......Mapping nuisance regressor $roi"
 
       ###Need to use warp from MNI to EPI from qualityCheck
-      #make a standard zscore: (averaging across zscores makes the stdev less than 1)
-      #3dTstat -prefix  'MeanMcImg.nii.gz' -mean mcImg.nii.gz 
-      #3dTstat -prefix  'STDMcImg.nii.gz' -stdev mcImg.nii.gz
-      #3dcalc -a STDMcImg.nii.gz -b MeanMcImg.nii.gz -c mcImg.nii.gz -expr '(c-b)/a' -prefix z_scored_mcImg.nii.gz
       MNItoEPIwarp=`cat $logDir/rsParams | grep "MNItoEPIWarp=" | tail -1 | awk -F"=" '{print $2}'`
       applywarp --ref=$indir/mcImgMean_stripped.nii.gz --in=${scriptDir}/ROIs/${roi}.nii.gz --out=rois/${roi}_native.nii.gz --warp=$MNItoEPIwarp --datatype=float
       fslmaths rois/${roi}_native.nii.gz -thr 0.5 rois/${roi}_native.nii.gz
@@ -408,9 +442,11 @@ if [[ -e ${nuisancefeat} ]]; then
       dwellTime=$dwellTimeBase
     fi
 
+    epiVoxTot=`fslstats ${epiDataFilt} -v | awk '{print $1}'`
 
-    cat $scriptDir/dummy_nuisance.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
+    cat $scriptDir/dummy_nuisance_5.0.10_argon.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
                                         sed 's|SUBJECTEPIPATH|'${epiDataFilt}'|g' | \
+                                        sed 's|VOXTOT|'${epiVoxTot}'|g' | \
                                         sed 's|SUBJECTT1PATH|'${t1Data}'|g' | \
                                         sed 's|SCANTE|'${te}'|g' | \
                                         sed 's|SUBJECTVOLS|'${numtimepoint}'|g' | \
@@ -424,7 +460,7 @@ if [[ -e ${nuisancefeat} ]]; then
 
 
     #### Calculate Nuisance Regressor time-series ############
-#can this be accomplished with fslstats and 3dcalc?
+
 # Create Regressors using Octave
 echo "...Creating Regressors"
 filename=run_normseedregressors.m;
@@ -456,7 +492,7 @@ EOF
     # Run script using Matlab or Octave
     haveMatlab=`which matlab`
     if [ "$haveMatlab" == "" ]; then
-      octave --no-window-system $indir/$filename 
+      octave --no-window-system $indir/$filename
     else
       matlab -nodisplay -r "run $indir/$filename"
     fi
@@ -479,7 +515,7 @@ EOF
       for mc in ${mclist}
       do
           cp ${indir}/tsregressorslp/mc${mc}_normalized.txt ${indir}/tsregressorslp/mc${mc}_normalized.1D
-          1dBandpass $highpassArg $lowpassArg ${indir}/tsregressorslp/mc${mc}_normalized.1D > ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D   
+          1dBandpass $highpassArg $lowpassArg ${indir}/tsregressorslp/mc${mc}_normalized.1D > ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D
           cat ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D > ${indir}/tsregressorslp/mc${mc}_normalized.txt
       done
     else
@@ -488,7 +524,7 @@ EOF
       for mc in ${mclist}
       do
           cp ${indir}/tsregressorslp/mc${mc}_normalized.txt ${indir}/tsregressorslp/mc${mc}_normalized.1D
-          1dBandpass 0 99999 ${indir}/tsregressorslp/mc${mc}_normalized.1D > ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D   
+          1dBandpass 0 99999 ${indir}/tsregressorslp/mc${mc}_normalized.1D > ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D
           cat ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D > ${indir}/tsregressorslp/mc${mc}_normalized.txt
       done
     fi
@@ -503,7 +539,7 @@ EOF
 
     for roi in $roiList
     do
-      fsl_tsplot -i $indir/tsregressorslp/${roi}_normalized_ts.txt -t "${roi} Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o $indir/${roi}_norm.png  
+      fsl_tsplot -i $indir/tsregressorslp/${roi}_normalized_ts.txt -t "${roi} Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o $indir/${roi}_norm.png
       echo "<br><br><img src=\"$indir/${roi}_norm.png\" alt=\"$roi nuisance regressor\"><br>" >> $indir/analysisResults.html
     done
 
@@ -512,11 +548,10 @@ EOF
 
 
     #### FEAT Regression ######
-    
+
     #Run feat
     echo "...Running FEAT (nuisancereg)"
     feat ${indir}/${fsf}
-
     #################################
 
 
@@ -533,18 +568,18 @@ EOF
     #Remove all FEAT files (after backup), repopulate with proper files
     cp -r $regDir $indir/${nuisancefeat}/regORIG
     rm -rf $regDir
-    
+
     ##Copy over appropriate reg directory from melodic.ica or preproc.feat processing
       #If Melodic was run, copy over that version of the registration, otherwise use the portion from preprocessing
       if [[ $melFlag == 1 ]]; then
         ##Melodic was used (-P 2)
           #Copy over "melodic" registration directory
         cp -r $indir/${melodicfeat}/reg $indir/${nuisancefeat}
-      
+
       else
         ##Melodic was not used (-P 2a)
           #Copy over "preproc" registration directory
-        cp -r $indir/${preprocfeat}/reg $indir/${nuisancefeat}      
+        cp -r $indir/${preprocfeat}/reg $indir/${nuisancefeat}
       fi
 
     #Backup original design file
@@ -558,7 +593,7 @@ EOF
       #NUISANCEDIR
       nuisanceDir=$indir/${nuisancefeat}
 
-    cat $scriptDir/dummy_nuisance_regFix.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
+    cat $scriptDir/dummy_nuisance_regFix_5.0.10_argon.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
                                                sed 's|VOXTOT|'${epiVoxTot}'|g' | \
                                                sed 's|NUISANCEDIR|'${nuisanceDir}'|g' | \
                                                sed 's|SCANTE|'${te}'|g' | \
@@ -571,7 +606,6 @@ EOF
     #Re-run feat
     echo "...Rerunning FEAT (nuisancereg(post-stats only)0"
     feat ${indir}/${fsf2}
-
 
     #Log output to HTML file
     echo "<a href=\"$indir/${nuisancefeat}/report.html\">FSL Nuisance Regressor Results</a>" >> $indir/analysisResults.html
@@ -587,7 +621,7 @@ EOF
     #Backup file
     echo "...Scaling data by 1000"
     cp res4d.nii.gz res4d_orig.nii.gz
-	
+
     #For some reason, this mask isn't very good.  Use the good mask top-level
     echo "...Copy Brain mask"
     cp $indir/mcImgMean_mask.nii.gz mask.nii.gz
@@ -595,8 +629,8 @@ EOF
 
     #normalize res4d here
     echo "...Normalize Data"
-    fslmaths res4d -Tmean res4d_tmean 
-    fslmaths res4d -Tstd res4d_std 
+    fslmaths res4d -Tmean res4d_tmean
+    fslmaths res4d -Tstd res4d_std
     fslmaths res4d -sub res4d_tmean res4d_dmean
     fslmaths res4d_dmean -div res4d_std res4d_normed
     fslmaths res4d_normed -add mask1000 res4d_normandscaled -odt float
@@ -605,13 +639,13 @@ EOF
     echo "epiNorm=$indir/$nuisancefeat/stats/res4d_normandscaled.nii.gz" >> $logDir/rsParams
 
     #################################
-    
+
   else
     echo "$0 has already been run use the -c option to overwrite results"
     exit
   fi
 else
-  #First run of analysis  
+  #First run of analysis
 
   cd $indir/${preprocfeat}
   if [ ! -e rois ]; then
@@ -638,7 +672,7 @@ else
       fslmaths $indir/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
       fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
       epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
- 
+
       #Log filtered file
       echo "lowpassFilt=$lowpassArg" >> $logDir/rsParams
       echo "_allpassFilt" >> $logDir/rsParams
@@ -677,7 +711,7 @@ else
       fslmaths $indir/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
       fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
       epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
- 
+
      #Log filtered file
       echo "lowpassFilt=$lowpassArg" >> $logDir/rsParams
       echo "highpassFilt=$highpassArg" >> $logDir/rsParams
@@ -718,7 +752,7 @@ else
 
     ###Need to use warp from MNI to EPI from qualityCheck
     MNItoEPIwarp=`cat $logDir/rsParams | grep "MNItoEPIWarp=" | tail -1 | awk -F"=" '{print $2}'`
-    applywarp --ref=$indir/mcImgMean_stripped.nii.gz --in=${scriptDir}/ROIs/${roi}.nii.gz --out=rois/${roi}_native.nii.gz --warp=$MNItoEPIwarp --datatype=float  
+    applywarp --ref=$indir/mcImgMean_stripped.nii.gz --in=${scriptDir}/ROIs/${roi}.nii.gz --out=rois/${roi}_native.nii.gz --warp=$MNItoEPIwarp --datatype=float
     fslmaths rois/${roi}_native.nii.gz -thr 0.5 rois/${roi}_native.nii.gz
     fslmaths rois/${roi}_native.nii.gz -bin rois/${roi}_native.nii.gz
     fslmeants -i $epiDataFilt -o rois/mean_${roi}_ts.txt -m rois/${roi}_native.nii.gz
@@ -757,10 +791,12 @@ else
     dwellTime=$dwellTimeBase
   fi
 
+  epiVoxTot=`fslstats ${epiDataFilt} -v | awk '{print $1}'`
 
-  cat $scriptDir/dummy_nuisance.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
+  cat $scriptDir/dummy_nuisance_5.0.10_argon.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
                                       sed 's|SUBJECTEPIPATH|'${epiDataFilt}'|g' | \
                                       sed 's|SUBJECTT1PATH|'${t1Data}'|g' | \
+                                      sed 's|VOXTOT|'${epiVoxTot}'|g' | \
                                       sed 's|SCANTE|'${te}'|g' | \
                                       sed 's|SUBJECTVOLS|'${numtimepoint}'|g' | \
                                       sed 's|SUBJECTTR|'${tr}'|g' | \
@@ -805,7 +841,7 @@ EOF
   # Run script using Matlab or Octave
   haveMatlab=`which matlab`
   if [ "$haveMatlab" == "" ]; then
-    octave --no-window-system $indir/$filename 
+    octave --no-window-system $indir/$filename
   else
     matlab -nodisplay -r "run $indir/$filename"
   fi
@@ -828,7 +864,7 @@ EOF
       for mc in ${mclist}
       do
           cp ${indir}/tsregressorslp/mc${mc}_normalized.txt ${indir}/tsregressorslp/mc${mc}_normalized.1D
-          1dBandpass $highpassArg $lowpassArg ${indir}/tsregressorslp/mc${mc}_normalized.1D > ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D   
+          1dBandpass $highpassArg $lowpassArg ${indir}/tsregressorslp/mc${mc}_normalized.1D > ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D
           cat ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D | awk '{print $1}' > ${indir}/tsregressorslp/mc${mc}_normalized.txt
       done
     else
@@ -837,7 +873,7 @@ EOF
       for mc in ${mclist}
       do
           cp ${indir}/tsregressorslp/mc${mc}_normalized.txt ${indir}/tsregressorslp/mc${mc}_normalized.1D
-          1dBandpass 0 99999 ${indir}/tsregressorslp/mc${mc}_normalized.1D > ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D   
+          1dBandpass 0 99999 ${indir}/tsregressorslp/mc${mc}_normalized.1D > ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D
           cat ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D | awk '{print $1}' > ${indir}/tsregressorslp/mc${mc}_normalized.txt
       done
     fi
@@ -852,7 +888,7 @@ EOF
 
   for roi in $roiList
   do
-    fsl_tsplot -i $indir/tsregressorslp/${roi}_normalized_ts.txt -t "${roi} Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o $indir/${roi}_norm.png  
+    fsl_tsplot -i $indir/tsregressorslp/${roi}_normalized_ts.txt -t "${roi} Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o $indir/${roi}_norm.png
     echo "<br><img src=\"$indir/${roi}_norm.png\" alt=\"$roi nuisance regressor\"><br>" >> $indir/analysisResults.html
   done
 
@@ -861,11 +897,11 @@ EOF
 
 
   #### FEAT Regression ######
-    
+
   #Run feat
   echo "...Running FEAT (nuisancereg)"
+  echo "here"
   feat ${indir}/${fsf}
-
   #################################
 
 
@@ -882,7 +918,7 @@ EOF
   #Remove all FEAT files (after backup), repopulate with proper files
   cp -r $regDir $indir/${nuisancefeat}/regORIG
   rm -rf $regDir
-    
+
 
   ##Copy over appropriate reg directory from melodic.ica or preproc.feat processing
     #If Melodic was run, copy over that version of the registration, otherwise use the portion from preprocessing
@@ -890,11 +926,11 @@ EOF
       ##Melodic was used (-P 2)
         #Copy over "melodic" registration directory
       cp -r $indir/${melodicfeat}/reg $indir/${nuisancefeat}
-      
+
     else
       ##Melodic was not used (-P 2a)
         #Copy over "preproc" registration directory
-      cp -r $indir/${preprocfeat}/reg $indir/${nuisancefeat}      
+      cp -r $indir/${preprocfeat}/reg $indir/${nuisancefeat}
     fi
 
   #Backup original design file
@@ -908,7 +944,7 @@ EOF
     #NUISANCEDIR
     nuisanceDir=$indir/${nuisancefeat}
 
-  cat $scriptDir/dummy_nuisance_regFix.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
+  cat $scriptDir/dummy_nuisance_regFix_5.0.10_argon.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
                                              sed 's|VOXTOT|'${epiVoxTot}'|g' | \
                                              sed 's|NUISANCEDIR|'${nuisanceDir}'|g' | \
                                              sed 's|SCANTE|'${te}'|g' | \
@@ -921,7 +957,6 @@ EOF
   #Re-run feat
   echo "...Rerunning FEAT (nuisancereg (post-stats only))"
   feat ${indir}/${fsf2}
-
 
   #Log output to HTML file
   echo "<a href=\"$indir/${nuisancefeat}/report.html\">FSL Nuisance Regressor Results</a>" >> $indir/analysisResults.html
@@ -937,7 +972,7 @@ EOF
   #Backup file
   echo "...Scaling data by 1000"
   cp res4d.nii.gz res4d_orig.nii.gz
-	
+
   #For some reason, this mask isn't very good.  Use the good mask top-level
   echo "...Copy Brain mask"
   cp $indir/mcImgMean_mask.nii.gz mask.nii.gz
@@ -945,8 +980,8 @@ EOF
 
   #normalize res4d here
   echo "...Normalize Data"
-  fslmaths res4d -Tmean res4d_tmean 
-  fslmaths res4d -Tstd res4d_std 
+  fslmaths res4d -Tmean res4d_tmean
+  fslmaths res4d -Tstd res4d_std
   fslmaths res4d -sub res4d_tmean res4d_dmean
   fslmaths res4d_dmean -div res4d_std res4d_normed
   fslmaths res4d_normed -add mask1000 res4d_normandscaled -odt float
@@ -959,10 +994,7 @@ EOF
 fi
 
 
-	
+
 echo "$0 Complete"
 echo ""
 echo ""
-
-
-

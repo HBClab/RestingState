@@ -1,2 +1,0 @@
-/Users/mwvoss/bin/RestingState2014a/ROIs/latvent.nii.gz
-/Users/mwvoss/bin/RestingState2014a/ROIs/wmroi.nii.gz

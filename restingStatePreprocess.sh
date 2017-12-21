@@ -16,6 +16,7 @@ scriptDir=`dirname $scriptPath`
 analysis=preproc
 fsf=${analysis}.fsf
 preprocfeat=${analysis}.feat
+SGE_ROOT='';export SGE_ROOT
 
 
 function printCommandLine {
@@ -96,7 +97,7 @@ fi
   if [[ $tr == "" ]]; then
     tr=2
   fi
-  
+
   if [[ $smooth == "" ]]; then
     smooth=6
   fi
@@ -168,9 +169,10 @@ if [[ -e $indir/${preprocfeat} ]]; then
 
     ###### FEAT (preproc) ########################################
     echo "...Running FEAT (preproc)"
+    epiVoxTot=`fslstats ${epiData} -v | awk '{print $1}'`
 
     #.fsf setup
-    cat $scriptDir/dummy_preproc.fsf | sed 's|SUBJECTPATH|'${indir}'|g'  | \
+    cat $scriptDir/dummy_preproc_5.0.10_argon.fsf | sed 's|SUBJECTPATH|'${indir}'|g'  | \
                                        sed 's|SUBJECTEPIPATH|'${epiData}'|g' |  \
                                        sed 's|SUBJECTT1PATH|'${t1Data}'|g' | \
                                        sed 's|SCANTE|'${te}'|g' | \
@@ -178,6 +180,7 @@ if [[ -e $indir/${preprocfeat} ]]; then
                                        sed 's|SUBJECTSMOOTH|'${smooth}'|g' | \
                                        sed 's|SUBJECTTR|'${tr}'|g' | \
                                        sed 's|EPIDWELL|'${dwellTime}'|g' | \
+                                       sed 's|VOXTOT|'${epiVoxTot}'|g' | \
                                        sed 's|PEDIR|'${peDirNEW}'|g' | \
                                        sed 's|FSLDIR|'${FSLDIR}'|g' > ${indir}/${fsf}
     #Run FEAT
@@ -230,7 +233,7 @@ if [[ -e $indir/${preprocfeat} ]]; then
     #Remove all FEAT files (after backup), repopulate with proper files
     cp -r $regDir $preprocDir/regORIG
     rm -f $regDir/*
-    
+
     ##Copy over appropriate files from previous processing
     #T1 (highres)
     fslmaths $t1Data $regDir/highres.nii.gz
@@ -256,7 +259,7 @@ if [[ -e $indir/${preprocfeat} ]]; then
     #Transforms
       #EPItoT1/T1toEPI (Check for presence of FieldMap Correction)
       epiWarpDirtmp=`cat $indir/rsParams | grep "EPItoT1Warp=" | tail -1 | awk -F"=" '{print $2}'`
-        epiWarpDir=`dirname $epiWarpDirtmp`  
+        epiWarpDir=`dirname $epiWarpDirtmp`
 
       if [[ $fieldMapFlag == 1 ]]; then
         #Copy the EPItoT1 warp file
@@ -264,7 +267,7 @@ if [[ -e $indir/${preprocfeat} ]]; then
       else
         #Only copy the affine .mat files
         cp $epiWarpDir/EPItoT1_init.mat $regDir/example_func2initial_highres.mat
-        cp $epiWarpDir/EPItoT1.mat $regDir/example_func2highres.mat    
+        cp $epiWarpDir/EPItoT1.mat $regDir/example_func2highres.mat
       fi
 
       #T1toMNI
@@ -295,7 +298,7 @@ if [[ -e $indir/${preprocfeat} ]]; then
     pngappend example_func2highres1.png - example_func2highres2.png example_func2highres.png
 
     rm sl*.png
-                                                                                                                                                                            
+
     #highres2standard
     echo "......highres2standard"
     slicer highres2standard.nii.gz standard.nii.gz -s 2 -x 0.35 sla.png -x 0.45 slb.png -x 0.55 slc.png -x 0.65 sld.png -y 0.35 sle.png -y 0.45 slf.png -y 0.55 slg.png -y 0.65 slh.png -z 0.35 sli.png -z 0.45 slj.png -z 0.55 slk.png -z 0.65 sll.png
@@ -328,18 +331,19 @@ if [[ -e $indir/${preprocfeat} ]]; then
   fi
 else
   ##First instance of smoothing, reg setup
-
+  epiVoxTot=`fslstats ${epiData} -v | awk '{print $1}'`
   ###### FEAT (preproc) ########################################
   echo "...Running FEAT (preproc)"
 
   #.fsf setup
-  cat $scriptDir/dummy_preproc.fsf | sed 's|SUBJECTPATH|'${indir}'|g'  | \
+  cat $scriptDir/dummy_preproc_5.0.10_argon.fsf | sed 's|SUBJECTPATH|'${indir}'|g'  | \
                                      sed 's|SUBJECTEPIPATH|'${epiData}'|g' |  \
                                      sed 's|SUBJECTT1PATH|'${t1Data}'|g' | \
                                      sed 's|SCANTE|'${te}'|g' | \
                                      sed 's|SUBJECTVOLS|'${numtimepoint}'|g' | \
                                      sed 's|SUBJECTSMOOTH|'${smooth}'|g' | \
                                      sed 's|SUBJECTTR|'${tr}'|g' | \
+                                     sed 's|VOXTOT|'${epiVoxTot}'|g' | \
                                      sed 's|EPIDWELL|'${dwellTime}'|g' | \
                                      sed 's|PEDIR|'${peDirNEW}'|g' | \
                                      sed 's|FSLDIR|'${FSLDIR}'|g' > ${indir}/${fsf}
@@ -373,14 +377,14 @@ else
 
   #Threshold output by mean mask, rename original data
   fslmaths $preprocDir/nonfiltered_smooth.nii.gz -mul $preprocDir/mask.nii.gz $preprocDir/nonfiltered_smooth_data.nii.gz
-  mv $preprocDir/nonfiltered_smooth.nii.gz $preprocDir/nonfiltered_smooth_data_orig.nii.gz  
+  mv $preprocDir/nonfiltered_smooth.nii.gz $preprocDir/nonfiltered_smooth_data_orig.nii.gz
 
   #Echo out output to rsParams file
   echo "epiNonfilt=$preprocDir/nonfiltered_smooth_data.nii.gz" >> $indir/rsParams
 
   ################################################################
 
-    
+
   ###### FEAT registration correction ########################################
   echo "...Fixing FEAT registration QC images."
 
@@ -392,7 +396,7 @@ else
   #Remove all FEAT files (after backup), repopulate with proper files
   cp -r $regDir $preprocDir/regORIG
   rm -f $regDir/*
-  
+
   ##Copy over appropriate files from previous processing
   #T1 (highres)
   fslmaths $t1Data $regDir/highres.nii.gz
@@ -418,7 +422,7 @@ else
   #Transforms
     #EPItoT1/T1toEPI (Check for presence of FieldMap Correction)
     epiWarpDirtmp=`cat $indir/rsParams | grep "EPItoT1Warp=" | tail -1 | awk -F"=" '{print $2}'`
-      epiWarpDir=`dirname $epiWarpDirtmp`  
+      epiWarpDir=`dirname $epiWarpDirtmp`
 
     if [[ $fieldMapFlag == 1 ]]; then
       #Copy the EPItoT1 warp file
@@ -426,7 +430,7 @@ else
     else
       #Only copy the affine .mat files
       cp $epiWarpDir/EPItoT1_init.mat $regDir/example_func2initial_highres.mat
-      cp $epiWarpDir/EPItoT1.mat $regDir/example_func2highres.mat    
+      cp $epiWarpDir/EPItoT1.mat $regDir/example_func2highres.mat
     fi
 
     #T1toMNI
@@ -457,7 +461,7 @@ else
   pngappend example_func2highres1.png - example_func2highres2.png example_func2highres.png
 
   rm sl*.png
-                                                                                                                                                                            
+
   #highres2standard
   echo "......highres2standard"
   slicer highres2standard.nii.gz standard.nii.gz -s 2 -x 0.35 sla.png -x 0.45 slb.png -x 0.55 slc.png -x 0.65 sld.png -y 0.35 sle.png -y 0.45 slf.png -y 0.55 slg.png -y 0.65 slh.png -z 0.35 sli.png -z 0.45 slj.png -z 0.55 slk.png -z 0.65 sll.png
@@ -505,8 +509,3 @@ echo "<br><a href=\"$indir/${preprocfeat}/report.html\">FSL Preprocessing Result
 echo "$0 Complete"
 echo ""
 echo ""
-
-
-
-
-

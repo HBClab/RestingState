@@ -1,3 +1,0 @@
-UIUC_DMN_bPCC
-UIUC_DMN_bmPFC
-UIUC_DMN_core

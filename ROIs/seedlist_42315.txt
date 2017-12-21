@@ -1,8 +1,0 @@
-UIUC_DMN_lmtgf
-UIUC_DMN_lphgf
-UIUC_DMN_multif
-UIUC_DMN_rphgf
-UIUC_MOT_lMOT
-UIUC_MOT_rMOT
-UIUC_VIS_lvis
-UIUC_VIS_rvis

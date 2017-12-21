@@ -1,8 +1,0 @@
-smith_dmn_c4_bin
-smith_fp_c3_bin
-smith_rexec_c9_bin
-smith_lexec_c10_bin
-smith_bilexec_bin
-smith_sal_c8_bin
-
-

@@ -1,6 +1,0 @@
-gICA_mask_DAN
-gICA_mask_DMN
-gICA_mask_lECN
-gICA_mask_pDMN
-gICA_mask_rECN
-smith_sal_c8_bin

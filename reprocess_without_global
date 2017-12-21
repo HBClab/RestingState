@@ -1,8 +1,0 @@
-#reprocessing without global
-
-
-
-master_Reproc.sh -i inputDirectory -n nuisanceROI -t TR -T TE -D 0.000350475 -d PhaseEncDir -L lowpass_nuisance -H highpass_nuisance -m motionScrubLevel -r seedROI -V Create_output_QCimages"
-
-
-/Users/mwvoss/bin/RestingState2014a/master_Reproc.sh -i /Users/mwvoss/Analysis/ChordLearning/SeedAnalysis/denoised/sub100_1 -N /Users/mwvoss/Analysis/ChordLearning/SeedAnalysis/denoised/sub100_1/nuisance_noglobal.txt -t 2 -T 30  -L .1 -H .008 -g 3 -m 2 -R /Users/mwvoss/bin/RestingState2014a/ROIs/roilist_cl.txt -V

@@ -1,7 +1,0 @@
-smith_fp_c3
-smith_lexec_c10
-smith_rexec_c9
-smith_sal_c8
-smith_dmn_c4
-
-
