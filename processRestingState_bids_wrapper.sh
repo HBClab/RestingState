@@ -6,7 +6,6 @@ function printCommandLine {
   echo "Usage: processRestingState_wrapper.sh -o path/to/rsOut -R roilist "
   echo "-o path/to/BIDS/derivatives/rsOut_legacy/sub-GEA161/ses-activepost"
   echo "-R file with list of rois. must include path to roi file."
-
   exit 1
 }
 
@@ -242,4 +241,7 @@ else
   fi
   printf "\n$(date)\nBeginning reproc nuisance regression (ica_aroma + compcor)...\n"
   ${scriptdir}/reproc_2016.sh -i ${rsOut} -R ${roilist} -A "${MBA_dir}"
+
+  # prevents permissions denied error when others run new seeds
+  parallel chmod 774 ::: $(find ${rsOut} -type f \( -name "highres2standard.nii.gz" -o -name "seeds*.txt" -o -name "rsParams*" -o -name "run*.m" -o -name "highres.nii.gz" -o -name "standard.nii.gz" -o -name "analysisResults.html" \))
 fi
