@@ -46,6 +46,35 @@ function clobber()
 clob=false
 export -f clobber
 
+
+function softwareCheck()
+{
+  fsl_check=$(which fsl)
+  afni_check=$(which afni)
+  freesurfer_check=$(which freesurfer)
+	aroma_check=$(which ICA_AROMA.py)
+
+  if [ "${afni_check}" == "" ]; then
+      echo "afni is either not downloaded or not defined in your path, exiting script"
+      exit 1
+  fi
+
+  if [ "${fsl_check}" == "" ]; then
+      echo "fsl is either not downloaded or not defined in your path, exiting script"
+      exit 1
+  fi
+
+  if [ "${freesurfer_check}" == "" ]; then
+      echo "freesurfer is either not downloaded or not defined in your path, exiting script"
+      exit 1
+  fi
+
+	if [ "$(which ICA_AROMA.py)" == "" ]; then
+      echo "ICA_AROMA is either not downloaded or not defined in your path, exiting script"
+      exit 1
+  fi
+}
+
 function bandpass()
 {
 	local inData=$1
@@ -205,10 +234,12 @@ function dataScale()
 export -f dataScale
 
 function printCommandLine {
-    echo "Usage: reproc_2016.sh -i epiDir -c clobber (optional)"
+    echo "Usage: reproc_2016.sh -i epiDir -A path/to/T1_seg -R roilist -c clobber (optional)"
     echo " where:"
     echo "-i    Directory where the reconstructed EPI lives"
-    echo -e "\n"
+		echo "-A    Directory where the segmented T1 lives (optional)"
+		echo "-R		file containing paths to ROIs for seedcorrelation"
+		echo "-c		Overwrite existing files"
     exit 1
 }
 
@@ -353,6 +384,8 @@ if [ "${epiDir}" == "" ]; then
   exit 1
 fi
 
+softwareCheck # check dependencies
+
 analysis=nuisancereg_compcor_wGMR
 analysisFix=nuisanceregFix_compcor_wGMR
 nuisancefeat=${analysis}.feat
@@ -384,7 +417,7 @@ medianScale $epiDir/preproc.feat/nonfiltered_smooth_data.nii.gz $epiDir/mcImgMea
 # ICA-AROMA
 clobber $epiDir/ica_aroma/denoised_func_data_nonaggr.nii.gz &&\
 if [ -d $epiDir/ica_aroma ]; then rm -rf $epiDir/ica_aroma; fi &&\
-python ${VossLabMount}/UniversalSoftware/ICA-AROMA/ICA_AROMA.py -i $epiDir/preproc.feat/nonfiltered_smooth_data_intnorm.nii.gz -o $epiDir/ica_aroma -mc $epiDir/mcImg.par -w $epiDir/EPItoT1optimized/EPItoMNI_warp.nii.gz
+python ICA_AROMA.py -i $epiDir/preproc.feat/nonfiltered_smooth_data_intnorm.nii.gz -o $epiDir/ica_aroma -mc $epiDir/mcImg.par -w $epiDir/EPItoT1optimized/EPItoMNI_warp.nii.gz
 
 if [ ! -e $epiDir/ica_aroma/denoised_func_data_nonaggr.nii.gz ]; then
   >&2 echo "$epiDir/ica_aroma/denoised_func_data_nonaggr.nii.gz not found! exiting"
