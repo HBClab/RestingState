@@ -1,6 +1,8 @@
 #!/bin/bash
 # wrapper script for calling legacy resting state scripts
-
+# assumes BIDS directory structure
+# TODOS:
+# need a different way to determine scannerID. e.g., dicom header?
 function printCommandLine {
   echo ""
   echo "Usage: processRestingState_wrapper.sh -o path/to/rsOut -R roilist "
@@ -90,10 +92,8 @@ do
 
 scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-printf "${rsOut}" 1>&2
-
 if [ "${rsOut}" == "" ]; then
-  echo "ERROR: -r is required flag"
+  echo "ERROR: -O is required flag"
   exit 1
 fi
 
@@ -103,30 +103,24 @@ if [[ "${roilist}" == "" ]]; then
   roilist=${scriptdir}/roiList_tmp.txt
 fi
 
-bidsDir=${rsOut//\/derivatives\/rsOut_legacy} # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161/ses-activepre
+bidsDir=${rsOut//\/derivatives\/rsOut_legacy} # directory that contains subid's e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161/ses-activepre
 subDir="$(dirname ${bidsDir})" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161
 subID="$(echo ${rsOut} | cut -d "-" -f 2 | sed 's|/.*||g')" # gets subID from rsOut path
-c_bal="$(echo ${subID} | cut -c 3)"
-ses=$(echo ${rsOut} | sed 's|.*/||')
-scanner="$(echo ${subID} | cut -c -2)"
+scanner="$(echo ${subID} | cut -c -2)" # extract scannerID from subID, works when scannerID is embedded in subID. TODO: need a different way to determine scannerID. e.g., dicom header?
 
-# find dayone condition (Bike_ATrain: for determining where MBA-stripped T1 live)
-if [ "${c_bal}" == "A" ]; then
-  dayone="active"
-  daytwo="passive"
-else
-  dayone="passive"
-  daytwo="active"
-fi
 
 # load variables needed for processing
 
-MBA_dir="$(dirname ${subDir})/derivatives/MBA/sub-${subID}/ses-${dayone}pre"
+MBA_dir="$(dirname $(find ${subDir})/derivatives/MBA/sub-${subID} -type f -print -quit))" # find dir containing MBA output
+
 if [[ ! -d "${MBA_dir}" ]]; then
   echo "ERROR: MBA directory not found in derivatives. Exiting."
   exit 1
 else
-  T1_RPI="${subDir}/ses-${dayone}pre/anat/sub-${subID}_ses-${dayone}pre_T1w.nii.gz"
+  T1_RPI="$(find ${subDir}/ses-*/anat -type f -name "sub-${subID}_ses*_T1w.nii.gz")"
+  T1_RPI_brain="$(find ${subDir}/ses-*/anat -type f -name "sub-${subID}_ses*_T1w_brain.nii.gz")"
+  T1_brain_mask="(find ${MBA_dir} -type f -name "sub-${subID}_ses*_T1w_mask_60_smooth.nii.gz")"
+
   T1_RPI_brain="${MBA_dir}/sub-${subID}_ses-${dayone}pre_T1w_brain.nii.gz"
   T1_brain_mask="${MBA_dir}/sub-${subID}_ses-${dayone}pre_T1w_mask_60_smooth.nii.gz"
 fi
@@ -155,6 +149,8 @@ else
 
   printf "\n$(date)\nBeginning preprocesssing (classic mode)...\n"
 
+  mkdir -p ${rsOut}
+
   echo "t1=${T1_RPI_brain}" >> ${rsOut}/rsParams
   echo "t1Skull=${T1_RPI}" >> ${rsOut}/rsParams
   echo "t1Mask=${T1_brain_mask}" >> ${rsOut}/rsParams
@@ -167,7 +163,7 @@ else
   # copy raw rest image from BIDS to derivatives/rsOut_legacy/subID/sesID/
   cp ${rawRest} ${rsOut}
 
-  if [ ! -z "${fmap_prepped}" ]; then
+  if [ ! -z "${fmap_prepped}" ]; then # process with fmap
     echo "fieldMapCorrection=1" >> ${rsOut}/rsParams
     #skull strip mag image
     if [ "${fmap_mag_stripped}" == "" ]; then
@@ -181,7 +177,8 @@ else
 
     ${scriptdir}/qualityCheck.sh -E "$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
       -A ${T1_RPI_brain} \
-      -a ${T1_RPI} -f \
+      -a ${T1_RPI} \
+      -f \
       -b ${fmap_prepped} \
       -v ${fmap_mag} \
       -x ${fmap_mag_stripped} \
