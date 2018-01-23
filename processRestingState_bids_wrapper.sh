@@ -131,7 +131,7 @@ else
   T1_brain_mask="${MBA_dir}/sub-${subID}_ses-${dayone}pre_T1w_mask_60_smooth.nii.gz"
 fi
 
-rawRest="$(find ${bidsDir}/func -type f -name "*rest_bold.nii.gz")"
+rawRest="$(find ${bidsDir}/func -type f -name "*rest_bold*.nii.gz")"
 
 if [ "${scanner}" == "GE" ]; then
   fmap_prepped="$(find ${bidsDir}/fmap -type f -name "*fieldmap.nii.gz")"
@@ -179,7 +179,7 @@ else
       fmap_mag_stripped="$(find ${bidsDir}/fmap -type f -name "*magnitude_stripped.nii.gz")"
     fi
 
-    ${scriptdir}/qualityCheck.sh -E "$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold.nii.gz")" \
+    ${scriptdir}/qualityCheck.sh -E "$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
       -A ${T1_RPI_brain} \
       -a ${T1_RPI} -f \
       -b ${fmap_prepped} \
@@ -211,7 +211,7 @@ else
       -f -V
   else
     printf "no fieldmap found."
-    ${scriptdir}/qualityCheck.sh -E "$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold.nii.gz")" \
+    ${scriptdir}/qualityCheck.sh -E "$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
       -A ${T1_RPI_brain} \
       -a ${T1_RPI} \
       -D ${dwellTime} \
