@@ -107,7 +107,7 @@ fi
 bidsDir=${inFile//\/sub*} # bids directory e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS
 subID="$(echo ${inFile} | cut -d "-" -f 2 | sed 's|/.*||g')" # gets subID from inFile
 sesID="$(dirname $(dirname $inFile) | rev | cut -d '/' -f 1 | rev)" # gets sesID from inFile
-subDir="${bidsDir}/${subID}" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161
+subDir="${bidsDir}/sub-${subID}" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161
 scanner="$(echo ${subID} | cut -c -2)" # extract scannerID from subID, works when scannerID is embedded in subID. TODO: need a different way to determine scannerID. e.g., dicom header?
 rsOut="${bidsDir}/derivatives/rsOut_legacy/${subID}/${sesID}"
 
@@ -129,17 +129,17 @@ else
   T1_brain_mask="${MBA_dir}/sub-${subID}_ses-${dayone}pre_T1w_mask_60_smooth.nii.gz"
 fi
 
-rawRest="$(find ${bidsDir}/func -type f -name "*rest_bold*.nii.gz")"
+rawRest="$(find ${subDir}/func -type f -name "*rest_bold*.nii.gz")"
 
 if [ "${scanner}" == "GE" ]; then
-  fmap_prepped="$(find ${bidsDir}/fmap -type f -name "*fieldmap.nii.gz")"
-  fmap_mag="$(find ${bidsDir}/fmap -type f -name "*magnitude.nii.gz")"
-  fmap_mag_stripped="$(find ${bidsDir}/fmap -type f -name "*magnitude_stripped.nii.gz")"
-  dwellTime="$(cat $(find ${bidsDir}/func -type f -name "*rest_bold_info.txt") | grep "dwellTime=" | awk -F"=" '{print $2}' | tail -1)"
+  fmap_prepped="$(find ${subDir}/fmap -type f -name "*fieldmap.nii.gz")"
+  fmap_mag="$(find ${subDir}/fmap -type f -name "*magnitude.nii.gz")"
+  fmap_mag_stripped="$(find ${subDir}/fmap -type f -name "*magnitude_stripped.nii.gz")"
+  dwellTime="$(cat $(find ${subDir}/func -type f -name "*rest_bold_info.txt") | grep "dwellTime=" | awk -F"=" '{print $2}' | tail -1)"
 elif [ "${scanner}" == "SE" ]; then
-  fmap_prepped="$(find ${bidsDir}/fmap -maxdepth 1 -type f -name "*fieldmap_prepped.nii.gz")"
-  fmap_mag="$(find ${bidsDir}/fmap -maxdepth 1 -type f -name "*magnitude1.nii.gz")"
-  fmap_mag_stripped="$(find ${bidsDir}/fmap/mag1/ -type f -name "*_stripped.nii.gz")"
+  fmap_prepped="$(find ${subDir}/fmap -maxdepth 1 -type f -name "*fieldmap_prepped.nii.gz")"
+  fmap_mag="$(find ${subDir}/fmap -maxdepth 1 -type f -name "*magnitude1.nii.gz")"
+  fmap_mag_stripped="$(find ${subDir}/fmap/mag1/ -type f -name "*_stripped.nii.gz")"
   dwellTime=0.00056
 fi
 
@@ -171,12 +171,12 @@ else
     echo "fieldMapCorrection=1" >> ${rsOut}/rsParams
     #skull strip mag image
     if [ "${fmap_mag_stripped}" == "" ]; then
-      clobber ${bidsDir}/fmap/$(find ${bidsDir}/fmap -type f -name "*magnitude_stripped.nii.gz") &&\
+      clobber ${subDir}/fmap/$(find ${subDir}/fmap -type f -name "*magnitude_stripped.nii.gz") &&\
       printf "\n$(date)\nSkull stripping fmap magnitude image..." &&\
       bet ${fmap_mag} "$(echo ${fmap_mag} | sed -e 's/magnitude/magnitude_stripped/')" -m -n -f 0.3 -B &&\
-      fslmaths "$(find ${bidsDir}/fmap -type f -name "*magnitude_stripped_mask.nii.gz")" -ero -bin "$(echo ${fmap_mag} | sed -e 's/magnitude/magnitude_stripped_mask_eroded/')" -odt char &&\
+      fslmaths "$(find ${subDir}/fmap -type f -name "*magnitude_stripped_mask.nii.gz")" -ero -bin "$(echo ${fmap_mag} | sed -e 's/magnitude/magnitude_stripped_mask_eroded/')" -odt char &&\
       fslmaths ${fmap_mag} -mas "$(echo ${fmap_mag} | sed -e 's/magnitude/magnitude_stripped_mask_eroded/')" "$(echo ${fmap_mag} | sed -e 's/magnitude/magnitude_stripped/')" &&\
-      fmap_mag_stripped="$(find ${bidsDir}/fmap -type f -name "*magnitude_stripped.nii.gz")"
+      fmap_mag_stripped="$(find ${subDir}/fmap -type f -name "*magnitude_stripped.nii.gz")"
     fi
 
     ${scriptdir}/qualityCheck.sh -E "$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
