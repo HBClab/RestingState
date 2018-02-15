@@ -5,8 +5,8 @@
 # need a different way to determine scannerID. e.g., dicom header?
 function printCommandLine {
   echo ""
-  echo "Usage: processRestingState_wrapper.sh -o path/to/rsOut -R roilist "
-  echo "-o path/to/BIDS/derivatives/rsOut_legacy/sub-GEA161/ses-activepost"
+  echo "Usage: processRestingState_wrapper.sh -i infile -R roilist "
+  echo "-i path/to/BIDS/sub-GEA161/ses-activepost"
   echo "-R file with list of rois. must include path to roi file."
   exit 1
 }
@@ -103,15 +103,18 @@ if [[ "${roilist}" == "" ]]; then
   roilist=${scriptdir}/roiList_tmp.txt
 fi
 
-bidsDir=${rsOut//\/derivatives\/rsOut_legacy} # directory that contains subid's e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161/ses-activepre
-subDir="$(dirname ${bidsDir})" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161
+bidsDir=${rsOut//\/derivatives\/rsOut_legacy*} # bids directory e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS
 subID="$(echo ${rsOut} | cut -d "-" -f 2 | sed 's|/.*||g')" # gets subID from rsOut path
+subDir="${bidsDir}/${subID}" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161
 scanner="$(echo ${subID} | cut -c -2)" # extract scannerID from subID, works when scannerID is embedded in subID. TODO: need a different way to determine scannerID. e.g., dicom header?
 
 
 # load variables needed for processing
 
-MBA_dir="$(dirname $(find ${subDir})/derivatives/MBA/sub-${subID} -type f -print -quit))" # find dir containing MBA output
+MBA_dir="$(dirname $(find ${bidsDir}/derivatives/MBA/sub-${subID} -type f -print -quit))" # find dir containing MBA output
+echo "subDir is ${subDir}."
+echo "MBA_dir is ${MBA_dir}."
+
 
 if [[ ! -d "${MBA_dir}" ]]; then
   echo "ERROR: MBA directory not found in derivatives. Exiting."
