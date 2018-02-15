@@ -102,7 +102,6 @@ fi
 if [[ "${roilist}" == "" ]]; then
   echo "$(find ${scriptdir}/ROIs -type f -name "*.nii.gz" -print -quit)" > ${scriptdir}/roiList_tmp.txt
   roilist=${scriptdir}/roiList_tmp.txt
-  printCommandLine
 fi
 
 bidsDir=${inFile//\/sub*} # bids directory e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS
@@ -118,7 +117,7 @@ MBA_dir="$(dirname $(find ${bidsDir}/derivatives/MBA/sub-${subID} -type f -print
 echo "subDir is ${subDir}."
 echo "MBA_dir is ${MBA_dir}."
 
-
+exit 1
 if [[ ! -d "${MBA_dir}" ]]; then
   echo "ERROR: MBA directory not found in derivatives. Exiting."
   exit 1
