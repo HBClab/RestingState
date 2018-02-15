@@ -6,7 +6,7 @@
 function printCommandLine {
   echo ""
   echo "Usage: processRestingState_wrapper.sh -i infile -R roilist "
-  echo "-i path/to/BIDS/sub-GEA161/ses-activepost"
+  echo "-i path/to/BIDS/sub-GEA161/ses-activepre/func/sub-GEA161_ses-activepre_task-rest_bold.nii.gz"
   echo "-R file with list of rois. must include path to roi file."
   exit 1
 }
@@ -71,11 +71,11 @@ function clobber()
 clob=false
 export -f clobber
 
-while getopts “o:R:h” OPTION
+while getopts “i:R:h” OPTION
 do
   case $OPTION in
-    o)
-      rsOut=$OPTARG  # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/derivatives/rsOut_legacy/sub-GEA161/ses-activepre
+    i)
+      inFile=$OPTARG  # e.g., -i path/to/BIDS/sub-GEA161/ses-activepre/func/sub-GEA161_ses-activepre_task-rest_bold.nii.gz
       ;;
     R)
       roilist=$OPTARG
@@ -92,8 +92,9 @@ do
 
 scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-if [ "${rsOut}" == "" ]; then
-  echo "ERROR: -O is required flag"
+if [ "${inFile}" == "" ]; then
+  echo "ERROR: -i is required flag"
+  printCommandLine
   exit 1
 fi
 
@@ -101,13 +102,15 @@ fi
 if [[ "${roilist}" == "" ]]; then
   echo "$(find ${scriptdir}/ROIs -type f -name "*.nii.gz" -print -quit)" > ${scriptdir}/roiList_tmp.txt
   roilist=${scriptdir}/roiList_tmp.txt
+  printCommandLine
 fi
 
-bidsDir=${rsOut//\/derivatives\/rsOut_legacy*} # bids directory e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS
-subID="$(echo ${rsOut} | cut -d "-" -f 2 | sed 's|/.*||g')" # gets subID from rsOut path
+bidsDir=${inFile//\/sub*} # bids directory e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS
+subID="$(echo ${inFile} | cut -d "-" -f 2 | sed 's|/.*||g')" # gets subID from inFile
+sesID="$(dirname $(dirname $inFile) | rev | cut -d '/' -f 1 | rev)" # gets sesID from inFile
 subDir="${bidsDir}/${subID}" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161
 scanner="$(echo ${subID} | cut -c -2)" # extract scannerID from subID, works when scannerID is embedded in subID. TODO: need a different way to determine scannerID. e.g., dicom header?
-
+rsOut="${bidsDir}/derivatives/rsOut_legacy/${subID}/${sesID}"
 
 # load variables needed for processing
 
