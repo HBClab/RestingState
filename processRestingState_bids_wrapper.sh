@@ -117,7 +117,6 @@ MBA_dir="$(dirname $(find ${bidsDir}/derivatives/MBA/sub-${subID} -type f -print
 echo "subDir is ${subDir}."
 echo "MBA_dir is ${MBA_dir}."
 
-exit 1
 if [[ ! -d "${MBA_dir}" ]]; then
   echo "ERROR: MBA directory not found in derivatives. Exiting."
   exit 1
