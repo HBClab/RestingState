@@ -444,7 +444,7 @@ if [[ -e ${nuisancefeat} ]]; then
 
     epiVoxTot=`fslstats ${epiDataFilt} -v | awk '{print $1}'`
 
-    cat $scriptDir/dummy_nuisance_5.0.10_argon.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
+    cat $scriptDir/dummy_nuisance_5.0.10.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
                                         sed 's|SUBJECTEPIPATH|'${epiDataFilt}'|g' | \
                                         sed 's|VOXTOT|'${epiVoxTot}'|g' | \
                                         sed 's|SUBJECTT1PATH|'${t1Data}'|g' | \
@@ -593,7 +593,7 @@ EOF
       #NUISANCEDIR
       nuisanceDir=$indir/${nuisancefeat}
 
-    cat $scriptDir/dummy_nuisance_regFix_5.0.10_argon.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
+    cat $scriptDir/dummy_nuisance_regFix_5.0.10.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
                                                sed 's|VOXTOT|'${epiVoxTot}'|g' | \
                                                sed 's|NUISANCEDIR|'${nuisanceDir}'|g' | \
                                                sed 's|SCANTE|'${te}'|g' | \
@@ -793,7 +793,7 @@ else
 
   epiVoxTot=`fslstats ${epiDataFilt} -v | awk '{print $1}'`
 
-  cat $scriptDir/dummy_nuisance_5.0.10_argon.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
+  cat $scriptDir/dummy_nuisance_5.0.10.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
                                       sed 's|SUBJECTEPIPATH|'${epiDataFilt}'|g' | \
                                       sed 's|SUBJECTT1PATH|'${t1Data}'|g' | \
                                       sed 's|VOXTOT|'${epiVoxTot}'|g' | \
@@ -944,7 +944,7 @@ EOF
     #NUISANCEDIR
     nuisanceDir=$indir/${nuisancefeat}
 
-  cat $scriptDir/dummy_nuisance_regFix_5.0.10_argon.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
+  cat $scriptDir/dummy_nuisance_regFix_5.0.10.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
                                              sed 's|VOXTOT|'${epiVoxTot}'|g' | \
                                              sed 's|NUISANCEDIR|'${nuisanceDir}'|g' | \
                                              sed 's|SCANTE|'${te}'|g' | \

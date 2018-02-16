@@ -172,7 +172,7 @@ if [[ -e $indir/${preprocfeat} ]]; then
     epiVoxTot=`fslstats ${epiData} -v | awk '{print $1}'`
 
     #.fsf setup
-    cat $scriptDir/dummy_preproc_5.0.10_argon.fsf | sed 's|SUBJECTPATH|'${indir}'|g'  | \
+    cat $scriptDir/dummy_preproc_5.0.10.fsf | sed 's|SUBJECTPATH|'${indir}'|g'  | \
                                        sed 's|SUBJECTEPIPATH|'${epiData}'|g' |  \
                                        sed 's|SUBJECTT1PATH|'${t1Data}'|g' | \
                                        sed 's|SCANTE|'${te}'|g' | \
@@ -336,7 +336,7 @@ else
   echo "...Running FEAT (preproc)"
 
   #.fsf setup
-  cat $scriptDir/dummy_preproc_5.0.10_argon.fsf | sed 's|SUBJECTPATH|'${indir}'|g'  | \
+  cat $scriptDir/dummy_preproc_5.0.10.fsf | sed 's|SUBJECTPATH|'${indir}'|g'  | \
                                      sed 's|SUBJECTEPIPATH|'${epiData}'|g' |  \
                                      sed 's|SUBJECTT1PATH|'${t1Data}'|g' | \
                                      sed 's|SCANTE|'${te}'|g' | \
