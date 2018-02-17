@@ -207,7 +207,7 @@ else
     ${scriptdir}/seedVoxelCorrelation.sh -E $rsOut/RestingState.nii.gz \
       -m 2 \
       -R ${roilist} \
-      -f -V
+      -f
   else
     printf "no fieldmap found."
     ${scriptdir}/qualityCheck.sh -E "$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
@@ -235,8 +235,7 @@ else
 
     ${scriptdir}/seedVoxelCorrelation.sh -E $rsOut/RestingState.nii.gz \
       -m 2 \
-      -R ${roilist} \
-      -V
+      -R ${roilist}
   fi
   printf "\n$(date)\nBeginning reproc nuisance regression (ica_aroma + compcor)...\n"
   ${scriptdir}/reproc_2016.sh -i ${rsOut} -R ${roilist} -A "${MBA_dir}"
