@@ -16,7 +16,7 @@ function clobber()
 	local -i num_args=$#
 
 	#Tally all existing outputs
-	for arg in $@; do
+	for arg in "$@"; do
 		if [ -s "${arg}" ] && [ "${clob}" == true ]; then
 			rm -rf "${arg}"
 		elif [ -s "${arg}" ] && [ "${clob}" == false ]; then
@@ -29,20 +29,20 @@ function clobber()
 		fi
 	done
 
-	#see if the command should be run by seeing if the requisite files exist.
-	#0=true
-	#1=false
+	# see if the command should be run by seeing if the requisite files exist.
+	# 0=true
+	# 1=false
 	if [ ${num_existing_files} -lt ${num_args} ]; then
 		return 0
 	else
 		return 1
 	fi
 
-	#example usage
-	#clobber test.nii.gz &&\
-	#fslmaths input.nii.gz -mul 10 test.nii.gz
+	# example usage
+	# clobber test.nii.gz &&\
+	# fslmaths input.nii.gz -mul 10 test.nii.gz
 }
-#default
+# default
 clob=false
 export -f clobber
 
@@ -83,7 +83,7 @@ function bandpass()
   local lpf=$4
   local inDir=$(dirname ${inData})
 
-  #defaults
+  # defaults
   if [ "$hpf" == "" ]; then
     hpf=.008
   fi
@@ -108,15 +108,10 @@ function medianScale()
   local maskFile=$2
   local outDir=$(dirname $inFile)
 
-  # if [ ! -s "{$inFile}" ]; then
-  #   >&2 echo "${inFile} doesn't exist! exiting."
-  #   exit 1
-  # else
-    echo "scaling over median intensity"
-    median_intensity=$(fslstats $inFile -k $maskFile -p 50)
-    scaling=$(echo "scale=16; 10000/${median_intensity}" | bc)
-    fslmaths $inFile -mul $scaling $outDir/nonfiltered_smooth_data_intnorm.nii.gz
-  # fi
+  echo "scaling over median intensity"
+  median_intensity=$(fslstats $inFile -k $maskFile -p 50)
+  scaling=$(echo "scale=16; 10000/${median_intensity}" | bc)
+  fslmaths $inFile -mul $scaling $outDir/nonfiltered_smooth_data_intnorm.nii.gz
 }
 export -f medianScale
 
@@ -138,25 +133,24 @@ function feat_regFix()
 
 
 
-  #http://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FEAT/FAQ
-  #ss: "How can I insert a custom registration into a FEAT analysis?"
+  # http://fsl.fmrib.ox.ac.uk/fsl/fslwiki/FEAT/FAQ
+  # ss: "How can I insert a custom registration into a FEAT analysis?"
 
   regDir=$epiDir/${nuisancefeat}/reg
 
-  #Remove all FEAT files (after backup), repopulate with proper files
+  # Remove all FEAT files (after backup), repopulate with proper files
   if [ -d $epiDir/${nuisancefeat}/reg ]; then
     echo "...Fixing FEAT registration QC images. ${nuisancefeat}"
-    # mv $regDir $epiDir/${nuisancefeat}/regORIG
 		rm -r $epiDir/${nuisancefeat}/reg
   fi
-	##Copy over appropriate reg directory from melodic.ica or preproc.feat processing
+	# Copy over appropriate reg directory from melodic.ica or preproc.feat processing
 	rsync -a $epiDir/${preprocfeat}/reg $epiDir/${nuisancefeat}
 
-  #NUISANCEDIR
+  # NUISANCEDIR
   nuisanceDir=$epiDir/${nuisancefeat}
   local fsf_regFix="dummy_$(basename ${fsf} .fsf | sed 's/reg//')_regFix_5.0.10.fsf"
   if [ -e ${scriptDir}/${fsf_regFix} ]; then
-    #Backup original design file
+    # Backup original design file
     rsync -a $epiDir/${nuisancefeat}/design.fsf $epiDir/${nuisancefeat}/designORIG.fsf
 
     cat $scriptDir/${fsf_regFix} | sed 's|SUBJECTPATH|'${epiDir}'|g' | \
@@ -169,12 +163,12 @@ function feat_regFix()
                                          sed 's|PEDIR|\'${peDirNEW}'|g' | \
                                          sed 's|FSLDIR|'${FSLDIR}'|g' > ${fsf%.*}_regFix.fsf
 
-      #Re-run feat
+      # Re-run feat
       if [ ! -e $epiDir/${nuisancefeat}/old/designORIG.fsf ]; then
         echo "...Rerunning FEAT (nuisancereg(post-stats only))"
         feat ${fsf%.*}_regFix.fsf
 
-        #Log output to HTML file
+        # Log output to HTML file
         echo "<a href=\"$epiDir/${nuisancefeat}/report.html\">FSL Nuisance Regressor Results</a>" >> $epiDir/analysisResults.html
       fi
   else
@@ -192,7 +186,7 @@ function dataScale()
 
   echo "...Scaling data by 1000"
 
-  #Backup file
+  # Backup file
   if [ -e $inDir/stats/res4d.nii.gz ]; then
     if [ ! -e $inDir/stats/res4d_orig.nii.gz ]; then
       rsync -a res4d.nii.gz res4d_orig.nii.gz
@@ -202,14 +196,14 @@ function dataScale()
      return 1
   fi
 
-  #For some reason, this mask isn't very good.  Use the good mask top-level
+  # For some reason, this mask isn't very good.  Use the good mask top-level
   if [ ! -e mask1000.nii.gz ]; then
     echo "...Copy Brain mask"
     rsync -a ../../mcImgMean_mask.nii.gz mask.nii.gz
     fslmaths mask -mul 1000 mask1000 -odt float
   fi
 
-  #normalize res4d here
+  # normalize res4d here
   echo "...Normalize Data"
   if [ ! -s res4d_tmean.nii.gz ]; then
     fslmaths res4d -Tmean res4d_tmean
@@ -243,9 +237,6 @@ function printCommandLine {
     exit 1
 }
 
-
-function motionScrub()
-{
 ##################################################################################################################
 # Motion Scrubbing (Censoring TRs with too much movement (Power 2012 Neuroimage)
 #     1. Scrubbing
@@ -253,6 +244,8 @@ function motionScrub()
 #       b. 1=Motion Scrubbing
 #       c. 2=No Scrubbing, Motion Scrubbing in parallel
 ##################################################################################################################
+
+function motionScrub() {
 
 local epiData=$1
 local nuisancefeat=$2
@@ -264,17 +257,17 @@ if [ "$epiData" == "" ]; then
   exit 1
 fi
 
-local indir=`dirname $epiData`
+local indir=$(dirname $epiData)
 
 echo "Running motionScrub on $nuisancefeat ..."
 
 cd $indir
 
 # Extract image dimensions from the NIFTI File
-local numXdim=`fslinfo $epiData | grep ^dim1 | awk '{print $2}'`
-local numYdim=`fslinfo $epiData | grep ^dim2 | awk '{print $2}'`
-local numZdim=`fslinfo $epiData | grep ^dim3 | awk '{print $2}'`
-local numtimepoint=`fslinfo $epiData | grep ^dim4 | awk '{print $2}'`
+local numXdim=$(fslinfo $epiData | grep ^dim1 | awk '{print $2}')
+local numYdim=$(fslinfo $epiData | grep ^dim2 | awk '{print $2}')
+local numZdim=$(fslinfo $epiData | grep ^dim3 | awk '{print $2}')
+local numtimepoint=$(fslinfo $epiData | grep ^dim4 | awk '{print $2}')
 
 #### Motion scrubbing ############
 
@@ -290,7 +283,7 @@ quit
 EOF
 
 # Run script using Matlab or Octave
-haveMatlab=`which matlab`
+haveMatlab=$(which matlab)
 if [ "$haveMatlab" == "" ]; then
   octave --no-window-system $indir/$filename
 else
@@ -302,18 +295,18 @@ fi
 #### Process Summary ############
 echo "...Summarizing Results"
 
-##Want to summarize motion-scrubbing output
+# Want to summarize motion-scrubbing output
 echo "ID,total_volumes,deleted_volumes,prop_deleted,resid_vols" > ${indir}/motion_scrubbing_info.txt
 
-##Echo out the pertinent info for the motion-scrubbed/processed subjects
+# Echo out the pertinent info for the motion-scrubbed/processed subjects
 
-numvols=`fslinfo ${indir}/nuisancereg.feat/stats/res4d_normandscaled.nii | grep ^dim4 | awk '{print $2}'`
-delvols=`cat ${indir}/nuisancereg.feat/stats/deleted_vols.txt | wc | awk '{print $2}'`
-propdel=`echo ${numvols} ${delvols} | awk '{print ($2/$1)}'`
-residvols=`echo ${numvols} ${delvols} | awk '{print ($1-$2)}'`
+numvols=$(fslinfo ${indir}/nuisancereg.feat/stats/res4d_normandscaled.nii | grep ^dim4 | awk '{print $2}')
+delvols=$(cat ${indir}/nuisancereg.feat/stats/deleted_vols.txt | wc | awk '{print $2}')
+propdel=$(echo ${numvols} ${delvols} | awk '{print ($2/$1)}')
+residvols=$(echo ${numvols} ${delvols} | awk '{print ($1-$2)}')
 echo "${indir},${numvols},${delvols},${propdel},${residvols}" >> ${indir}/motion_scrubbing_info.txt
 
-#Echo out motionscrub info to rsParams file
+# Echo out motionscrub info to rsParams file
 echo "epiNormMS=${indir}/nuisancereg.feat/stats/res4d_normandscaled_motionscrubbed.nii" >> $indir/rsParams
 
 echo "<hr>" >> ${indir}/analysisResults.html
@@ -322,9 +315,9 @@ echo "<b>Total Volumes</b>: $numvols<br>" >> ${indir}/analysisResults.html
 echo "<b>Deleted Volumes</b>: $delvols<br>" >> ${indir}/analysisResults.html
 echo "<b>Remaining Volumes</b>: $residvols<br>" >> ${indir}/analysisResults.html
 
-scrubDataCheck=`cat $indir/$nuisancefeat/stats/deleted_vols.txt | head -1`
+scrubDataCheck=$(cat $indir/$nuisancefeat/stats/deleted_vols.txt | head -1)
 if [[ $scrubDataCheck != "" ]]; then
-  echo "<b>Scrubbed TR</b>: `cat ${indir}/nuisancereg.feat/stats/deleted_vols.txt | awk '{$1=$1}1'`<br>" >> ${indir}/analysisResults.html
+  echo "<b>Scrubbed TR</b>: $(cat ${indir}/nuisancereg.feat/stats/deleted_vols.txt | awk '{$1=$1}1')<br>" >> ${indir}/analysisResults.html
 fi
 
 #################################
@@ -335,24 +328,24 @@ echo ""
 }
 
 ################################################################
-#Global SNR Estimation
+# Global SNR Estimation
 function SNRcalc() {
-    cd $(dirname $1)
+    cd "$(dirname $1)"
     echo "...Calculating signal to noise measurements"
 
-    fslmaths $1 -Tmean $(basename $1 .nii.gz)_mean
-    #calculate standard deviation image of motion corrected functional series
-    fslmaths $1 -Tstd $(basename $1 .nii.gz)_Std
-    #ratio of mean over standard deviation
-    fslmaths $(basename $1 .nii.gz)_mean -div $(basename $1 .nii.gz)_Std $(basename $1 .nii.gz)_SNR
-    #mask the SNR img to keep only brain voxels
-    fslmaths $(basename $1 .nii.gz)_SNR -mas $epiDir/mcImgMean_mask.nii.gz $(basename $1 .nii.gz)_SNR
+    fslmaths $1 -Tmean "$(basename $1 .nii.gz)"_mean
+    # calculate standard deviation image of motion corrected functional series
+    fslmaths $1 -Tstd "$(basename $1 .nii.gz)"_Std
+    # ratio of mean over standard deviation
+    fslmaths "$(basename $1 .nii.gz)"_mean -div "$(basename $1 .nii.gz)"_Std "$(basename $1 .nii.gz)"_SNR
+    # mask the SNR img to keep only brain voxels
+    fslmaths "$(basename $1 .nii.gz)"_SNR -mas $epiDir/mcImgMean_mask.nii.gz "$(basename $1 .nii.gz)"_SNR
 
-    fslstats $(basename $1 .nii.gz)_SNR -M >> SNR_calc.txt
+    fslstats "$(basename $1 .nii.gz)"_SNR -M >> SNR_calc.txt
 
 }
 
-while getopts “hi:A:R:c” OPTION
+while getopts "hi:A:R:c" OPTION
 do
     case $OPTION in
   i)
@@ -400,15 +393,10 @@ nuisancefeat3=${analysis3}.feat
 
 fsf=${analysis}.fsf
 fsf2=${analysis2}.fsf
-fsf3=${analysis3}.fsf
+fsf3=${analysis3}.fsf # TODO: does this variable do anything?
 
 
 scriptDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-
-# if [ "$(which parallel)" == "" ]; then
-#     echo "GNU parallel is either not downloaded or not defined in your path, exiting script"
-#     exit 1
-# fi
 
 # scaling by median intensity
 clobber $epiDir/preproc.feat/nonfiltered_smooth_data_intnorm.nii.gz &&\
@@ -446,7 +434,7 @@ bandpass $epiDir/ica_aroma/denoised_func_data_nonaggr.nii.gz $epiDir/mcImgMean_m
 clobber ${epiDir}/mcImg_smooth_denoised_bp.nii.gz &&\
 cp $epiDir/ica_aroma/denoised_func_data_nonaggr_bp.nii.gz ${epiDir}/mcImg_smooth_denoised_bp.nii.gz
 epiDataFilt=${epiDir}/mcImg_smooth_denoised_bp.nii.gz
-epiVoxTot=`fslstats ${epiDataFilt} -v | awk '{print $1}'`
+epiVoxTot=$(fslstats ${epiDataFilt} -v | awk '{print $1}')
 
 
 # warping nuisance ROIs  #### Nuisance ROI mapping ############
@@ -461,7 +449,7 @@ fi
 snrDir=${epiDir}/SNR
 preprocDir=${epiDir}/preproc.feat
 epiWarpDir=${epiDir}/EPItoT1optimized
-fieldmapFlag=`cat ${epiDir}/rsParams | grep "fieldMapCorrection=" | tail -1 | awk -F"=" '{print $2}'`
+fieldmapFlag=$(cat ${epiDir}/rsParams | grep "fieldMapCorrection=" | tail -1 | awk -F"=" '{print $2}')
 
 if [ "${fieldmapFlag}" == "1" ]; then
 	echo "field map flag detected, using nonlinear transform"
@@ -525,7 +513,7 @@ ${scriptDir}/PlotPow.sh -tr 2 $epiDataFilt $snrDir/GM_pve_to_RS_thresh.nii.gz $e
 clobber $epiDir/powplot_mcImg_GM_mask_final.png &&\
 ${scriptDir}/PlotPow.sh -tr 2 $epiDataFilt $snrDir/GM_mask_final.nii.gz $epiDir/powplot_mcImg_GM_mask_final
 
-#separate 5 eigenvectors into single files
+# separate 5 eigenvectors into single files
 for i in {1..5}; do
   for j in WM CSF; do
     rm $preprocDir/rois/${j}_FAST_${i}_ts.txt 2> /dev/null
@@ -576,7 +564,7 @@ quit;
 EOF
 
 # Run script using Matlab or Octave
-haveMatlab=`which matlab`
+haveMatlab=$(which matlab)
 if [ "$haveMatlab" == "" ]; then
   octave --no-window-system $epiDir/$filename
 else
@@ -597,7 +585,7 @@ done
 
 for i in CSF WM; do
   clobber $epiDir/${i}_regressors_ts_norm.png &&\
-  pngappend $(find $epiDir -maxdepth 1 -type f -name "${i}_FAST*_norm.png" | tr '\n' '-' | sed -e 's|.png-/|.png - /|g' -e 's|.png-|.png|g') $epiDir/${i}_regressors_ts_norm.png
+  pngappend "$(find $epiDir -maxdepth 1 -type f -name "${i}_FAST*_norm.png" | tr '\n' '-' | sed -e 's|.png-/|.png - /|g' -e 's|.png-|.png|g')" $epiDir/${i}_regressors_ts_norm.png
 done
 
 #################################
@@ -609,14 +597,14 @@ echo "... FEAT setup"
 cd $epiDir
 logDir=$epiDir
 
-#Set a few variables from data
-  #epi_reg peDir setup (e.g. -y) is backwards from FEAT peDir (e.g. y-)
-peDirBase=`cat $epiDir/rsParams | grep "peDir=" | tail -1 | awk -F"=" '{print $2}'`
+# Set a few variables from data
+# epi_reg peDir setup (e.g. -y) is backwards from FEAT peDir (e.g. y-)
+peDirBase=$(cat $epiDir/rsParams | grep "peDir=" | tail -1 | awk -F"=" '{print $2}')
 if [[ $peDirBase == "" ]]; then
   peDirNEW="y-"
 else
-  peDirTmp1=`echo $peDirBase | cut -c1`
-  peDirTmp2=`echo $peDirBase | cut -c2`
+  peDirTmp1=$(echo $peDirBase | cut -c1)
+  peDirTmp2=$(echo $peDirBase | cut -c2)
   if [[ "$peDirTmp1" == "-" ]]; then
     peDirNEW="${peDirTmp2}${peDirTmp1}"
   else
@@ -624,28 +612,18 @@ else
   fi
 fi
 
-numtimepoint=`fslinfo $epiDataFilt | grep ^dim4 | awk '{print $2}'`
+numtimepoint=$(fslinfo $epiDataFilt | grep ^dim4 | awk '{print $2}')
 
-dwellTimeBase=`cat $logDir/rsParams | grep "epiDwell=" | tail -1 | awk -F"=" '{print $2}'`
+dwellTimeBase=$(cat $logDir/rsParams | grep "epiDwell=" | tail -1 | awk -F"=" '{print $2}')
 if [[ $dwellTimeBase == "" ]]; then
   dwellTime=0.00056
 else
   dwellTime=$dwellTimeBase
 fi
 
-t1Data=`cat $logDir/rsParams | grep "^T1=" | tail -1 | awk -F"=" '{print $2}'`
-te=`cat $logDir/rsParams | grep "epiTE=" | tail -1 | awk -F"=" '{print $2}'`
-tr=`cat $logDir/rsParams | grep "epiTR=" | tail -1 | awk -F"=" '{print $2}'`
-
-# cat $scriptDir/dummy_nuisance_compcor_wGMR.fsf | sed 's|SUBJECTPATH|'${epiDir}'|g' | \
-#                                     sed 's|SUBJECTEPIPATH|'${epiDataFilt}'|g' | \
-#                                     sed 's|SUBJECTT1PATH|'${t1Data}'|g' | \
-#                                     sed 's|SCANTE|'${te}'|g' | \
-#                                     sed 's|SUBJECTVOLS|'${numtimepoint}'|g' | \
-#                                     sed 's|SUBJECTTR|'${tr}'|g' | \
-#                                     sed 's|EPIDWELL|'${dwellTime}'|g' | \
-#                                     sed 's|PEDIR|\'${peDirNEW}'|g' | \
-#                                     sed 's|FSLDIR|'${FSLDIR}'|g' > ${epiDir}/${fsf}
+t1Data=$(cat $logDir/rsParams | grep "^T1=" | tail -1 | awk -F"=" '{print $2}')
+te=$(cat $logDir/rsParams | grep "epiTE=" | tail -1 | awk -F"=" '{print $2}')
+tr=$(cat $logDir/rsParams | grep "epiTR=" | tail -1 | awk -F"=" '{print $2}')
 
 cat $scriptDir/dummy_nuisance_compcor_5.0.10.fsf | sed 's|SUBJECTPATH|'${epiDir}'|g' | \
                                     sed 's|SUBJECTEPIPATH|'${epiDataFilt}'|g' | \
@@ -658,56 +636,20 @@ cat $scriptDir/dummy_nuisance_compcor_5.0.10.fsf | sed 's|SUBJECTPATH|'${epiDir}
                                     sed 's|PEDIR|\'${peDirNEW}'|g' | \
                                     sed 's|FSLDIR|'${FSLDIR}'|g' > ${epiDir}/${fsf2}
 
-# cat $scriptDir/dummy_nuisance_compcor_wGMRv1.fsf | sed 's|SUBJECTPATH|'${epiDir}'|g' | \
-#                                     sed 's|SUBJECTEPIPATH|'${epiDataFilt}'|g' | \
-#                                     sed 's|SUBJECTT1PATH|'${t1Data}'|g' | \
-#                                     sed 's|SCANTE|'${te}'|g' | \
-#                                     sed 's|SUBJECTVOLS|'${numtimepoint}'|g' | \
-#                                     sed 's|SUBJECTTR|'${tr}'|g' | \
-#                                     sed 's|EPIDWELL|'${dwellTime}'|g' | \
-#                                     sed 's|PEDIR|\'${peDirNEW}'|g' | \
-#                                     sed 's|FSLDIR|'${FSLDIR}'|g' > ${epiDir}/${fsf3}
-#
-# cat $scriptDir/dummy_nuisance_classic_aroma.fsf | sed 's|SUBJECTPATH|'${epiDir}'|g' | \
-#                                     sed 's|SUBJECTEPIPATH|'${epiDataFilt}'|g' | \
-#                                     sed 's|SUBJECTT1PATH|'${t1Data}'|g' | \
-#                                     sed 's|SCANTE|'${te}'|g' | \
-#                                     sed 's|SUBJECTVOLS|'${numtimepoint}'|g' | \
-#                                     sed 's|SUBJECTTR|'${tr}'|g' | \
-#                                     sed 's|EPIDWELL|'${dwellTime}'|g' | \
-#                                     sed 's|PEDIR|\'${peDirNEW}'|g' | \
-#                                     sed 's|FSLDIR|'${FSLDIR}'|g' > ${epiDir}/nuisancereg_classic_aroma.fsf
-
 #################################
 
 #### FEAT Regression ######
-#Run feat
-
-#parallel --header : feat {fsf} ::: fsf $(for i in $nuisancefeat $nuisancefeat2 $nuisancefeat3; do if [ ! -f ${epiDir}/${i}/stats/res4d.nii.gz ]; then echo ${epiDir}/${i%.*}.fsf; fi; done)
-
-# clobber ${epiDir}/nuisancereg_classic_aroma.feat/stats/res4d.nii.gz &&\
-# feat ${epiDir}/nuisancereg_classic_aroma.fsf
+# Run feat
 
 clobber ${epiDir}/nuisancereg_compcor.feat/stats/res4d.nii.gz &&\
 feat ${epiDir}/nuisancereg_compcor.fsf
 #################################
 
-#parallel --link --header : feat_regFix {in} $scriptDir $epiDir $epiVoxTot $te $numtimepoint $tr $dwellTime $peDirNEW {fsf} ::: in "${nuisancefeat}" "${nuisancefeat2}" "${nuisancefeat3}" ::: fsf "${epiDir}/${fsf}" "${epiDir}/${fsf2}" "${epiDir}/${fsf3}"
-#parallel --header : dataScale {in} ::: in $epiDir/${nuisancefeat} $epiDir/${nuisancefeat2} $epiDir/${nuisancefeat3}
-
-# feat_regFix nuisancereg_classic_aroma.feat $scriptDir $epiDir $epiVoxTot $te $numtimepoint $tr $dwellTime $peDirNEW "${epiDir}/nuisancereg_classic_aroma.fsf"
-# dataScale $epiDir/nuisancereg_classic_aroma.feat
-
 feat_regFix nuisancereg_compcor.feat $scriptDir $epiDir $epiVoxTot $te $numtimepoint $tr $dwellTime $peDirNEW "${epiDir}/nuisancereg_compcor.fsf"
 dataScale $epiDir/nuisancereg_compcor.feat
 
-
-# clobber $epiDir/nuisancereg_classic_aroma.feat/stats/res4d_normandscaled_motionscrubbed.nii &&\
-# motionScrub $epiDir/RestingState.nii.gz nuisancereg_classic_aroma.feat
-
 clobber $epiDir/nuisancereg_compcor.feat/stats/res4d_normandscaled_motionscrubbed.nii &&\
 motionScrub $epiDir/RestingState.nii.gz nuisancereg_compcor.feat
-
 
 for i in 1; do # 1=compcor, 2=compcor_wGMR, 3=compcor_wGMRv1, 4=classic_aroma, ""=classic
 
@@ -716,6 +658,3 @@ for i in 1; do # 1=compcor, 2=compcor_wGMR, 3=compcor_wGMRv1, 4=classic_aroma, "
     -R ${roilist} \
     -f -n ${i}
 done
-
-#${scriptDir}/seedVoxelCorrelation.sh -E $epiDir/RestingState.nii.gz -m 0 \
-#-R ${VossLabMount}/Projects/FAST/PreprocData/scripts/fast_crossx_seedlist_reproc.txt -n 4 -f

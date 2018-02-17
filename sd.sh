@@ -37,7 +37,7 @@ fi              #  See example data file, below.
 
 if [ ! -e "$datafile" ]
 then
-  echo "\""$datafile"\" does not exist!"
+  echo "${datafile} does not exist!"
   exit $E_DATAFILE
 fi
 # -----------------------------------------------------
