@@ -90,7 +90,7 @@ do
       esac
  done
 
-scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+scriptdir="$(realpath "${BASH_SOURCE[0]}")"
 
 if [ "${inFile}" == "" ]; then
   echo "ERROR: -i is required flag"
