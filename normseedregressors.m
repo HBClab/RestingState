@@ -1,4 +1,4 @@
-function normseedregressors(subjectPath,roiList,featdir,includemotion,meanFlag)
+function normseedregressors(subjectPath,roiList,featdir,includemotion)
 
 %michelle voss
 %mvoss@illinois.edu
@@ -76,17 +76,10 @@ end
 
 roiN=length(roiList);
 for r=1:roiN
-  if meanFlag == 1
-    ts=load(['mean_',char(roiList{r}),'_ts.txt']);
-    normedts=zscore(ts);
-    CFV=cat(2,CFV,normedts);
-    dlmwrite(['../../tsregressorslp/',char(roiList{r}),'_normalized_ts.txt'],normedts);
-  elseif(meanFlag) == 0
-    ts=load([char(roiList{r}),'_ts.txt']);
-    normedts=zscore(ts);
-    CFV=cat(2,CFV,normedts);
-    dlmwrite(['../../tsregressorslp/',char(roiList{r}),'_normalized_ts.txt'],normedts);
-  end
+  ts=load(['mean_',char(roiList{r}),'_ts.txt']);
+  normedts=zscore(ts);
+  CFV=cat(2,CFV,normedts);
+  dlmwrite(['../../tsregressorslp/',char(roiList{r}),'_normalized_ts.txt'],normedts);
 end
 
 
