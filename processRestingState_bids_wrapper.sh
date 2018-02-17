@@ -54,20 +54,20 @@ function clobber()
 		fi
 	done
 
-	#see if the command should be run by seeing if the requisite files exist.
-	#0=true
-	#1=false
+	# see if the command should be run by seeing if the requisite files exist.
+	# 0=true
+	# 1=false
 	if [ ${num_existing_files} -lt ${num_args} ]; then
 		return 0
 	else
 		return 1
 	fi
 
-	#example usage
-	#clobber test.nii.gz &&\
-	#fslmaths input.nii.gz -mul 10 test.nii.gz
+	# example usage
+	# clobber test.nii.gz &&\
+	# fslmaths input.nii.gz -mul 10 test.nii.gz
 }
-#default
+# default
 clob=false
 export -f clobber
 
