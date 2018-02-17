@@ -109,7 +109,7 @@ subID="$(echo ${inFile} | cut -d "-" -f 2 | sed 's|/.*||g')" # gets subID from i
 sesID="$(dirname $(dirname $inFile) | rev | cut -d '/' -f 1 | rev)" # gets sesID from inFile
 subDir="${bidsDir}/sub-${subID}" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161
 scanner="$(echo ${subID} | cut -c -2)" # extract scannerID from subID, works when scannerID is embedded in subID. TODO: need a different way to determine scannerID. e.g., dicom header?
-rsOut="${bidsDir}/derivatives/rsOut_legacy/${subID}/${sesID}"
+rsOut="${bidsDir}/derivatives/rsOut_legacy/sub-${subID}/${sesID}"
 
 # load variables needed for processing
 
