@@ -41,7 +41,7 @@ function clobber()
 	local -i num_args=$#
 
 	#Tally all existing outputs
-	for arg in $@; do
+	for arg in "$@"; do
 		if [ -s "${arg}" ] && [ "${clob}" == true ]; then
 			rm -rf "${arg}"
 		elif [ -s "${arg}" ] && [ "${clob}" == false ]; then
@@ -71,7 +71,7 @@ function clobber()
 clob=false
 export -f clobber
 
-while getopts “i:R:h” OPTION
+while getopts "i:R:h" OPTION
 do
   case $OPTION in
     i)
@@ -90,7 +90,7 @@ do
       esac
  done
 
-scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+scriptdir="$(realpath "${BASH_SOURCE[0]}")"
 
 if [ "${inFile}" == "" ]; then
   echo "ERROR: -i is required flag"
@@ -106,14 +106,14 @@ fi
 
 bidsDir=${inFile//\/sub*} # bids directory e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS
 subID="$(echo ${inFile} | cut -d "-" -f 2 | sed 's|/.*||g')" # gets subID from inFile
-sesID="$(dirname $(dirname $inFile) | rev | cut -d '/' -f 1 | rev)" # gets sesID from inFile
+sesID="$(dirname "$(dirname $inFile)" | rev | cut -d '/' -f 1 | rev)" # gets sesID from inFile
 subDir="${bidsDir}/sub-${subID}" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161
 scanner="$(echo ${subID} | cut -c -2)" # extract scannerID from subID, works when scannerID is embedded in subID. TODO: need a different way to determine scannerID. e.g., dicom header?
 rsOut="${bidsDir}/derivatives/rsOut_legacy/sub-${subID}/${sesID}"
 
 # load variables needed for processing
 
-MBA_dir="$(dirname $(find ${bidsDir}/derivatives/MBA/sub-${subID} -type f -print -quit))" # find dir containing MBA output
+MBA_dir="$(dirname "$(find ${bidsDir}/derivatives/MBA/sub-${subID} -type f -print -quit)")" # find dir containing MBA output
 echo "subDir is ${subDir}."
 echo "MBA_dir is ${MBA_dir}."
 
@@ -123,7 +123,7 @@ if [[ ! -d "${MBA_dir}" ]]; then
 else
   T1_RPI="$(find ${subDir}/ses-*/anat -type f -name "sub-${subID}_ses*_T1w.nii.gz")"
   T1_RPI_brain="$(find ${subDir}/ses-*/anat -type f -name "sub-${subID}_ses*_T1w_brain.nii.gz")"
-  T1_brain_mask="(find ${MBA_dir} -type f -name "sub-${subID}_ses*_T1w_mask_60_smooth.nii.gz")"
+  T1_brain_mask="$(find ${MBA_dir} -type f -name "sub-${subID}_ses*_T1w_mask_60_smooth.nii.gz")"
 
   T1_RPI_brain="${MBA_dir}/sub-${subID}_ses-${dayone}pre_T1w_brain.nii.gz"
   T1_brain_mask="${MBA_dir}/sub-${subID}_ses-${dayone}pre_T1w_mask_60_smooth.nii.gz"
@@ -134,7 +134,7 @@ if [ "${scanner}" == "GE" ]; then
   fmap_prepped="$(find ${subDir}/${sesID}/fmap -type f -name "*fieldmap.nii.gz")"
   fmap_mag="$(find ${subDir}/${sesID}/fmap -type f -name "*magnitude.nii.gz")"
   fmap_mag_stripped="$(find ${subDir}/${sesID}/fmap -type f -name "*magnitude_stripped.nii.gz")"
-  dwellTime="$(cat $(find ${subDir}/${sesID}/func -type f -name "*rest_bold_info.txt") | grep "dwellTime=" | awk -F"=" '{print $2}' | tail -1)"
+  dwellTime="$(cat "$(find ${subDir}/${sesID}/func -type f -name "*rest_bold_info.txt")" | grep "dwellTime=" | awk -F"=" '{print $2}' | tail -1)"
 elif [ "${scanner}" == "SE" ]; then
   fmap_prepped="$(find ${subDir}/${sesID}/fmap -maxdepth 1 -type f -name "*fieldmap_prepped.nii.gz")"
   fmap_mag="$(find ${subDir}/${sesID}/fmap -maxdepth 1 -type f -name "*magnitude1.nii.gz")"
@@ -144,13 +144,13 @@ fi
 
 
 if [ -z "${T1_RPI}" ] || [ -z "${T1_RPI_brain}" ] || [ -z "${inFile}" ]; then
-  printf "\n$(date)\nERROR: at least one prerequisite scan is missing. Exiting.\n" 1>&2
+  printf "\n%s\nERROR: at least one prerequisite scan is missing. Exiting.\n" "$(date)" 1>&2
   exit 1
 else
 
   softwareCheck # check dependencies
 
-  printf "\n$(date)\nBeginning preprocesssing (classic mode)...\n"
+  printf "\n%s\nBeginning preprocesssing (classic mode)...\n" "$(date)"
 
   mkdir -p ${rsOut}
 
@@ -170,7 +170,7 @@ else
     echo "fieldMapCorrection=1" >> ${rsOut}/rsParams
     #skull strip mag image
     if [ "${fmap_mag_stripped}" == "" ]; then
-      printf "\n$(date)\nSkull stripping fmap magnitude image..." &&\
+      printf "\n%s\nSkull stripping fmap magnitude image..." "$(date)" &&\
       bet ${fmap_mag} "$(echo ${fmap_mag} | sed -e 's/magnitude/magnitude_stripped/')" -m -n -f 0.3 -B &&\
       fslmaths "$(find ${subDir}/${sesID}/fmap -type f -name "*magnitude_stripped_mask.nii.gz")" -ero -bin "$(echo ${fmap_mag} | sed -e 's/magnitude/magnitude_stripped_mask_eroded/')" -odt char &&\
       fslmaths ${fmap_mag} -mas "$(echo ${fmap_mag} | sed -e 's/magnitude/magnitude_stripped_mask_eroded/')" "$(echo ${fmap_mag} | sed -e 's/magnitude/magnitude_stripped/')" &&\
@@ -237,9 +237,9 @@ else
       -m 2 \
       -R ${roilist}
   fi
-  printf "\n$(date)\nBeginning reproc nuisance regression (ica_aroma + compcor)...\n"
+  printf "\n%s\nBeginning reproc nuisance regression (ica_aroma + compcor)...\n" "$(date)"
   ${scriptdir}/reproc_2016.sh -i ${rsOut} -R ${roilist} -A "${MBA_dir}"
 
   # prevents permissions denied error when others run new seeds
-  parallel chmod 774 ::: $(find ${rsOut} -type f \( -name "highres2standard.nii.gz" -o -name "seeds*.txt" -o -name "rsParams*" -o -name "run*.m" -o -name "highres.nii.gz" -o -name "standard.nii.gz" -o -name "analysisResults.html" \))
+  parallel chmod 774 ::: "$(find ${rsOut} -type f \( -name "highres2standard.nii.gz" -o -name "seeds*.txt" -o -name "rsParams*" -o -name "run*.m" -o -name "highres.nii.gz" -o -name "standard.nii.gz" -o -name "analysisResults.html" \))"
 fi
