@@ -89,7 +89,7 @@ if [ "$FSLDIR" == "" ]; then
 fi
 
 
-#A few default parameters (if input not specified, these parameters are assumed)
+# A few default parameters (if input not specified, these parameters are assumed)
 if [[ $te == "" ]]; then
   te=30
 fi
@@ -256,10 +256,10 @@ if [[ -e $indir/${preprocfeat} ]]; then
     epiWarpDir=$(dirname $epiWarpDirtmp)
 
     if [[ $fieldMapFlag == 1 ]]; then
-      #Copy the EPItoT1 warp file
+      # Copy the EPItoT1 warp file
       cp  $epiWarpDir/EPItoT1_warp.nii.gz $regDir/example_func2highres_warp.nii.gz
     else
-      #Only copy the affine .mat files
+      # Only copy the affine .mat files
       cp $epiWarpDir/EPItoT1_init.mat $regDir/example_func2initial_highres.mat
       cp $epiWarpDir/EPItoT1.mat $regDir/example_func2highres.mat
     fi
