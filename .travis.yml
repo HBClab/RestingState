@@ -2,4 +2,4 @@ language: bash
 before_install:
   - wget -c https://goo.gl/ZzKHFv -O - | tar -xvJ -C /tmp/
   - PATH="/tmp/shellcheck-latest:$PATH"
-script: shellcheck *.sh
+script: ./tests/shellcheck.sh
