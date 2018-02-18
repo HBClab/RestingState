@@ -71,7 +71,7 @@ function clobber()
 clob=false
 export -f clobber
 
-while getopts "i:R:h" OPTION
+while getopts "i:R:fh" OPTION
 do
   case $OPTION in
     i)
@@ -79,6 +79,10 @@ do
       ;;
     R)
       roilist=$OPTARG
+      ;;
+    f)
+      fieldMapFlag=1
+      echo "forcing fieldmap correction."
       ;;
     h)
       printCommandLine
@@ -105,8 +109,8 @@ if [[ "${roilist}" == "" ]]; then
 fi
 
 bidsDir=${inFile//\/sub*} # bids directory e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS
-subID="$(echo ${inFile} | grep -o "sub-[a-z0-9A-Z]*" | head -n 1 | sed -e "s|sub-||")" # gets subID from inFile
-sesID="$(echo ${inFile} | grep -o "ses-[a-z0-9A-Z]*" | head -n 1 | sed -e "s|ses-||")" # gets sesID from inFile
+subID="$(echo ${inFile} | cut -d "-" -f 2 | sed 's|/.*||g')" # gets subID from inFile
+sesID="$(dirname "$(dirname $inFile)" | rev | cut -d '/' -f 1 | rev)" # gets sesID from inFile
 subDir="${bidsDir}/sub-${subID}" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161
 scanner="$(echo ${subID} | cut -c -2)" # extract scannerID from subID, works when scannerID is embedded in subID. TODO: need a different way to determine scannerID. e.g., dicom header?
 rsOut="${bidsDir}/derivatives/rsOut_legacy/sub-${subID}/${sesID}"
@@ -164,7 +168,7 @@ else
   # copy raw rest image from BIDS to derivatives/rsOut_legacy/subID/sesID/
   cp ${inFile} ${rsOut}
 
-  if [ ! -z "${fmap_prepped}" ]; then # process with fmap
+  if [ ! -z "${fmap_prepped}" ] && [ "${fieldMapFlag}" == 1 ]; then # process with fmap
     echo "fieldMapCorrection=1" >> ${rsOut}/rsParams
     #skull strip mag image
     if [ "${fmap_mag_stripped}" == "" ]; then
@@ -206,8 +210,8 @@ else
       -m 2 \
       -R ${roilist} \
       -f
-  else
-    printf "no fieldmap found."
+  elif [ ! "${fieldMapFlag}" == 1 ]; then
+    printf "Process without fieldmap."
     ${scriptdir}/qualityCheck.sh -E "$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
       -A ${T1_RPI_brain} \
       -a ${T1_RPI} \
