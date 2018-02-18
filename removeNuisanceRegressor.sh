@@ -436,7 +436,7 @@ if [[ -e ${nuisancefeat} ]]; then
     -e "s|SUBJECTTR|${tr}|g" \
     -e "s|EPIDWELL|${dwellTime}|g" \
     -e "s|PEDIR|${peDirNEW}|g" \
-    -e "s|FSLDIR|${FSLDIR}|g" "$scriptDir"/dummy_nuisance_5.0.10.fsf\ > "${indir}"/"${fsf}"
+    -e "s|FSLDIR|${FSLDIR}|g" "$scriptDir"/dummy_nuisance_5.0.10.fsf > "${indir}"/"${fsf}"
 
     #################################
 
