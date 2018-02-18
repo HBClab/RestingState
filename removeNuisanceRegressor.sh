@@ -19,9 +19,9 @@ fsf=${analysis}.fsf
 fsf2=${analysis2}.fsf
 
 ##Check of all ROIs (from ROIs directory), that can be used for nuisance regression
-scriptPath=$(perl -e 'use Cwd "abs_path";print abs_path(shift)' $0)
-scriptDir=$(dirname $scriptPath)
-knownNuisanceRois=$(ls -1 $scriptDir/ROIs/*nii* | awk -F"/" '{print $NF}' | awk -F"." '{print $1}')
+scriptPath=$(perl -e 'use Cwd "abs_path";print abs_path(shift)' "$0")
+scriptDir=$(dirname "$scriptPath")
+knownNuisanceRois=$(echo "$scriptDir"/ROIs/*nii* | awk -F"/" '{print $NF}' | awk -F"." '{print $1}')
 
 SGE_ROOT='';export SGE_ROOT
 
@@ -67,7 +67,7 @@ function clobber()
 		if [ -s "${arg}" ] && [ "${clob}" == true ]; then
 			rm -rf "${arg}"
 		elif [ -s "${arg}" ] && [ "${clob}" == false ]; then
-			num_existing_files=$(( ${num_existing_files} + 1 ))
+			num_existing_files=$(( $num_existing_files + 1 ))
 			continue
 		elif [ ! -s "${arg}" ]; then
 			continue
@@ -79,7 +79,7 @@ function clobber()
 	#see if the command should be run by seeing if the requisite files exist.
 	#0=true
 	#1=false
-	if [ ${num_existing_files} -lt ${num_args} ]; then
+	if [ "${num_existing_files}" -lt "${num_args}" ]; then
 		return 0
 	else
 		return 1
@@ -107,11 +107,11 @@ do
       t1Data=$OPTARG
       ;;
     n)
-      nuisanceList=$(echo $nuisanceList $OPTARG)
+      nuisanceList=("$nuisanceList" "$OPTARG")
       nuisanceInd=1
       ;;
     N)
-      nuisanceList=$(cat $OPTARG)
+      nuisanceList=$(cat "$OPTARG")
       nuisanceInFile=$OPTARG
       ;;
     L)
@@ -161,7 +161,7 @@ fi
 
 for roi in $nuisanceList
 do
-  testRoi=$(echo $knownNuisanceRois | grep $roi)
+  testRoi=$(echo "$knownNuisanceRois" | grep "$roi")
   if [ "$testRoi" == "" ]; then
     echo "Error: Invalid Nuisance ROI specified (${roi})"
     echo "Valid Nuisance ROIs: $knownNuisanceRois"
@@ -205,24 +205,24 @@ fi
 # Vanilla settings for filtering: L=.08, H=.008
 
 # Source input (~func) directory
-indirTmp=$(dirname $epiData)
-indir=$(dirname $indirTmp)
-preprocfeat=$(echo $indirTmp | awk -F"/" '{print $NF}')
+indirTmp=$(dirname "$epiData")
+indir=$(dirname "$indirTmp")
+preprocfeat=$(echo "$indirTmp" | awk -F"/" '{print $NF}')
 logDir=$indir
 
 # Set flag depending on whether Melodic was run or not (to determine which directory to pull "reg" files from)
 # "Classic" processing = nonfiltered_smooth_data.nii.gz ('nonfiltered')
 # Melodic processing = denoised_func_data.nii.gz ('denoised')
-epiBase=$(basename $epiData | awk -F"_" '{print $1}')
+epiBase=$(basename "$epiData" | awk -F"_" '{print $1}')
 if [[ $epiBase == "denoised" ]]; then
   melFlag=1
 fi
 
 # If new nuisance regressors were added, echo them out to the rsParams file (only if they don't already exist in the file)
 # Making a *strong* assumption that any nuisanceROI lists added after initial processing won't reuse the first ROI (e.g. pccrsp)
-nuisanceTestBase=$(cat $logDir/rsParams | grep "nuisanceROI=" | awk -F"=" '{print $2}' | awk -F"-n " '{for (i=2; i<=NF; i++) print $i}')
-nuisanceTest=$(echo $nuisanceTestBase | awk '{print $1}')
-roiTest=$(echo $nuisanceList | awk '{print $1}')
+nuisanceTestBase=$(grep "nuisanceROI=" "$logDir"/rsParams | awk -F"=" '{print $2}' | awk -F"-n " '{for (i=2; i<=NF; i++) print $i}')
+nuisanceTest=$(echo "$nuisanceTestBase" | awk '{print $1}')
+roiTest=$(echo "$nuisanceList" | awk '{print $1}')
 
 for i in $nuisanceList
 do
@@ -230,13 +230,13 @@ do
 done
 
 if [[ "$nuisanceTest" != "$roiTest" ]]; then
-  echo "nuisanceROI=$nuisanceROI" >> $logDir/rsParams
+  echo "nuisanceROI=$nuisanceROI" >> "$logDir"/rsParams
 fi
 
 # Echo out nuisance ROIs to a text file in input directory.
 
-if [ -e $indir/nuisance_rois.txt ]; then
-  rm $indir/nuisance_rois.txt
+if [ -e "$indir"/nuisance_rois.txt ]; then
+  rm "$indir"/nuisance_rois.txt
 fi
 
 for i in $nuisanceList
@@ -245,50 +245,50 @@ do
 done
 
 nuisanceroiList=$indir/nuisance_rois.txt
-nuisanceCount=$(cat $nuisanceroiList | awk 'END {print NR}')
+nuisanceCount=$(awk 'END {print NR}' "$nuisanceroiList")
 
 # Echo out all input parameters into a log
-echo "$scriptPath" >> $logDir/rsParams_log
+echo "$scriptPath" >> "$logDir"/rsParams_log
 echo "------------------------------------" >> $logDir/rsParams_log
-echo "-E $epiData" >> $logDir/rsParams_log
-echo "-A $t1Data" >> $logDir/rsParams_log
+echo "-E $epiData" >> "$logDir"/rsParams_log
+echo "-A $t1Data" >> "$logDir"/rsParams_log
 if [[ $nuisanceInd == 1 ]]; then
-  echo "$nuisanceROI" >> $logDir/rsParams_log
+  echo "$nuisanceROI" >> "$logDir"/rsParams_log
 else
-  echo "-N $nuisanceInFile" >> $logDir/rsParams_log
+  echo "-N $nuisanceInFile" >> "$logDir"/rsParams_log
 fi
-echo "-L $lowpassArg" >> $logDir/rsParams_log
-echo "-H $highpassArg" >> $logDir/rsParams_log
-echo "-t $tr" >> $logDir/rsParams_log
-echo "-T $te" >> $logDir/rsParams_log
+echo "-L $lowpassArg" >> "$logDir"/rsParams_log
+echo "-H $highpassArg" >> "$logDir"/rsParams_log
+echo "-t $tr" >> "$logDir"/rsParams_log
+echo "-T $te" >> "$logDir"/rsParams_log
 if [[ $overwriteFlag == 1 ]]; then
-  echo "-c" >> $logDir/rsParams_log
+  echo "-c" >> "$logDir"/rsParams_log
 fi
-echo "$(date)" >> $logDir/rsParams_log
-echo "" >> $logDir/rsParams_log
-echo "" >> $logDir/rsParams_log
+date >> "$logDir"/rsParams_log
+echo -e "\n\n" >> "$logDir"/rsParams_log
+
 
 # If user defines overwrite, note in rsParams file
 if [[ $overwriteFlag == 1 ]]; then
-  echo "_removeNuisanceRegressor_clobber" >> $logDir/rsParams
+  echo "_removeNuisanceRegressor_clobber" >> "$logDir"/rsParams
 fi
 
 echo "Running $0 ..."
 
-roiList=$(echo $nuisanceList)
+roiList=$nuisanceList
 
 # Fix loop to remove directory and redo (if overWrite), first time processing, or echo with exit
 
-cd $indir
+cd "$indir" || exit
 if [[ -e ${nuisancefeat} ]]; then
   if [[ $overwriteFlag == 1 ]]; then
     # Cleanup of old files
-    rm *_norm.png run_normseedregressors.m
+    rm -- *_norm.png run_normseedregressors.m
     rm -rf nuisancereg.*
     rm -rf tsregressorslp
 
     # Re-run full analysis
-    cd $indir/${preprocfeat}
+    cd "$indir"/"${preprocfeat}" || exit
     if [ ! -e rois ]; then
       mkdir rois
     fi
@@ -308,29 +308,29 @@ if [[ -e ${nuisancefeat} ]]; then
         # Allpass filter (only 0 and Nyquist frequencies are removed)
         # Scale data by 1000
 
-        3dBandpass -prefix bandpass.nii.gz 0 99999 ${epiData}
+        3dBandpass -prefix bandpass.nii.gz 0 99999 "${epiData}"
         mv bandpass.nii.gz filtered_func_data.nii.gz
-        fslmaths $indir/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
+        fslmaths "$indir"/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
         fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
         epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
 
         # Log filtered file
-        echo "lowpassFilt=$lowpassArg" >> $logDir/rsParams
-        echo "_allpassFilt" >> $logDir/rsParams
-        echo "epiDataFilt=$epiDataFilt" >> $logDir/rsParams
+        echo "lowpassFilt=$lowpassArg" >> "$logDir"/rsParams
+        echo "_allpassFilt" >> "$logDir"/rsParams
+        echo "epiDataFilt=$epiDataFilt" >> "$logDir"/rsParams
       else
         # Filtering and scaling (lowpass)
         # Scale data by 1000
 
-        3dBandpass -prefix bandpass.nii.gz 0 $lowpassArg ${epiData}
+        3dBandpass -prefix bandpass.nii.gz 0 $lowpassArg "${epiData}"
         mv bandpass.nii.gz filtered_func_data.nii.gz
-        fslmaths $indir/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
+        fslmaths "$indir"/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
         fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
         epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
 
         # Log filtered file
-        echo "lowpassFilt=$lowpassArg" >> $logDir/rsParams
-        echo "epiDataFilt=$epiDataFilt" >> $logDir/rsParams
+        echo "lowpassFilt=$lowpassArg" >> "$logDir"/rsParams
+        echo "epiDataFilt=$epiDataFilt" >> "$logDir"/rsParams
       fi
 
     else
@@ -347,31 +347,31 @@ if [[ -e ${nuisancefeat} ]]; then
         # Allpass filter (only 0 and Nyquist frequencies are removed)
         # Scale data by 1000
 
-        3dBandpass -prefix bandpass.nii.gz 0 99999 ${epiData}
+        3dBandpass -prefix bandpass.nii.gz 0 99999 "${epiData}"
         mv bandpass.nii.gz filtered_func_data.nii.gz
-        fslmaths $indir/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
+        fslmaths "$indir"/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
         fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
         epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
 
        # Log filtered file
-        echo "lowpassFilt=$lowpassArg" >> $logDir/rsParams
-        echo "highpassFilt=$highpassArg" >> $logDir/rsParams
-        echo "_allpassFilt" >> $logDir/rsParams
-        echo "epiDataFilt=$epiDataFilt" >> $logDir/rsParams
+        echo "lowpassFilt=$lowpassArg" >> "$logDir"/rsParams
+        echo "highpassFilt=$highpassArg" >> "$logDir"/rsParams
+        echo "_allpassFilt" >> "$logDir"/rsParams
+        echo "epiDataFilt=$epiDataFilt" >> "$logDir"/rsParams
       else
         # Filtering and scaling (either lowpass, highpass or both)
         # Scale data by 1000
 
-        3dBandpass -prefix bandpass.nii.gz $highpassArg $lowpassArg ${epiData}
+        3dBandpass -prefix bandpass.nii.gz "$highpassArg" "$lowpassArg" "${epiData}"
         mv bandpass.nii.gz filtered_func_data.nii.gz
-        fslmaths $indir/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
+        fslmaths "$indir"/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
         fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
         epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
 
         # Log filtered file
-        echo "lowpassFilt=$lowpassArg" >> $logDir/rsParams
-        echo "highpassFilt=$highpassArg" >> $logDir/rsParams
-        echo "epiDataFilt=$epiDataFilt" >> $logDir/rsParams
+        echo "lowpassFilt=$lowpassArg" >> "$logDir"/rsParams
+        echo "highpassFilt=$highpassArg" >> "$logDir"/rsParams
+        echo "epiDataFilt=$epiDataFilt" >> "$logDir"/rsParams
       fi
     fi
 
@@ -386,11 +386,11 @@ if [[ -e ${nuisancefeat} ]]; then
       echo "......Mapping nuisance regressor $roi"
 
       # Need to use warp from MNI to EPI from qualityCheck
-      MNItoEPIwarp=$(cat $logDir/rsParams | grep "MNItoEPIWarp=" | tail -1 | awk -F"=" '{print $2}')
-      applywarp --ref=$indir/mcImgMean_stripped.nii.gz --in=${scriptDir}/ROIs/${roi}.nii.gz --out=rois/${roi}_native.nii.gz --warp=$MNItoEPIwarp --datatype=float
-      fslmaths rois/${roi}_native.nii.gz -thr 0.5 rois/${roi}_native.nii.gz
-      fslmaths rois/${roi}_native.nii.gz -bin rois/${roi}_native.nii.gz
-      fslmeants -i $epiDataFilt -o rois/mean_${roi}_ts.txt -m rois/${roi}_native.nii.gz
+      MNItoEPIwarp=$(grep "MNItoEPIWarp=" "$logDir"/rsParams | tail -1 | awk -F"=" '{print $2}')
+      applywarp --ref="$indir"/mcImgMean_stripped.nii.gz --in="${scriptDir}"/ROIs/"${roi}".nii.gz --out=rois/"${roi}"_native.nii.gz --warp="$MNItoEPIwarp" --datatype=float
+      fslmaths rois/"${roi}"_native.nii.gz -thr 0.5 rois/"${roi}"_native.nii.gz
+      fslmaths rois/"${roi}"_native.nii.gz -bin rois/"${roi}"_native.nii.gz
+      fslmeants -i "$epiDataFilt" -o rois/mean_"${roi}"_ts.txt -m rois/"${roi}"_native.nii.gz
     done
 
     #################################
@@ -399,16 +399,16 @@ if [[ -e ${nuisancefeat} ]]; then
     #### FEAT setup ############
     echo "... FEAT setup"
 
-    cd $indir
+    cd "$indir" || exit
 
     # Set a few variables from data
     # epi_reg peDir setup (e.g. -y) is backwards from FEAT peDir (e.g. y-)
-    peDirBase=$(cat $logDir/rsParams | grep "peDir=" | tail -1 | awk -F"=" '{print $2}')
+    peDirBase=$(grep "peDir=" $logDir/rsParams | tail -1 | awk -F"=" '{print $2}')
     if [[ $peDirBase == "" ]]; then
       peDirNEW="y-"
     else
-      peDirTmp1=$(echo $peDirBase | cut -c1)
-      peDirTmp2=$(echo $peDirBase | cut -c2)
+      peDirTmp1=$(echo "$peDirBase" | cut -c1)
+      peDirTmp2=$(echo "$peDirBase" | cut -c2)
       if [[ "$peDirTmp1" == "-" ]]; then
         peDirNEW="${peDirTmp2}${peDirTmp1}"
       else
@@ -416,27 +416,27 @@ if [[ -e ${nuisancefeat} ]]; then
       fi
     fi
 
-    numtimepoint=$(fslinfo $epiDataFilt | grep ^dim4 | awk '{print $2}')
+    numtimepoint=$(fslinfo "$epiDataFilt" | grep ^dim4 | awk '{print $2}')
 
-    dwellTimeBase=$(cat $logDir/rsParams | grep "epiDwell=" | tail -1 | awk -F"=" '{print $2}')
+    dwellTimeBase=$(grep "epiDwell=" $logDir/rsParams | tail -1 | awk -F"=" '{print $2}')
     if [[ $dwellTimeBase == "" ]]; then
       dwellTime=0.00056
     else
       dwellTime=$dwellTimeBase
     fi
 
-    epiVoxTot=$(fslstats ${epiDataFilt} -v | awk '{print $1}')
+    epiVoxTot=$(fslstats "${epiDataFilt}" -v | awk '{print $1}')
 
-    cat $scriptDir/dummy_nuisance_5.0.10.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
-                                        sed 's|SUBJECTEPIPATH|'${epiDataFilt}'|g' | \
-                                        sed 's|VOXTOT|'${epiVoxTot}'|g' | \
-                                        sed 's|SUBJECTT1PATH|'${t1Data}'|g' | \
-                                        sed 's|SCANTE|'${te}'|g' | \
-                                        sed 's|SUBJECTVOLS|'${numtimepoint}'|g' | \
-                                        sed 's|SUBJECTTR|'${tr}'|g' | \
-                                        sed 's|EPIDWELL|'${dwellTime}'|g' | \
-                                        sed 's|PEDIR|\'${peDirNEW}'|g' | \
-                                        sed 's|FSLDIR|'${FSLDIR}'|g' > ${indir}/${fsf}
+    cat $scriptDir/dummy_nuisance_5.0.10.fsf | sed "s|SUBJECTPATH|${indir}|g" | \
+                                        sed "s|SUBJECTEPIPATH|${epiDataFilt}|g" | \
+                                        sed "s|VOXTOT|${epiVoxTot}|g" | \
+                                        sed "s|SUBJECTT1PATH|${t1Data}|g" | \
+                                        sed "s|SCANTE|${te}|g" | \
+                                        sed "s|SUBJECTVOLS|${numtimepoint}|g" | \
+                                        sed "s|SUBJECTTR|${tr}|g" | \
+                                        sed "s|EPIDWELL|${dwellTime}|g" | \
+                                        sed "s|PEDIR|${peDirNEW}|g" | \
+                                        sed "s|FSLDIR|${FSLDIR}|g" > "${indir}"/"${fsf}"
 
     #################################
 
@@ -475,13 +475,13 @@ EOF
     # Run script using Matlab or Octave
     haveMatlab=$(which matlab)
     if [ "$haveMatlab" == "" ]; then
-      octave --no-window-system $indir/$filename
+      octave --no-window-system "$indir"/"$filename"
     else
       matlab -nodisplay -r "run $indir/$filename"
     fi
 
 
-    echo "<hr><h2>Nuisance Regressors</h2>" >> $indir/analysisResults.html
+    echo "<hr><h2>Nuisance Regressors</h2>" >> "$indir"/analysisResults.html
 
     #################################
 
@@ -497,18 +497,18 @@ EOF
       mclist='1 2 3 4 5 6'
       for mc in ${mclist}
       do
-          cp ${indir}/tsregressorslp/mc${mc}_normalized.txt ${indir}/tsregressorslp/mc${mc}_normalized.1D
-          1dBandpass $highpassArg $lowpassArg ${indir}/tsregressorslp/mc${mc}_normalized.1D > ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D
-          cat ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D > ${indir}/tsregressorslp/mc${mc}_normalized.txt
+          cp "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D
+          1dBandpass "$highpassArg" "$lowpassArg" "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D
+          cat "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt
       done
     else
       # Passband filter
       mclist='1 2 3 4 5 6'
       for mc in ${mclist}
       do
-          cp ${indir}/tsregressorslp/mc${mc}_normalized.txt ${indir}/tsregressorslp/mc${mc}_normalized.1D
-          1dBandpass 0 99999 ${indir}/tsregressorslp/mc${mc}_normalized.1D > ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D
-          cat ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D > ${indir}/tsregressorslp/mc${mc}_normalized.txt
+          cp "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D
+          1dBandpass 0 99999 "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D
+          cat "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt
       done
     fi
 
@@ -522,8 +522,8 @@ EOF
 
     for roi in $roiList
     do
-      fsl_tsplot -i $indir/tsregressorslp/${roi}_normalized_ts.txt -t "${roi} Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o $indir/${roi}_norm.png
-      echo "<br><br><img src=\"$indir/${roi}_norm.png\" alt=\"$roi nuisance regressor\"><br>" >> $indir/analysisResults.html
+      fsl_tsplot -i "$indir"/tsregressorslp/"${roi}"_normalized_ts.txt -t "${roi} Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o "$indir"/"${roi}"_norm.png
+      echo "<br><br><img src=\"$indir/${roi}_norm.png\" alt=\"$roi nuisance regressor\"><br>" >> "$indir"/analysisResults.html
     done
 
     #################################
@@ -534,7 +534,7 @@ EOF
 
     # Run feat
     echo "...Running FEAT (nuisancereg)"
-    feat ${indir}/${fsf}
+    feat "${indir}"/"${fsf}"
     #################################
 
 
@@ -549,49 +549,49 @@ EOF
     regDir=$indir/${nuisancefeat}/reg
 
     # Remove all FEAT files (after backup), repopulate with proper files
-    cp -r $regDir $indir/${nuisancefeat}/regORIG
-    rm -rf $regDir
+    cp -r "$regDir" "$indir"/"${nuisancefeat}"/regORIG
+    rm -rf "$regDir"
 
     # Copy over appropriate reg directory from melodic.ica or preproc.feat processing
       #If Melodic was run, copy over that version of the registration, otherwise use the portion from preprocessing
     if [[ $melFlag == 1 ]]; then
       # Melodic was used (-P 2)
       # Copy over "melodic" registration directory
-      cp -r $indir/${melodicfeat}/reg $indir/${nuisancefeat}
+      cp -r "$indir"/"${melodicfeat}"/reg "$indir"/"${nuisancefeat}"
 
     else
       # Melodic was not used (-P 2a)
       # Copy over "preproc" registration directory
-      cp -r $indir/${preprocfeat}/reg $indir/${nuisancefeat}
+      cp -r "$indir"/"${preprocfeat}"/reg "$indir"/"${nuisancefeat}"
     fi
 
     # Backup original design file
-    cp $indir/${nuisancefeat}/design.fsf $indir/${nuisancefeat}/designORIG.fsf
+    cp "$indir"/"${nuisancefeat}"/design.fsf "$indir"/"${nuisancefeat}"/designORIG.fsf
 
 
     # Rerun FEAT to fix only post-stats portions (with no registrations)
     # VOXTOT
-    epiVoxTot=$(fslstats ${epiDataFilt} -v | awk '{print $1}')
+    epiVoxTot=$(fslstats "${epiDataFilt}" -v | awk '{print $1}')
 
     # NUISANCEDIR
     nuisanceDir=$indir/${nuisancefeat}
 
-    cat $scriptDir/dummy_nuisance_regFix_5.0.10.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
-                                               sed 's|VOXTOT|'${epiVoxTot}'|g' | \
-                                               sed 's|NUISANCEDIR|'${nuisanceDir}'|g' | \
-                                               sed 's|SCANTE|'${te}'|g' | \
-                                               sed 's|SUBJECTVOLS|'${numtimepoint}'|g' | \
-                                               sed 's|SUBJECTTR|'${tr}'|g' | \
-                                               sed 's|EPIDWELL|'${dwellTime}'|g' | \
-                                               sed 's|PEDIR|\'${peDirNEW}'|g' | \
-                                               sed 's|FSLDIR|'${FSLDIR}'|g' > ${indir}/${fsf2}
+    sed -e "s|SUBJECTPATH|${indir}|g" \
+    -e "s|VOXTOT|${epiVoxTot}|g" \
+    -e "s|NUISANCEDIR|${nuisanceDir}|g" \
+    -e "s|SCANTE|${te}|g" \
+    -e "s|SUBJECTVOLS|${numtimepoint}|g" \
+    -e "s|SUBJECTTR|${tr}|g" \
+    -e "s|EPIDWELL|${dwellTime}|g" \
+    -e "s|PEDIR|${peDirNEW}|g" \
+    -e "s|FSLDIR|${FSLDIR}|g" "$scriptDir"/dummy_nuisance_regFix_5.0.10.fsf > "${indir}"/"${fsf2}"
 
     # Re-run feat
     echo "...Rerunning FEAT (nuisancereg(post-stats only)0"
-    feat ${indir}/${fsf2}
+    feat "${indir}"/"${fsf2}"
 
     # Log output to HTML file
-    echo "<a href=\"$indir/${nuisancefeat}/report.html\">FSL Nuisance Regressor Results</a>" >> $indir/analysisResults.html
+    echo "<a href=\"$indir/${nuisancefeat}/report.html\">FSL Nuisance Regressor Results</a>" >> "$indir"/analysisResults.html
 
     #################################
 
@@ -599,7 +599,7 @@ EOF
 
     ###### Post-FEAT data-scaling ########################################
 
-    cd $indir/${nuisancefeat}/stats
+    cd "$indir"/"${nuisancefeat}"/stats || exit
 
     # Backup file
     echo "...Scaling data by 1000"
@@ -607,7 +607,7 @@ EOF
 
     # For some reason, this mask isn't very good.  Use the good mask top-level
     echo "...Copy Brain mask"
-    cp $indir/mcImgMean_mask.nii.gz mask.nii.gz
+    cp "$indir"/mcImgMean_mask.nii.gz mask.nii.gz
     fslmaths mask -mul 1000 mask1000 -odt float
 
     # normalize res4d here
@@ -619,7 +619,7 @@ EOF
     fslmaths res4d_normed -add mask1000 res4d_normandscaled -odt float
 
     # Echo out final file to rsParams file
-    echo "epiNorm=$indir/$nuisancefeat/stats/res4d_normandscaled.nii.gz" >> $logDir/rsParams
+    echo "epiNorm=$indir/$nuisancefeat/stats/res4d_normandscaled.nii.gz" >> "$logDir"/rsParams
 
     #################################
 
@@ -630,7 +630,7 @@ EOF
 else
   # First run of analysis
 
-  cd $indir/${preprocfeat}
+  cd "$indir"/"${preprocfeat}" || exit
   if [ ! -e rois ]; then
     mkdir rois
   fi
@@ -650,29 +650,29 @@ else
       # Allpass filter (only 0 and Nyquist frequencies are removed)
       # Scale data by 1000
 
-      3dBandpass -prefix bandpass.nii.gz 0 99999 ${epiData}
+      3dBandpass -prefix bandpass.nii.gz 0 99999 "${epiData}"
       mv bandpass.nii.gz filtered_func_data.nii.gz
-      fslmaths $indir/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
+      fslmaths "$indir"/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
       fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
       epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
 
       # Log filtered file
-      echo "lowpassFilt=$lowpassArg" >> $logDir/rsParams
-      echo "_allpassFilt" >> $logDir/rsParams
-      echo "epiDataFilt=$epiDataFilt" >> $logDir/rsParams
+      echo "lowpassFilt=$lowpassArg" >> "$logDir"/rsParams
+      echo "_allpassFilt" >> "$logDir"/rsParams
+      echo "epiDataFilt=$epiDataFilt" >> "$logDir"/rsParams
     else
       # Filtering and scaling (lowpass)
       # Scale data by 1000
 
-      3dBandpass -prefix bandpass.nii.gz 0 $lowpassArg ${epiData}
+      3dBandpass -prefix bandpass.nii.gz 0 "$lowpassArg" "${epiData}"
       mv bandpass.nii.gz filtered_func_data.nii.gz
-      fslmaths $indir/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
+      fslmaths "$indir"/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
       fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
       epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
 
       # Log filtered file
-      echo "lowpassFilt=$lowpassArg" >> $logDir/rsParams
-      echo "epiDataFilt=$epiDataFilt" >> $logDir/rsParams
+      echo "lowpassFilt=$lowpassArg" >> "$logDir"/rsParams
+      echo "epiDataFilt=$epiDataFilt" >> "$logDir"/rsParams
     fi
 
   else
@@ -689,31 +689,31 @@ else
       # Allpass filter (only 0 and Nyquist frequencies are removed)
       # Scale data by 1000
 
-      3dBandpass -prefix bandpass.nii.gz 0 99999 ${epiData}
+      3dBandpass -prefix bandpass.nii.gz 0 99999 "${epiData}"
       mv bandpass.nii.gz filtered_func_data.nii.gz
-      fslmaths $indir/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
+      fslmaths "$indir"/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
       fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
       epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
 
      # Log filtered file
-      echo "lowpassFilt=$lowpassArg" >> $logDir/rsParams
-      echo "highpassFilt=$highpassArg" >> $logDir/rsParams
-      echo "_allpassFilt" >> $logDir/rsParams
-      echo "epiDataFilt=$epiDataFilt" >> $logDir/rsParams
+      echo "lowpassFilt=$lowpassArg" >> "$logDir"/rsParams
+      echo "highpassFilt=$highpassArg" >> "$logDir"/rsParams
+      echo "_allpassFilt" >> "$logDir"/rsParams
+      echo "epiDataFilt=$epiDataFilt" >> "$logDir"/rsParams
     else
       # Filtering and scaling (either lowpass, highpass or both)
       # Scale data by 1000
 
-      3dBandpass -prefix bandpass.nii.gz $highpassArg $lowpassArg ${epiData}
+      3dBandpass -prefix bandpass.nii.gz "$highpassArg" "$lowpassArg" "${epiData}"
       mv bandpass.nii.gz filtered_func_data.nii.gz
-      fslmaths $indir/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
+      fslmaths "$indir"/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
       fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
       epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
 
       # Log filtered file
-      echo "lowpassFilt=$lowpassArg" >> $logDir/rsParams
-      echo "highpassFilt=$highpassArg" >> $logDir/rsParams
-      echo "epiDataFilt=$epiDataFilt" >> $logDir/rsParams
+      echo "lowpassFilt=$lowpassArg" >> "$logDir"/rsParams
+      echo "highpassFilt=$highpassArg" >> "$logDir"/rsParams
+      echo "epiDataFilt=$epiDataFilt" >> "$logDir"/rsParams
     fi
   fi
 
@@ -734,11 +734,11 @@ else
     echo "......Mapping nuisance regressor $roi"
 
     # Need to use warp from MNI to EPI from qualityCheck
-    MNItoEPIwarp=$(cat $logDir/rsParams | grep "MNItoEPIWarp=" | tail -1 | awk -F"=" '{print $2}')
-    applywarp --ref=$indir/mcImgMean_stripped.nii.gz --in=${scriptDir}/ROIs/${roi}.nii.gz --out=rois/${roi}_native.nii.gz --warp=$MNItoEPIwarp --datatype=float
-    fslmaths rois/${roi}_native.nii.gz -thr 0.5 rois/${roi}_native.nii.gz
-    fslmaths rois/${roi}_native.nii.gz -bin rois/${roi}_native.nii.gz
-    fslmeants -i $epiDataFilt -o rois/mean_${roi}_ts.txt -m rois/${roi}_native.nii.gz
+    MNItoEPIwarp=$(grep "MNItoEPIWarp=" "$logDir"/rsParams | tail -1 | awk -F"=" '{print $2}')
+    applywarp --ref="$indir"/mcImgMean_stripped.nii.gz --in="${scriptDir}"/ROIs/"${roi}".nii.gz --out=rois/"${roi}"_native.nii.gz --warp="$MNItoEPIwarp" --datatype=float
+    fslmaths rois/"${roi}"_native.nii.gz -thr 0.5 rois/"${roi}"_native.nii.gz
+    fslmaths rois/"${roi}"_native.nii.gz -bin rois/"${roi}"_native.nii.gz
+    fslmeants -i "$epiDataFilt" -o rois/mean_"${roi}"_ts.txt -m rois/"${roi}"_native.nii.gz
   done
 
   #################################
@@ -748,16 +748,16 @@ else
   #### FEAT setup ############
   echo "... FEAT setup"
 
-  cd $indir
+  cd $indir || exit
 
   # Set a few variables from data
   # epi_reg peDir setup (e.g. -y) is backwards from FEAT peDir (e.g. y-)
-  peDirBase=$(cat $logDir/rsParams | grep "peDir=" | tail -1 | awk -F"=" '{print $2}')
+  peDirBase=$(grep "peDir=" "$logDir"/rsParams | tail -1 | awk -F"=" '{print $2}')
   if [[ $peDirBase == "" ]]; then
     peDirNEW="y-"
   else
-    peDirTmp1=$(echo $peDirBase | cut -c1)
-    peDirTmp2=$(echo $peDirBase | cut -c2)
+    peDirTmp1=$(echo "$peDirBase" | cut -c1)
+    peDirTmp2=$(echo "$peDirBase" | cut -c2)
     if [[ "$peDirTmp1" == "-" ]]; then
       peDirNEW="${peDirTmp2}${peDirTmp1}"
     else
@@ -765,27 +765,27 @@ else
     fi
   fi
 
-  numtimepoint=$(fslinfo $epiDataFilt | grep ^dim4 | awk '{print $2}')
+  numtimepoint=$(fslinfo "$epiDataFilt" | grep ^dim4 | awk '{print $2}')
 
-  dwellTimeBase=$(cat $logDir/rsParams | grep "epiDwell=" | tail -1 | awk -F"=" '{print $2}')
+  dwellTimeBase=$(grep "epiDwell=" $logDir/rsParams | tail -1 | awk -F"=" '{print $2}')
   if [[ $dwellTimeBase == "" ]]; then
     dwellTime=0.00056
   else
     dwellTime=$dwellTimeBase
   fi
 
-  epiVoxTot=$(fslstats ${epiDataFilt} -v | awk '{print $1}')
+  epiVoxTot=$(fslstats "${epiDataFilt}" -v | awk '{print $1}')
 
-  cat $scriptDir/dummy_nuisance_5.0.10.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
-                                      sed 's|SUBJECTEPIPATH|'${epiDataFilt}'|g' | \
-                                      sed 's|SUBJECTT1PATH|'${t1Data}'|g' | \
-                                      sed 's|VOXTOT|'${epiVoxTot}'|g' | \
-                                      sed 's|SCANTE|'${te}'|g' | \
-                                      sed 's|SUBJECTVOLS|'${numtimepoint}'|g' | \
-                                      sed 's|SUBJECTTR|'${tr}'|g' | \
-                                      sed 's|EPIDWELL|'${dwellTime}'|g' | \
-                                      sed 's|PEDIR|\'${peDirNEW}'|g' | \
-                                      sed 's|FSLDIR|'${FSLDIR}'|g' > ${indir}/${fsf}
+  sed -e "s|SUBJECTPATH|${indir}|g" \
+  -e "s|SUBJECTEPIPATH|${epiDataFilt}|g" \
+  -e "s|SUBJECTT1PATH|${t1Data}|g" \
+  -e "s|VOXTOT|${epiVoxTot}|g" \
+  -e "s|SCANTE|${te}|g" \
+  -e "s|SUBJECTVOLS|${numtimepoint}|g" \
+  -e "s|SUBJECTTR|${tr}|g" \
+  -e "s|EPIDWELL|${dwellTime}|g" \
+  -e "s|PEDIR|${peDirNEW}|g" \
+  -e "s|FSLDIR|${FSLDIR}|g" $scriptDir/dummy_nuisance_5.0.10.fsf > "${indir}"/"${fsf}"
 
   #################################
 
@@ -824,13 +824,13 @@ EOF
   # Run script using Matlab or Octave
   haveMatlab=$(which matlab)
   if [ "$haveMatlab" == "" ]; then
-    octave --no-window-system $indir/$filename
+    octave --no-window-system "$indir"/"$filename"
   else
     matlab -nodisplay -r "run $indir/$filename"
   fi
 
 
-  echo "<hr><h2>Nuisance Regressors</h2>" >> $indir/analysisResults.html
+  echo "<hr><h2>Nuisance Regressors</h2>" >> "$indir"/analysisResults.html
 
   #################################
 
@@ -846,18 +846,18 @@ EOF
       mclist='1 2 3 4 5 6'
       for mc in ${mclist}
       do
-          cp ${indir}/tsregressorslp/mc${mc}_normalized.txt ${indir}/tsregressorslp/mc${mc}_normalized.1D
-          1dBandpass $highpassArg $lowpassArg ${indir}/tsregressorslp/mc${mc}_normalized.1D > ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D
-          cat ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D | awk '{print $1}' > ${indir}/tsregressorslp/mc${mc}_normalized.txt
+          cp "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D
+          1dBandpass "$highpassArg" "$lowpassArg" "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D
+          awk '{print $1}' "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt
       done
     else
       # Passband filter
       mclist='1 2 3 4 5 6'
       for mc in ${mclist}
       do
-          cp ${indir}/tsregressorslp/mc${mc}_normalized.txt ${indir}/tsregressorslp/mc${mc}_normalized.1D
-          1dBandpass 0 99999 ${indir}/tsregressorslp/mc${mc}_normalized.1D > ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D
-          cat ${indir}/tsregressorslp/mc${mc}_normalized_filt.1D | awk '{print $1}' > ${indir}/tsregressorslp/mc${mc}_normalized.txt
+          cp "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D
+          1dBandpass 0 99999 "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D
+          awk '{print $1}' "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt
       done
     fi
 
@@ -871,8 +871,8 @@ EOF
 
   for roi in $roiList
   do
-    fsl_tsplot -i $indir/tsregressorslp/${roi}_normalized_ts.txt -t "${roi} Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o $indir/${roi}_norm.png
-    echo "<br><img src=\"$indir/${roi}_norm.png\" alt=\"$roi nuisance regressor\"><br>" >> $indir/analysisResults.html
+    fsl_tsplot -i "$indir"/tsregressorslp/"${roi}"_normalized_ts.txt -t "${roi} Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o "$indir"/"${roi}"_norm.png
+    echo "<br><img src=\"$indir/${roi}_norm.png\" alt=\"$roi nuisance regressor\"><br>" >> "$indir"/analysisResults.html
   done
 
   #################################
@@ -884,7 +884,7 @@ EOF
   # Run feat
   echo "...Running FEAT (nuisancereg)"
   echo "here"
-  feat ${indir}/${fsf}
+  feat "${indir}"/"${fsf}"
   #################################
 
 
@@ -899,8 +899,8 @@ EOF
   regDir=$indir/${nuisancefeat}/reg
 
   # Remove all FEAT files (after backup), repopulate with proper files
-  cp -r $regDir $indir/${nuisancefeat}/regORIG
-  rm -rf $regDir
+  cp -r "$regDir" "$indir"/"${nuisancefeat}"/regORIG
+  rm -rf "$regDir"
 
 
   # Copy over appropriate reg directory from melodic.ica or preproc.feat processing
@@ -908,41 +908,41 @@ EOF
     if [[ $melFlag == 1 ]]; then
       # Melodic was used (-P 2)
       # Copy over "melodic" registration directory
-      cp -r $indir/${melodicfeat}/reg $indir/${nuisancefeat}
+      cp -r "$indir"/"${melodicfeat}"/reg "$indir"/"${nuisancefeat}"
 
     else
       # Melodic was not used (-P 2a)
       # Copy over "preproc" registration directory
-      cp -r $indir/${preprocfeat}/reg $indir/${nuisancefeat}
+      cp -r "$indir"/"${preprocfeat}"/reg "$indir"/"${nuisancefeat}"
     fi
 
   # Backup original design file
-  cp $indir/${nuisancefeat}/design.fsf $indir/${nuisancefeat}/designORIG.fsf
+  cp "$indir"/"${nuisancefeat}"/design.fsf "$indir"/"${nuisancefeat}"/designORIG.fsf
 
 
   # Rerun FEAT to fix only post-stats portions (with no registrations)
   # VOXTOT
-  epiVoxTot=$(fslstats ${epiDataFilt} -v | awk '{print $1}')
+  epiVoxTot=$(fslstats "${epiDataFilt}" -v | awk '{print $1}')
 
   # NUISANCEDIR
   nuisanceDir=$indir/${nuisancefeat}
 
-  cat $scriptDir/dummy_nuisance_regFix_5.0.10.fsf | sed 's|SUBJECTPATH|'${indir}'|g' | \
-                                             sed 's|VOXTOT|'${epiVoxTot}'|g' | \
-                                             sed 's|NUISANCEDIR|'${nuisanceDir}'|g' | \
-                                             sed 's|SCANTE|'${te}'|g' | \
-                                             sed 's|SUBJECTVOLS|'${numtimepoint}'|g' | \
-                                             sed 's|SUBJECTTR|'${tr}'|g' | \
-                                             sed 's|EPIDWELL|'${dwellTime}'|g' | \
-                                             sed 's|PEDIR|\'${peDirNEW}'|g' | \
-                                             sed 's|FSLDIR|'${FSLDIR}'|g' > ${indir}/${fsf2}
+  sed -e "s|SUBJECTPATH|${indir}|g" \
+  -e "s|VOXTOT|${epiVoxTot}|g" \
+  -e "s|NUISANCEDIR|${nuisanceDir}|g" \
+  -e "s|SCANTE|${te}|g" \
+  -e "s|SUBJECTVOLS|${numtimepoint}|g" \
+  -e "s|SUBJECTTR|${tr}|g" \
+  -e "s|EPIDWELL|${dwellTime}|g" \
+  -e "s|PEDIR|${peDirNEW}|g" \
+  -e "s|FSLDIR|${FSLDIR}|g" "$scriptDir"/dummy_nuisance_regFix_5.0.10.fsf > "${indir}"/"${fsf2}"
 
   # Re-run feat
   echo "...Rerunning FEAT (nuisancereg (post-stats only))"
-  feat ${indir}/${fsf2}
+  feat "${indir}"/"${fsf2}"
 
   # Log output to HTML file
-  echo "<a href=\"$indir/${nuisancefeat}/report.html\">FSL Nuisance Regressor Results</a>" >> $indir/analysisResults.html
+  echo "<a href=\"$indir/${nuisancefeat}/report.html\">FSL Nuisance Regressor Results</a>" >> "$indir"/analysisResults.html
 
   #################################
 
@@ -950,7 +950,7 @@ EOF
 
   ###### Post-FEAT data-scaling ########################################
 
-  cd $indir/${nuisancefeat}/stats
+  cd "$indir"/"${nuisancefeat}"/stats || exit
 
   # Backup file
   echo "...Scaling data by 1000"
@@ -958,7 +958,7 @@ EOF
 
   # For some reason, this mask isn't very good.  Use the good mask top-level
   echo "...Copy Brain mask"
-  cp $indir/mcImgMean_mask.nii.gz mask.nii.gz
+  cp "$indir"/mcImgMean_mask.nii.gz mask.nii.gz
   fslmaths mask -mul 1000 mask1000 -odt float
 
   # normalize res4d here
@@ -970,7 +970,7 @@ EOF
   fslmaths res4d_normed -add mask1000 res4d_normandscaled -odt float
 
   # Echo out final file to rsParams file
-  echo "epiNorm=$indir/$nuisancefeat/stats/res4d_normandscaled.nii.gz" >> $logDir/rsParams
+  echo "epiNorm=$indir/$nuisancefeat/stats/res4d_normandscaled.nii.gz" >> "$logDir"/rsParams
 
   #################################
 
