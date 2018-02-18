@@ -241,7 +241,7 @@ fi
 
 for i in $nuisanceList
 do
-  echo $i >> $indir/nuisance_rois.txt
+  echo "$i" >> "$indir"/nuisance_rois.txt
 done
 
 nuisanceroiList=$indir/nuisance_rois.txt
