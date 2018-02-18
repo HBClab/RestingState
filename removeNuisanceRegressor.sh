@@ -111,7 +111,7 @@ do
       nuisanceInd=1
       ;;
     N)
-      nuisanceList=($("read -a $(cat "$OPTARG")"))
+      nuisanceList=( "$(cat "$OPTARG")" )
       nuisanceInFile=$OPTARG
       ;;
     L)
