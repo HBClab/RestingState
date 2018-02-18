@@ -178,27 +178,27 @@ fi
 
 
 # A few default parameters (if input not specified, these parameters are assumed)
-if [[ $overwriteFlag == "" ]]; then
+if [[ ${overwriteFlag} == "" ]]; then
   overwriteFlag=0
 fi
 
-if [[ $tr == "" ]]; then
+if [[ ${tr} == "" ]]; then
   tr=2
 fi
 
-if [[ $te == "" ]]; then
+if [[ ${te} == "" ]]; then
   te=30
 fi
 
-if [[ lowpassArg == "" ]]; then
+if [[ "${lowpassArg}" == "" ]]; then
   lowpassArg=0
 fi
 
-if [[ highpassArg == "" ]]; then
+if [[ "${highpassArg}" == "" ]]; then
   highpassArg=0
 fi
 
-if [[ $highpassMelodic == "" ]]; then
+if [[ "${highpassMelodic}" == "" ]]; then
   highpassMelodic=0
 fi
 
