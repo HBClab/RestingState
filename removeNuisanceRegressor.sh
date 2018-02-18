@@ -67,7 +67,7 @@ function clobber()
 		if [ -s "${arg}" ] && [ "${clob}" == true ]; then
 			rm -rf "${arg}"
 		elif [ -s "${arg}" ] && [ "${clob}" == false ]; then
-			num_existing_files=$(( $num_existing_files + 1 ))
+			num_existing_files=$(( num_existing_files + 1 ))
 			continue
 		elif [ ! -s "${arg}" ]; then
 			continue
@@ -111,7 +111,7 @@ do
       nuisanceInd=1
       ;;
     N)
-      nuisanceList=$(cat "$OPTARG")
+      nuisanceList=($(cat "$OPTARG"))
       nuisanceInFile=$OPTARG
       ;;
     L)
@@ -159,7 +159,7 @@ if [ "$FSLDIR" == "" ]; then
   exit 1
 fi
 
-for roi in $nuisanceList
+for roi in "${nuisanceList[@]}"
 do
   testRoi=$(echo "$knownNuisanceRois" | grep "$roi")
   if [ "$testRoi" == "" ]; then
@@ -169,7 +169,7 @@ do
   fi
 done
 
-if [[ "$nuisanceList" == "" ]]; then
+if [[ "${nuisanceList[@]}" == "" ]]; then
   echo "Error: At least one Nuisance ROI must be specified using the -n options"
   exit 1
 fi
@@ -222,9 +222,9 @@ fi
 # Making a *strong* assumption that any nuisanceROI lists added after initial processing won't reuse the first ROI (e.g. pccrsp)
 nuisanceTestBase=$(grep "nuisanceROI=" "$logDir"/rsParams | awk -F"=" '{print $2}' | awk -F"-n " '{for (i=2; i<=NF; i++) print $i}')
 nuisanceTest=$(echo "$nuisanceTestBase" | awk '{print $1}')
-roiTest=$(echo "$nuisanceList" | awk '{print $1}')
+roiTest=$(echo "${nuisanceList[@]}" | awk '{print $1}')
 
-for i in $nuisanceList
+for i in "${nuisanceList[@]}"
 do
   nuisanceROI="$nuisanceROI -n $i"
 done
@@ -239,7 +239,7 @@ if [ -e "$indir"/nuisance_rois.txt ]; then
   rm "$indir"/nuisance_rois.txt
 fi
 
-for i in $nuisanceList
+for i in "${nuisanceList[@]}"
 do
   echo "$i" >> "$indir"/nuisance_rois.txt
 done
@@ -248,24 +248,24 @@ nuisanceroiList=$indir/nuisance_rois.txt
 nuisanceCount=$(awk 'END {print NR}' "$nuisanceroiList")
 
 # Echo out all input parameters into a log
-echo "$scriptPath" >> "$logDir"/rsParams_log
-echo "------------------------------------" >> $logDir/rsParams_log
-echo "-E $epiData" >> "$logDir"/rsParams_log
-echo "-A $t1Data" >> "$logDir"/rsParams_log
+{ echo "$scriptPath"; \
+echo "------------------------------------"; \
+echo "-E $epiData"; \
+echo "-A $t1Data"; } >> "$logDir"/rsParams_log
 if [[ $nuisanceInd == 1 ]]; then
   echo "$nuisanceROI" >> "$logDir"/rsParams_log
 else
   echo "-N $nuisanceInFile" >> "$logDir"/rsParams_log
 fi
-echo "-L $lowpassArg" >> "$logDir"/rsParams_log
-echo "-H $highpassArg" >> "$logDir"/rsParams_log
-echo "-t $tr" >> "$logDir"/rsParams_log
-echo "-T $te" >> "$logDir"/rsParams_log
+{ echo "-L $lowpassArg"; \
+echo "-H $highpassArg"; \
+echo "-t $tr"; \
+echo "-T $te"; } >> "$logDir"/rsParams_log
 if [[ $overwriteFlag == 1 ]]; then
   echo "-c" >> "$logDir"/rsParams_log
 fi
 date >> "$logDir"/rsParams_log
-echo -e "\n\n" >> "$logDir"/rsParams_log
+echo -e "\\n\\n" >> "$logDir"/rsParams_log
 
 
 # If user defines overwrite, note in rsParams file
@@ -275,7 +275,7 @@ fi
 
 echo "Running $0 ..."
 
-roiList=$nuisanceList
+roiList=("${nuisanceList[@]}")
 
 # Fix loop to remove directory and redo (if overWrite), first time processing, or echo with exit
 
@@ -315,9 +315,9 @@ if [[ -e ${nuisancefeat} ]]; then
         epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
 
         # Log filtered file
-        echo "lowpassFilt=$lowpassArg" >> "$logDir"/rsParams
-        echo "_allpassFilt" >> "$logDir"/rsParams
-        echo "epiDataFilt=$epiDataFilt" >> "$logDir"/rsParams
+        { echo "lowpassFilt=$lowpassArg"; \
+        echo "_allpassFilt"; \
+        echo "epiDataFilt=$epiDataFilt"; } >> "$logDir"/rsParams
       else
         # Filtering and scaling (lowpass)
         # Scale data by 1000
@@ -354,10 +354,10 @@ if [[ -e ${nuisancefeat} ]]; then
         epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
 
        # Log filtered file
-        echo "lowpassFilt=$lowpassArg" >> "$logDir"/rsParams
-        echo "highpassFilt=$highpassArg" >> "$logDir"/rsParams
-        echo "_allpassFilt" >> "$logDir"/rsParams
-        echo "epiDataFilt=$epiDataFilt" >> "$logDir"/rsParams
+        { echo "lowpassFilt=$lowpassArg"; \
+        echo "highpassFilt=$highpassArg"; \
+        echo "_allpassFilt"; \
+        echo "epiDataFilt=$epiDataFilt"; } >> "$logDir"/rsParams
       else
         # Filtering and scaling (either lowpass, highpass or both)
         # Scale data by 1000
@@ -369,9 +369,9 @@ if [[ -e ${nuisancefeat} ]]; then
         epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
 
         # Log filtered file
-        echo "lowpassFilt=$lowpassArg" >> "$logDir"/rsParams
-        echo "highpassFilt=$highpassArg" >> "$logDir"/rsParams
-        echo "epiDataFilt=$epiDataFilt" >> "$logDir"/rsParams
+        { echo "lowpassFilt=$lowpassArg"; \
+        echo "highpassFilt=$highpassArg"; \
+        echo "epiDataFilt=$epiDataFilt"; } >> "$logDir"/rsParams
       fi
     fi
 
@@ -381,7 +381,7 @@ if [[ -e ${nuisancefeat} ]]; then
     #### Nuisance ROI mapping ############
     echo "...Warping Nuisance ROIs to EPI space"
 
-    for roi in $roiList
+    for roi in "${roiList[@]}"
     do
       echo "......Mapping nuisance regressor $roi"
 
@@ -403,7 +403,7 @@ if [[ -e ${nuisancefeat} ]]; then
 
     # Set a few variables from data
     # epi_reg peDir setup (e.g. -y) is backwards from FEAT peDir (e.g. y-)
-    peDirBase=$(grep "peDir=" $logDir/rsParams | tail -1 | awk -F"=" '{print $2}')
+    peDirBase=$(grep "peDir=" "$logDir"/rsParams | tail -1 | awk -F"=" '{print $2}')
     if [[ $peDirBase == "" ]]; then
       peDirNEW="y-"
     else
@@ -418,7 +418,7 @@ if [[ -e ${nuisancefeat} ]]; then
 
     numtimepoint=$(fslinfo "$epiDataFilt" | grep ^dim4 | awk '{print $2}')
 
-    dwellTimeBase=$(grep "epiDwell=" $logDir/rsParams | tail -1 | awk -F"=" '{print $2}')
+    dwellTimeBase=$(grep "epiDwell=" "$logDir"/rsParams | tail -1 | awk -F"=" '{print $2}')
     if [[ $dwellTimeBase == "" ]]; then
       dwellTime=0.00056
     else
@@ -427,16 +427,16 @@ if [[ -e ${nuisancefeat} ]]; then
 
     epiVoxTot=$(fslstats "${epiDataFilt}" -v | awk '{print $1}')
 
-    cat $scriptDir/dummy_nuisance_5.0.10.fsf | sed "s|SUBJECTPATH|${indir}|g" | \
-                                        sed "s|SUBJECTEPIPATH|${epiDataFilt}|g" | \
-                                        sed "s|VOXTOT|${epiVoxTot}|g" | \
-                                        sed "s|SUBJECTT1PATH|${t1Data}|g" | \
-                                        sed "s|SCANTE|${te}|g" | \
-                                        sed "s|SUBJECTVOLS|${numtimepoint}|g" | \
-                                        sed "s|SUBJECTTR|${tr}|g" | \
-                                        sed "s|EPIDWELL|${dwellTime}|g" | \
-                                        sed "s|PEDIR|${peDirNEW}|g" | \
-                                        sed "s|FSLDIR|${FSLDIR}|g" > "${indir}"/"${fsf}"
+    sed -e "s|SUBJECTPATH|${indir}|g" \
+    -e "s|SUBJECTEPIPATH|${epiDataFilt}|g" \
+    -e "s|VOXTOT|${epiVoxTot}|g" \
+    -e "s|SUBJECTT1PATH|${t1Data}|g" \
+    -e "s|SCANTE|${te}|g" \
+    -e "s|SUBJECTVOLS|${numtimepoint}|g" \
+    -e "s|SUBJECTTR|${tr}|g" \
+    -e "s|EPIDWELL|${dwellTime}|g" \
+    -e "s|PEDIR|${peDirNEW}|g" \
+    -e "s|FSLDIR|${FSLDIR}|g" "$scriptDir"/dummy_nuisance_5.0.10.fsf\ > "${indir}"/"${fsf}"
 
     #################################
 
@@ -520,7 +520,7 @@ EOF
 
     echo "...Plotting Regressor time series"
 
-    for roi in $roiList
+    for roi in "${roiList[@]}"
     do
       fsl_tsplot -i "$indir"/tsregressorslp/"${roi}"_normalized_ts.txt -t "${roi} Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o "$indir"/"${roi}"_norm.png
       echo "<br><br><img src=\"$indir/${roi}_norm.png\" alt=\"$roi nuisance regressor\"><br>" >> "$indir"/analysisResults.html
@@ -657,9 +657,9 @@ else
       epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
 
       # Log filtered file
-      echo "lowpassFilt=$lowpassArg" >> "$logDir"/rsParams
-      echo "_allpassFilt" >> "$logDir"/rsParams
-      echo "epiDataFilt=$epiDataFilt" >> "$logDir"/rsParams
+      { echo "lowpassFilt=$lowpassArg"; \
+      echo "_allpassFilt"; \
+      echo "epiDataFilt=$epiDataFilt"; }
     else
       # Filtering and scaling (lowpass)
       # Scale data by 1000
@@ -696,10 +696,10 @@ else
       epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
 
      # Log filtered file
-      echo "lowpassFilt=$lowpassArg" >> "$logDir"/rsParams
-      echo "highpassFilt=$highpassArg" >> "$logDir"/rsParams
-      echo "_allpassFilt" >> "$logDir"/rsParams
-      echo "epiDataFilt=$epiDataFilt" >> "$logDir"/rsParams
+      { echo "lowpassFilt=$lowpassArg"; \
+      echo "highpassFilt=$highpassArg"; \
+      echo "_allpassFilt"; \
+      echo "epiDataFilt=$epiDataFilt"; } >> "$logDir"/rsParams
     else
       # Filtering and scaling (either lowpass, highpass or both)
       # Scale data by 1000
@@ -711,16 +711,16 @@ else
       epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
 
       # Log filtered file
-      echo "lowpassFilt=$lowpassArg" >> "$logDir"/rsParams
-      echo "highpassFilt=$highpassArg" >> "$logDir"/rsParams
-      echo "epiDataFilt=$epiDataFilt" >> "$logDir"/rsParams
+      { echo "lowpassFilt=$lowpassArg"; \
+      echo "highpassFilt=$highpassArg"; \
+      echo "epiDataFilt=$epiDataFilt"; } >> "$logDir"/rsParam
     fi
   fi
 
   # Log Bandpass results
-  echo "<hr><h2>Bandpass Filtering (Hz)</h2>" >> analysisResults.html
-  echo "<b>Lowpass Filter</b>: ${lowpassArg}<br>" >> analysisResults.html
-  echo "<b>Highpass Filter</b>: ${highpassArg}<br>" >> analysisResults.html
+  { echo "<hr><h2>Bandpass Filtering (Hz)</h2>"; \
+  echo "<b>Lowpass Filter</b>: ${lowpassArg}<br>"; \
+  echo "<b>Highpass Filter</b>: ${highpassArg}<br>"; } >> analysisResults.html
 
   #################################
 
@@ -729,7 +729,7 @@ else
   #### Nuisance ROI mapping ############
   echo "...Warping Nuisance ROIs to EPI space"
 
-  for roi in $roiList
+  for roi in "${roiList[@]}"
   do
     echo "......Mapping nuisance regressor $roi"
 
@@ -748,7 +748,7 @@ else
   #### FEAT setup ############
   echo "... FEAT setup"
 
-  cd $indir || exit
+  cd "$indir" || exit
 
   # Set a few variables from data
   # epi_reg peDir setup (e.g. -y) is backwards from FEAT peDir (e.g. y-)
@@ -767,7 +767,7 @@ else
 
   numtimepoint=$(fslinfo "$epiDataFilt" | grep ^dim4 | awk '{print $2}')
 
-  dwellTimeBase=$(grep "epiDwell=" $logDir/rsParams | tail -1 | awk -F"=" '{print $2}')
+  dwellTimeBase=$(grep "epiDwell=" "$logDir"/rsParams | tail -1 | awk -F"=" '{print $2}')
   if [[ $dwellTimeBase == "" ]]; then
     dwellTime=0.00056
   else
@@ -785,7 +785,7 @@ else
   -e "s|SUBJECTTR|${tr}|g" \
   -e "s|EPIDWELL|${dwellTime}|g" \
   -e "s|PEDIR|${peDirNEW}|g" \
-  -e "s|FSLDIR|${FSLDIR}|g" $scriptDir/dummy_nuisance_5.0.10.fsf > "${indir}"/"${fsf}"
+  -e "s|FSLDIR|${FSLDIR}|g" "$scriptDir"/dummy_nuisance_5.0.10.fsf > "${indir}"/"${fsf}"
 
   #################################
 
@@ -869,7 +869,7 @@ EOF
 
   echo "...Plotting Regressor time series"
 
-  for roi in $roiList
+  for roi in "${roiList[@]}"
   do
     fsl_tsplot -i "$indir"/tsregressorslp/"${roi}"_normalized_ts.txt -t "${roi} Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o "$indir"/"${roi}"_norm.png
     echo "<br><img src=\"$indir/${roi}_norm.png\" alt=\"$roi nuisance regressor\"><br>" >> "$indir"/analysisResults.html
