@@ -1,0 +1,199 @@
+function [ resultFilename ] = createRDA( dicomFilename, rdaFilename )
+%createRDA Convert a Siemens DICOM spectrscopy file to RDA format
+%   This function will convert the specified Siemens DICOM file to RDA
+%   format. This format is used by LCModel to analyze the metabolic 
+%   concentrations.
+
+
+resultFilename = rdaFilename;
+
+%Create RDA FILE
+rda = fopen(rdaFilename, 'w');
+header = dicominfo(dicomFilename);
+spect = dicomParserMRS(dicomFilename);
+
+
+[status,sequence,header] = dicom_get_header(header,'SequenceName');
+[status,transmitCoil,header] = dicom_get_header(header,'TransmittingCoil');
+[status,tr,header] = dicom_get_header(header,'RepetitionTime');
+[status,te,header] = dicom_get_header(header,'EchoTime');
+[status,ti,header] = dicom_get_header(header,'InversionTime');
+[status,numAvgs,header] = dicom_get_header(header,'NumberOfAverages');
+[status,frequency,header] = dicom_get_header(header,'ImagingFrequency');
+[status,nucleus,header] = dicom_get_header(header,'ImagedNucleus');
+[status,echoNumber,header] = dicom_get_header(header,'EchoNumbers');
+[status,fieldStrength,header] = dicom_get_header(header,'MagneticFieldStrength');
+[status,numPhase,header] = dicom_get_header(header,'NumberOfPhaseEncodingSteps');
+[status,phaseFOV,header] = dicom_get_header(header,'PercentPhaseFieldOfView');
+[status,receiveCoil,header] = dicom_get_header(header,'ReceivingCoil');
+[status,acqMatrix,header] = dicom_get_header(header,'AcquisitionMatrix');
+[status,flipAngle,header] = dicom_get_header(header,'FlipAngle');
+[status,sliceThickness,header] = dicom_get_header(header,'SliceThickness');
+[status,imagePosition,header] = dicom_get_header(header,'ImagePositionPatient');
+[status,imageOrientation,header] = dicom_get_header(header,'ImageOrientationPatient');
+[status,sliceLocation,header] = dicom_get_header(header,'SliceLocation');
+[status,linePosition,header] = dicom_get_header(header,'EchoLinePosition');
+[status,columnPosition,header] = dicom_get_header(header,'EchoColumnPosition');
+[status,partitionPosition,header] = dicom_get_header(header,'EchoPartitionPosition');
+[status,dwellTime,header] = dicom_get_header(header,'RealDwellTime');
+[status,pixelSpacing,header] = dicom_get_header(header,'PixelSpacing');
+[status,pixelBandwith,header] = dicom_get_header(header,'PixelBandwidth');
+[status,gridShiftVector,header] = dicom_get_header(header,'CsiGridshiftVector');
+[status,acqPhaseColumns,header] = dicom_get_header(header,'SpectroscopyAcquisitionPhaseColumns');
+[status,acqPhaseRows,header] = dicom_get_header(header,'SpectroscopyAcquisitionPhaseRows');
+%[status,acqPhase3D,header] = dicom_get_header(header,'SpectroscopyAcquisitionOut-of-planePhaseSteps');
+[status,acqDataColumns,header] = dicom_get_header(header,'SpectroscopyAcquisitionDataColumns');
+[status,dataPointsRow,header] = dicom_get_header(header,'DataPointRows');
+[status,dataPointsColumns,header] = dicom_get_header(header,'DataPointColumns');
+[status,numColumns,header] = dicom_get_header(header,'Columns');
+[status,numRows,header] = dicom_get_header(header,'Rows');
+[status,hammingFilterWidth,header] = dicom_get_header(header,'HammingFilterWidth');
+[status,referenceAmplitude,header] = dicom_get_header(header,'TransmitterReferenceAmplitude');
+[status,voiThickness,header] = dicom_get_header(header,'VoiThickness');
+[status,voiPhaseFov,header] = dicom_get_header(header,'VoiPhaseFoV');
+[status,voiReadFov,header] = dicom_get_header(header,'VoiReadoutFoV');
+[status,voiOrientation,header] = dicom_get_header(header,'VoiOrientation');
+[status,voiPosition,header] = dicom_get_header(header,'VoiPosition');
+[status,voiRotation,header] = dicom_get_header(header,'VoiInPlaneRotation');
+[status,frequencyCorrect,header] = dicom_get_header(header,'FrequencyCorrection');
+[status,sliceSpacing,header] = dicom_get_header(header,'SpacingBetweenSlices');
+
+te = te;
+tr = tr;
+ti = ti;
+tm = 0.0;
+dwellTime = dwellTime / 1000.0;
+frequency = frequency;
+
+x = spect.lFinalMatrixSizePhase;
+y = spect.lFinalMatrixSizeRead; 
+z = spect.lFinalMatrixSizeSlice;
+v = spect.lVectorSize;
+
+fprintf(rda, '%s\r\n', '>>> Begin of header <<<');
+fprintf(rda, '%s %s^%s\n', 'PatientName:', header.PatientName.FamilyName,  'TEST' ); %header.PatientName.GivenName
+fprintf(rda, '%s %s\n', 'PatientID:',header.PatientID);
+fprintf(rda, '%s %s\n', 'PatientSex:',header.PatientSex);
+fprintf(rda, '%s %s\n', 'PatientBirthDate:',header.PatientBirthDate);
+fprintf(rda, '%s %s\n', 'StudyDate:',header.StudyDate);
+fprintf(rda, '%s %s\n', 'StudyTime:',header.StudyTime);
+fprintf(rda, '%s %s\n', 'StudyDescription:',header.StudyDescription);
+fprintf(rda, '%s %s\n', 'PatientAge:',header.PatientAge);
+fprintf(rda, '%s %f\n', 'PatientWeight:',header.PatientWeight);
+fprintf(rda, '%s %s\n', 'SeriesDate:', header.SeriesDate);
+fprintf(rda, '%s %s\n', 'SeriesTime:', header.SeriesTime);
+fprintf(rda, '%s %s\n', 'SeriesDescription:', header.SeriesDescription);
+fprintf(rda, '%s %s\n', 'ProtocolName:', header.ProtocolName);
+fprintf(rda, '%s %s\n', 'PatientPosition:', header.PatientPosition);
+fprintf(rda, '%s %i\n', 'SeriesNumber:', header.SeriesNumber);
+fprintf(rda, '%s %s\n', 'InstitutionName:', header.InstitutionName);
+fprintf(rda, '%s %s\n', 'StationName:', header.StationName);
+fprintf(rda, '%s %s\n', 'ModelName:', header.ManufacturerModelName);
+fprintf(rda, '%s %s\n', 'DeviceSerialNumber:', header.DeviceSerialNumber);
+fprintf(rda, '%s %s\n', 'SoftwareVersion[0]:', header.SoftwareVersion); 
+fprintf(rda, '%s %s\n', 'InstanceDate:', header.InstanceCreationDate);
+fprintf(rda, '%s %s\n', 'InstanceTime:', header.InstanceCreationTime);
+fprintf(rda, '%s %i\n', 'InstanceNumber:', header.InstanceNumber);
+fprintf(rda, '%s %s\n', 'InstanceComments:', header.ImageComments);
+fprintf(rda, '%s %i\n', 'AcquisitionNumber:', header.AcquisitionNumber);
+fprintf(rda, '%s %s\n', 'SequenceName:', sequence ); % 
+fprintf(rda, '%s %s\n', 'SequenceDescription:', sequence);  
+fprintf(rda, '%s %.6f\n', 'TR:', tr );
+fprintf(rda, '%s %.6f\n', 'TE:', te );
+fprintf(rda, '%s %.6f\n', 'TM:', tm );
+fprintf(rda, '%s %.6f\n', 'TI:', ti );
+fprintf(rda, '%s %d\n', 'DwellTime:', dwellTime);
+fprintf(rda, '%s %d\n', 'EchoNumber:', echoNumber);
+fprintf(rda, '%s %.6f\n', 'NumberOfAverages:', numAvgs);
+fprintf(rda, '%s %.6f\n', 'MRFrequency:', frequency);
+fprintf(rda, '%s %s\n', 'Nucleus:', nucleus);
+fprintf(rda, '%s %.6f\n', 'MagneticFieldStrength:', fieldStrength);
+fprintf(rda, '%s %i\n', 'NumOfPhaseEncodingSteps:', numPhase);
+fprintf(rda, '%s %i\n', 'FlipAngle:', flipAngle );
+fprintf(rda, '%s %i\n', 'VectorSize:', spect.lVectorSize );
+fprintf(rda, '%s %i\n', 'CSIMatrixSize[0]:', spect.lFinalMatrixSizePhase);
+fprintf(rda, '%s %i\n', 'CSIMatrixSize[1]:', spect.lFinalMatrixSizeRead);
+fprintf(rda, '%s %i\n', 'CSIMatrixSize[2]:', spect.lFinalMatrixSizeSlice);
+fprintf(rda, '%s %i\n', 'CSIMatrixSizeOfScan[0]:', spect.sKSpace.lBaseResolution);
+fprintf(rda, '%s %i\n', 'CSIMatrixSizeOfScan[1]:', spect.sKSpace.lPhaseEncodingLines);
+fprintf(rda, '%s %i\n', 'CSIMatrixSizeOfScan[2]:', spect.sKSpace.lPartitions);
+if (length(gridShiftVector) == 0)
+  fprintf(rda, '%s %d\n', 'CSIGridShift[0]:', 0.0);
+  fprintf(rda, '%s %d\n', 'CSIGridShift[1]:', 0.0);
+  fprintf(rda, '%s %d\n', 'CSIGridShift[2]:', 0.0);
+else
+  fprintf(rda, '%s %d\n', 'CSIGridShift[0]:', gridShiftVector(1));
+  fprintf(rda, '%s %d\n', 'CSIGridShift[1]:', gridShiftVector(2));
+  fprintf(rda, '%s %d\n', 'CSIGridShift[2]:', gridShiftVector(3));
+end
+if (hammingFilterWidth == 0.0)
+    fprintf(rda, '%s %s\n', 'HammingFilter:', 'Off');
+else
+    fprintf(rda, '%s %s\n', 'HammingFilter:', 'On');
+end
+
+if (hammingFilterWidth > 0.0)
+    fprintf(rda, '%s %d\n', 'HammingFilterWidth:', hammingFilterWidth);
+end
+
+fprintf(rda, '%s %s\n', 'FrequencyCorrection:', frequencyCorrect); 
+fprintf(rda, '%s %s\n', 'TransmitCoil:', transmitCoil);
+fprintf(rda, '%s %.6f\n', 'TransmitRefAmplitude[1H]:', referenceAmplitude);
+fprintf(rda, '%s %.6f\n', 'SliceThickness:', sliceThickness);
+fprintf(rda, '%s %.6f\n', 'PositionVector[0]:', imagePosition(1));
+fprintf(rda, '%s %.6f\n', 'PositionVector[1]:', imagePosition(2));
+fprintf(rda, '%s %.6f\n', 'PositionVector[2]:', imagePosition(3));
+fprintf(rda, '%s %.6f\n', 'RowVector[0]:', imageOrientation(1));
+fprintf(rda, '%s %.6f\n', 'RowVector[1]:', imageOrientation(2));
+fprintf(rda, '%s %.6f\n', 'RowVector[2]:', imageOrientation(3));
+fprintf(rda, '%s %.6f\n', 'ColumnVector[0]:', imageOrientation(4));
+fprintf(rda, '%s %.6f\n', 'ColumnVector[1]:', imageOrientation(5));
+fprintf(rda, '%s %.6f\n', 'ColumnVector[2]:', imageOrientation(6));
+fprintf(rda, '%s %.6f\n', 'VOIPositionSag:', voiPosition(1));
+fprintf(rda, '%s %.6f\n', 'VOIPositionCor:', voiPosition(2));
+fprintf(rda, '%s %.6f\n', 'VOIPositionTra:', voiPosition(3));
+fprintf(rda, '%s %.6f\n', 'VOIThickness:', voiThickness);
+fprintf(rda, '%s %.6f\n', 'VOIPhaseFOV:', voiPhaseFov);
+fprintf(rda, '%s %.6f\n', 'VOIReadoutFOV:', voiReadFov);
+fprintf(rda, '%s %.6f\n', 'VOINormalSag:', voiOrientation(1));
+fprintf(rda, '%s %.6f\n', 'VOINormalCor:', voiOrientation(2));
+fprintf(rda, '%s %.6f\n', 'VOINormalTra:', voiOrientation(3));
+fprintf(rda, '%s %.6f\n', 'VOIRotationInPlane:', voiRotation);
+if ((x == 1) && (y == 1) && (z == 1))
+  fprintf(rda, '%s %.6f\n', 'FoVHeight:', voiPhaseFov );
+  fprintf(rda, '%s %.6f\n', 'FoVWidth:', voiReadFov);
+  fprintf(rda, '%s %.6f\n', 'FoV3D:', voiThickness);
+else
+  fprintf(rda, '%s %.6f\n', 'FoVHeight:', spect.dPhaseFOV );
+  fprintf(rda, '%s %.6f\n', 'FoVWidth:', spect.dReadoutFOV);
+  fprintf(rda, '%s %.6f\n', 'FoV3D:', spect.dThickness);
+end
+fprintf(rda, '%s %.6f\n', 'PercentOfRectFoV:', phaseFOV);
+fprintf(rda, '%s %i\n', 'NumberOfRows:', spect.lFinalMatrixSizePhase);
+fprintf(rda, '%s %i\n', 'NumberOfColumns:', spect.lFinalMatrixSizeRead);
+fprintf(rda, '%s %i\n', 'NumberOf3DParts:', spect.lFinalMatrixSizeSlice);
+fprintf(rda, '%s %.6f\n', 'PixelSpacingRow:', pixelSpacing(1));
+fprintf(rda, '%s %.6f\n', 'PixelSpacingCol:', pixelSpacing(2));
+fprintf(rda, '%s %.6f\n', 'PixelSpacing3D:', sliceThickness);
+fprintf(rda, '%s\n', '>>> End of header <<<');
+
+fd = dicom_open(dicomFilename);
+[y_s,r,imag] = dicom_get_spectrum_siemens(fd);
+fclose(fd);
+
+tmpVector = zeros(v*2, 1);
+
+writeSize=0;
+for index = 1:x*y*z
+  for (i=1:v)
+    tmpVector(2*i-1) = r((index-1)*v+i); 
+    tmpVector(2*i) = imag((index-1)*v+i);
+   end
+   fwrite(rda, tmpVector, 'double');
+end
+
+fclose(rda);
+
+
+end
+
