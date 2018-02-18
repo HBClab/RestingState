@@ -111,7 +111,7 @@ do
       nuisanceInd=1
       ;;
     N)
-      nuisanceList=($(cat "$OPTARG"))
+      nuisanceList=($("read -a $(cat "$OPTARG")"))
       nuisanceInFile=$OPTARG
       ;;
     L)
@@ -169,7 +169,7 @@ do
   fi
 done
 
-if [[ "${nuisanceList[@]}" == "" ]]; then
+if [[ "${nuisanceList[*]}" == "" ]]; then
   echo "Error: At least one Nuisance ROI must be specified using the -n options"
   exit 1
 fi
