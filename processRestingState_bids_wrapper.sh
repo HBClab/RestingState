@@ -210,7 +210,7 @@ else
       -m 2 \
       -R ${roilist} \
       -f
-  elif [ ! "${fieldMapFlag}" == 1 ]; then
+  elif [ "${fieldMapFlag}" != 1 ]; then
     printf "Process without fieldmap."
     ${scriptdir}/qualityCheck.sh -E "$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
       -A ${T1_RPI_brain} \
