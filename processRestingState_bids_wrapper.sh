@@ -109,8 +109,8 @@ if [[ "${roilist}" == "" ]]; then
 fi
 
 bidsDir=${inFile//\/sub*} # bids directory e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS
-subID="$(echo ${inFile} | cut -d "-" -f 2 | sed 's|/.*||g')" # gets subID from inFile
-sesID="$(dirname "$(dirname $inFile)" | rev | cut -d '/' -f 1 | rev)" # gets sesID from inFile
+subID="$(echo ${inFile} | grep -o "sub-[a-z0-9A-Z]*" | head -n 1 | sed -e "s|sub-||")" # gets subID from inFile
+sesID="$(echo ${inFile} | grep -o "ses-[a-z0-9A-Z]*" | head -n 1 | sed -e "s|ses-||")" # gets sesID from inFile
 subDir="${bidsDir}/sub-${subID}" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161
 scanner="$(echo ${subID} | cut -c -2)" # extract scannerID from subID, works when scannerID is embedded in subID. TODO: need a different way to determine scannerID. e.g., dicom header?
 rsOut="${bidsDir}/derivatives/rsOut_legacy/sub-${subID}/${sesID}"
