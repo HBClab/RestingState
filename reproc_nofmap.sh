@@ -243,7 +243,7 @@ echo ""
 # inFile is denoised_func_data_nonaggr_bp
 inFile=$1
 
-bidsDir=${inFile//\/sub*} # bids directory e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS
+bidsDir=${inFile//\/derivatives*} # bids directory e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS
 subID="$(echo ${inFile} | grep -o "sub-[a-z0-9A-Z]*" | head -n 1 | sed -e "s|sub-||")" # gets subID from inFile
 sesID="$(echo ${inFile} | grep -o "ses-[a-z0-9A-Z]*" | head -n 1 | sed -e "s|ses-||")" # gets sesID from inFile
 subDir="${bidsDir}/sub-${subID}" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161
