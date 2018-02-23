@@ -251,8 +251,7 @@ rsOut="${bidsDir}/derivatives/rsOut_legacy/sub-${subID}/${sesID}"
 epiWarpDir=${rsOut}/EPItoT1optimized_nofmap
 scriptDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-epiDataFilt=${rsOut}/mcImg_smooth_denoised_bp.nii.gz
-epiVoxTot=$(fslstats ${epiDataFilt} -v | awk '{print $1}')
+epiVoxTot=$(fslstats ${inFile} -v | awk '{print $1}')
 
 # load variables needed for processing
 
@@ -312,12 +311,12 @@ clobber $preprocDir/rois/WM_FAST_nofmap_ts.txt &&\
 flirt -in $segDir/T1_pve_2.nii.gz -ref ${inFile} -applyxfm -init ${epiWarpDir}/T1toEPI_nofmap.mat -out $snrDir/WM_pve_to_RS_nofmap.nii.gz -interp nearestneighbour &&\
 fslmaths $snrDir/WM_pve_to_RS_nofmap.nii.gz -thr .99 -bin $snrDir/WM_pve_to_RS_nofmap_thresh.nii.gz &&\
 fslmaths $snrDir/WM_pve_to_RS_nofmap_thresh.nii.gz -kernel box 8 -ero $snrDir/WM_pve_to_RS_nofmap_thresh_ero.nii.gz &&\
-fslmeants -i $epiDataFilt -m $snrDir/WM_pve_to_RS_nofmap_thresh_ero.nii.gz -o $preprocDir/rois/WM_FAST_nofmap_ts.txt --eig --order=5
+fslmeants -i $inFile -m $snrDir/WM_pve_to_RS_nofmap_thresh_ero.nii.gz -o $preprocDir/rois/WM_FAST_nofmap_ts.txt --eig --order=5
 
 clobber $preprocDir/rois/CSF_FAST_nofmap_ts.txt &&\
 flirt -in $segDir/T1_pve_0.nii.gz -ref ${inFile} -applyxfm -init ${epiWarpDir}/T1toEPI_nofmap.mat -out $snrDir/CSF_pve_to_RS_nofmap.nii.gz -interp nearestneighbour &&\
 fslmaths $snrDir/CSF_pve_to_RS_nofmap.nii.gz -thr .99 -bin $snrDir/CSF_pve_to_RS_nofmap_thresh.nii.gz &&\
-fslmeants -i $epiDataFilt -m $snrDir/CSF_pve_to_RS_nofmap_thresh.nii.gz -o $preprocDir/rois/CSF_FAST_nofmap_ts.txt --eig --order=5
+fslmeants -i $inFile -m $snrDir/CSF_pve_to_RS_nofmap_thresh.nii.gz -o $preprocDir/rois/CSF_FAST_nofmap_ts.txt --eig --order=5
 
 # warp MNI rois to EPI
 rois=("wmroi" "global" "latvent")
@@ -326,7 +325,7 @@ for roi in "${rois[@]}"; do
   applywarp --ref=${inFile} --in="${scriptDir}"/ROIs/"${roi}".nii.gz --out=$preprocDir/rois/"${roi}"_native_nofmap.nii.gz --warp="${epiWarpDir}/MNItoEPI_nofmap_warp.nii.gz" --datatype=float &&\
   fslmaths $preprocDir/rois/"${roi}"_native_nofmap.nii.gz -thr 0.5 $preprocDir/rois/"${roi}"_native_nofmap.nii.gz &&\
   fslmaths $preprocDir/rois/"${roi}"_native_nofmap.nii.gz -bin $preprocDir/rois/"${roi}"_native_nofmap.nii.gz &&\
-  fslmeants -i "$epiDataFilt" -o $preprocDir/rois/mean_"${roi}"_nofmap_ts.txt -m $preprocDir/rois/"${roi}"_native_nofmap.nii.gz
+  fslmeants -i "$inFile" -o $preprocDir/rois/mean_"${roi}"_nofmap_ts.txt -m $preprocDir/rois/"${roi}"_native_nofmap.nii.gz
 done
 
 # separate 5 eigenvectors into single files
@@ -432,7 +431,7 @@ else
   fi
 fi
 
-numtimepoint=$(fslinfo $epiDataFilt | grep ^dim4 | awk '{print $2}')
+numtimepoint=$(fslinfo $inFile | grep ^dim4 | awk '{print $2}')
 
 dwellTimeBase=$(cat ${rsOut}/rsParams | grep "epiDwell=" | tail -1 | awk -F"=" '{print $2}')
 if [[ $dwellTimeBase == "" ]]; then
@@ -445,7 +444,7 @@ te=$(cat ${rsOut}/rsParams | grep "epiTE=" | tail -1 | awk -F"=" '{print $2}')
 tr=$(cat ${rsOut}/rsParams | grep "epiTR=" | tail -1 | awk -F"=" '{print $2}')
 
 sed -e "s|SUBJECTPATH|${rsOut}|g" \
--e "s|SUBJECTEPIPATH|${epiDataFilt}|g" \
+-e "s|SUBJECTEPIPATH|${inFile}|g" \
 -e "s|VOXTOT|${epiVoxTot}|g" \
 -e "s|SUBJECTT1PATH|${T1_RPI_brain}|g" \
 -e "s|SCANTE|${te}|g" \
@@ -457,7 +456,7 @@ sed -e "s|SUBJECTPATH|${rsOut}|g" \
 
 
 sed -e "s|SUBJECTPATH|${rsOut}|g" \
--e "s|SUBJECTEPIPATH|${epiDataFilt}|g" \
+-e "s|SUBJECTEPIPATH|${inFile}|g" \
 -e "s|VOXTOT|${epiVoxTot}|g" \
 -e "s|SUBJECTT1PATH|${T1_RPI_brain}|g" \
 -e "s|SCANTE|${te}|g" \
