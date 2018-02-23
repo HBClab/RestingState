@@ -279,19 +279,24 @@ printf "\n%s\nRunning epi_reg without field maps...\n" "$(date)"
 mkdir -p ${epiWarpDir}
 cp ${wmseg} ${epiWarpDir}/EPItoT1_nofmap_wmseg.nii.gz
 
+clobber ${epiWarpDir}/EPItoT1_nofmap.mat &&\
 epi_reg --epi=${rsOut}/mcImgMean.nii.gz --t1=${T1_RPI} --t1brain=${T1_RPI_brain} --wmseg=${epiWarpDir}/EPItoT1_nofmap_wmseg.nii.gz --out=${epiWarpDir}/EPItoT1_nofmap --noclean -v >> ${epiWarpDir}/EPItoT1_nofmap.out
 
 # Invert the affine registration (to get T1toEPI)
+clobber ${epiWarpDir}/T1toEPI_nofmap.mat &&\
 convert_xfm -omat ${epiWarpDir}/T1toEPI_nofmap.mat -inverse $epiWarpDir/EPItoT1_nofmap.mat
 
 # Apply the inverted (T1toEPI) mat file to the brain mask
+clobber ${rsOut}/mcImgMean_mask_nofmap.nii.gz &&\
 flirt -in ${T1_brain_mask} -ref ${rsOut}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI_nofmap.mat -out ${rsOut}/mcImgMean_mask_nofmap.nii.gz -interp nearestneighbour -datatype char
 
 # Create a stripped version of the EPI (mcImg) file, apply the mat file
-fslmaths ${rsOut}/mcImgMean.nii.gz -mas ${rsOut}/mcImgMean_mask_nofmap.nii.gz ${rsOut}/mcImgMean_nofmap_stripped.nii.gz
+clobber ${epiWarpDir}/EPIstrippedtoT1_nofmap.nii.gz &&\
+fslmaths ${rsOut}/mcImgMean.nii.gz -mas ${rsOut}/mcImgMean_mask_nofmap.nii.gz ${rsOut}/mcImgMean_nofmap_stripped.nii.gz &&\
 flirt -in ${rsOut}/mcImgMean_nofmap_stripped.nii.gz -ref ${T1_RPI_brain} -applyxfm -init ${epiWarpDir{}/EPItoT1_nofmap.mat -out ${epiWarpDir}/EPIstrippedtoT1_nofmap.nii.gz
 
 # Sum the nonlinear warp (MNItoT1_warp.nii.gz) with the affine transform (T1toEPI.mat) to get a warp from MNI to EPI
+clobber ${epiWarpDir}/MNItoEPI_nofmap_warp.nii.gz &&\
 convertwarp --ref=${rsOut}/mcImgMean.nii.gz --warp1=${MBA_dir}/T1forWarp/MNItoT1_warp.nii.gz --postmat=${epiWarpDir}/T1toEPI_nofmap.mat --out=${epiWarpDir}/MNItoEPI_nofmap_warp.nii.gz --relout
 
 # warping nuisance ROIs  #### Nuisance ROI mapping ############
@@ -317,9 +322,10 @@ fslmeants -i $epiDataFilt -m $snrDir/CSF_pve_to_RS_nofmap_thresh.nii.gz -o $prep
 # warp MNI rois to EPI
 rois=("wmroi" "global" "latvent")
 for roi in "${rois[@]}"; do
-  applywarp --ref=${inFile} --in="${scriptDir}"/ROIs/"${roi}".nii.gz --out=$preprocDir/rois/"${roi}"_native_nofmap.nii.gz --warp="${epiWarpDir}/MNItoEPI_nofmap_warp.nii.gz" --datatype=float
-  fslmaths $preprocDir/rois/"${roi}"_native_nofmap.nii.gz -thr 0.5 $preprocDir/rois/"${roi}"_native_nofmap.nii.gz
-  fslmaths $preprocDir/rois/"${roi}"_native_nofmap.nii.gz -bin $preprocDir/rois/"${roi}"_native_nofmap.nii.gz
+  clobber $preprocDir/rois/mean_"${roi}"_nofmap_ts.txt &&\
+  applywarp --ref=${inFile} --in="${scriptDir}"/ROIs/"${roi}".nii.gz --out=$preprocDir/rois/"${roi}"_native_nofmap.nii.gz --warp="${epiWarpDir}/MNItoEPI_nofmap_warp.nii.gz" --datatype=float &&\
+  fslmaths $preprocDir/rois/"${roi}"_native_nofmap.nii.gz -thr 0.5 $preprocDir/rois/"${roi}"_native_nofmap.nii.gz &&\
+  fslmaths $preprocDir/rois/"${roi}"_native_nofmap.nii.gz -bin $preprocDir/rois/"${roi}"_native_nofmap.nii.gz &&\
   fslmeants -i "$epiDataFilt" -o $preprocDir/rois/mean_"${roi}"_nofmap_ts.txt -m $preprocDir/rois/"${roi}"_native_nofmap.nii.gz
 done
 
@@ -435,7 +441,6 @@ else
   dwellTime=$dwellTimeBase
 fi
 
-t1Data=$(cat ${rsOut}/rsParams | grep "^T1=" | tail -1 | awk -F"=" '{print $2}')
 te=$(cat ${rsOut}/rsParams | grep "epiTE=" | tail -1 | awk -F"=" '{print $2}')
 tr=$(cat ${rsOut}/rsParams | grep "epiTR=" | tail -1 | awk -F"=" '{print $2}')
 
@@ -472,8 +477,6 @@ parallel --header : feat {fsf} ::: fsf $(for i in nuisancereg_compcor_nofmap.fea
 
 #################################
 
-feat_regFix nuisancereg_compcor.feat $scriptDir $rsOut $epiVoxTot $te $numtimepoint $tr $dwellTime $peDirNEW "${rsOut}/nuisancereg_compcor.fsf"
-dataScale $rsOut/nuisancereg_compcor.feat
 
 parallel --link --header : feat_regFix {in} $scriptDir $rsOut $epiVoxTot $te $numtimepoint $tr $dwellTime $peDirNEW {fsf} ::: in "nuisancereg_nofmap.feat" "nuisancereg_compcor_nofmap.feat" ::: fsf "${rsOut}/${fsf}" "${rsOut}/${fsf2}"
 
