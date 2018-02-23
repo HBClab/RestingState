@@ -32,12 +32,8 @@ function printCommandLine {
   echo "        *e.g. -r pccrsp -r icalc"
   echo "   -R Data file with seed list, one seed per line"
   echo "        **Use ONLY one option, -r or -R, NOT both"
-  echo "   -n Nuisance regression method"
-  echo "        1 = aroma + compcor only"
-  echo "        2 = aroma + compcor + GM FAST regression"
-  echo "        3 = aroma + compcor + GM mask regression"
-  echo "        4 = classic + aroma"
-  echo "        blank = classic"
+  echo "   -n Nuisance regression feat directory"
+  echo "        e.g., nuisancereg_compcor.feat"
   echo "   -f (fieldMap registration correction)"
   echo "        *Only set this flag if FieldMap correction was used during qualityCheck"
   echo "        **This affects only the EPI to T1 QC images"
@@ -106,7 +102,7 @@ do
       roiInFile=$OPTARG
       ;;
     n)
-      nuisanceFlag=$OPTARG
+      nuisancefeat=$OPTARG
       ;;
     f)
       fieldMapFlag=1
@@ -118,28 +114,11 @@ do
      esac
 done
 
-case "$nuisanceFlag" in
-  1)
-    nuisancefeat=nuisancereg_compcor.feat
-    seedcorrDir=$(dirname ${epiData})/seedCorrelation_compcor
-    ;;
-  2)
-    nuisancefeat=nuisancereg_compcor_wGMR.feat
-    seedcorrDir=$(dirname ${epiData})/seedCorrelation_compcor_wGMR
-    ;;
-  3)
-    nuisancefeat=nuisancereg_compcor_wGMRv1.feat
-    seedcorrDir=$(dirname ${epiData})/seedCorrelation_compcor_wGMRv1
-    ;;
-  4)
-    nuisancefeat=nuisancereg_classic_aroma.feat
-    seedcorrDir=$(dirname ${epiData})/seedCorrelation_classic_aroma
-    ;;
-  "")
-    nuisancefeat=nuisancereg.feat
-    seedcorrDir=$(dirname ${epiData})/seedCorrelation
-    ;;
-esac
+echo nuisancefeat is ${nuisancefeat}
+seedcorrDir=$(dirname ${epiData})/$(${nuisancefeat#nuisancereg_} | cut -f 1 -d '.')
+echo seedcorrDir is ${seedcorrDir}
+exit 1
+
 
 # Check for existence of output directory
 if [[ ! -d ${seedcorrDir} ]]; then
