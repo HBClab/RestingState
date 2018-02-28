@@ -8,8 +8,6 @@
 #     4. Seed zmap QC (push to highres (T1) and standard (MNI)
 ##################################################################################################################
 
-# nuisancefeat=nuisancereg.feat
-melodicfeat=melodic.ica
 
 # Check of all ROIs (from ROIs directory), that can be used for seeding
 scriptPath=$(perl -e 'use Cwd "abs_path";print abs_path(shift)' $0)
@@ -38,8 +36,6 @@ function printCommandLine {
   echo "        *Only set this flag if FieldMap correction was used during qualityCheck"
   echo "        **This affects only the EPI to T1 QC images"
   echo ""
-  echo "Existing seeds:"
-  echo "$knownRois"
   exit 1
 }
 
@@ -156,7 +152,6 @@ if [[ "$seedTest" != "$roiTest" ]]; then
   echo "seeds=$seeds" >> $indir/rsParams
 fi
 
-subjectDir=$(dirname $indir)
 
 if [ $motionscrubFlag == 0 ]; then
   filename=run_firstlevelseeding_parallel.m
