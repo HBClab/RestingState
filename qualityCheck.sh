@@ -38,7 +38,84 @@ function printCommandLine {
   exit 1
 }
 
+function motionCorrection {
+  local epiData=$1
+  local indir="$(dirname ${epiData})"
 
+  ########## Motion Correction ###################
+  # Going to run with AFNI's 3dvolreg over FSL's mcflirt.  Output pics will have same names to be drop-in replacments
+  echo "...Applying motion correction."
+
+  # Determine halfway point of dataset to use as a target for registration
+  halfPoint=$(fslhd $epiData | grep "^dim4" | awk '{print int($2/2)}')
+
+  # Run 3dvolreg, save matrices and parameters
+  # Saving "raw" AFNI output for possible use later (motionscrubbing?)
+  clobber $indir/mcImg.nii.gz &&\
+  3dvolreg -verbose -tshift 0 -Fourier -zpad 4 -prefix mcImg.nii.gz -base $halfPoint -dfile mcImg_raw.par -1Dmatrix_save mcImg.mat $epiData
+
+  # Create a mean volume
+  clobber mcImgMean.nii.gz &&\
+  fslmaths mcImg.nii.gz -Tmean mcImgMean.nii.gz
+
+  # Save out mcImg.par (like fsl) with only the translations and rotations
+  # mcflirt appears to have a different rotation/translation order.  Reorder 3dvolreg output to match "RPI" FSL ordering
+  # AFNI ordering
+   # roll  = rotation about the I-S axis }
+   # pitch = rotation about the R-L axis } degrees CCW
+   # yaw   = rotation about the A-P axis }
+   # dS  = displacement in the Superior direction  }
+   # dL  = displacement in the Left direction      } mm
+   # dP  = displacement in the Posterior direction }
+  clobber mcImg_deg.par &&\
+  cat mcImg_raw.par | awk '{print ($3 " " $4 " " $2 " " $6 " " $7 " " $5)}' >> mcImg_deg.par
+
+  # Need to convert rotational parameters from degrees to radians
+  # rotRad= (rotDeg*pi)/180
+  # pi=3.14159
+
+  clobber mcImg.par &&\
+  cat mcImg_deg.par | awk -v pi=3.14159 '{print (($1*pi)/180) " " (($2*pi)/180) " " (($3*pi)/180) " " $4 " " $5 " " $6}' > mcImg.par
+
+  # Need to create a version where ALL (rotations and translations) measurements are in mm.  Going by Power 2012 Neuroimage paper, radius of 50mm.
+  # Convert degrees to mm, leave translations alone.
+  # rotDeg= ((2r*Pi)/360) * Degrees = Distance (mm)
+  # d=2r=2*50=100
+  # pi=3.14159
+
+  clobber mcImg_mm.par &&\
+  cat mcImg_deg.par | awk -v pi=3.14159 -v d=100 '{print (((d*pi)/360)*$1) " " (((d*pi)/360)*$2) " " (((d*pi)/360)*$3) " " $4 " " $5 " " $6}' > mcImg_mm.par
+
+
+  # Cut motion parameter file into 6 distinct TR parameter files
+  for i in 1 2 3 4 5 6; do
+    clobber mc${i}.par &&\
+     cat mcImg.par | awk -v var=${i} '{print $var}' > mc${i}.par
+  done
+
+  # Need to create the absolute and relative displacement RMS measurement files
+  # From the FSL mailing list (https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=FSL;2ce58db1.1202):
+  # rms = sqrt(0.2*R^2*((cos(theta_x)-1)^2+(sin(theta_x))^2 + (cos(theta_y)-1)^2 + (sin(theta_y))^2 + (cos(theta_z)-1)^2 + (sin(theta_z)^2)) + transx^2+transy^2+transz^2)
+  # where R=radius of spherical ROI = 80mm used in rmsdiff; theta_x, theta_y, theta_z are the three rotation angles from the .par file; and transx, transy, transz are the three translations from the .par file.
+
+  # Absolute Displacement
+  cat mcImg.par | awk '{print (sqrt(0.2*80^2*((cos($1)-1)^2+(sin($1))^2 + (cos($2)-1)^2 + (sin($2))^2 + (cos($3)-1)^2 + (sin($3)^2)) + $4^2+$5^2+$6^2))}' >> mcImg_abs.rms
+
+  # Relative Displacement
+  # Create the relative displacement .par file from the input using AFNI's 1d_tool.py to first calculate the derivatives
+  1d_tool.py -infile mcImg.par -set_nruns 1 -derivative -write mcImg_deriv.par
+  cat mcImg_deriv.par | awk '{print (sqrt(0.2*80^2*((cos($1)-1)^2+(sin($1))^2 + (cos($2)-1)^2 + (sin($2))^2 + (cos($3)-1)^2 + (sin($3)^2)) + $4^2+$5^2+$6^2))}' >> mcImg_rel.rms
+
+
+  # Create images of the motion correction (translation, rotations, displacement), mm and radians
+  # switched from "MCFLIRT estimated...." title
+  fsl_tsplot -i mcImg.par -t '3dvolreg estimated rotations (radians)' -u 1 --start=1 --finish=3 -a x,y,z -w 800 -h 300 -o rot.png
+  fsl_tsplot -i mcImg.par -t '3dvolreg estimated translations (mm)' -u 1 --start=4 --finish=6 -a x,y,z -w 800 -h 300 -o trans.png
+  fsl_tsplot -i mcImg_mm.par -t '3dvolreg estimated rotations (mm)' -u 1 --start=1 --finish=3 -a x,y,z -w 800 -h 300 -o rot_mm.png
+  fsl_tsplot -i mcImg_mm.par -t '3dvolreg estimated rotations and translations (mm)' -u 1 --start=1 --finish=6 -a "x(rot),y(rot),z(rot),x(trans),y(trans),z(trans)" -w 800 -h 300 -o rot_trans.png
+  fsl_tsplot -i mcImg_abs.rms,mcImg_rel.rms -t '3dvolreg estimated mean displacement (mm)' -u 1 -w 800 -h 300 -a absolute,relative -o disp.png
+
+}
 
 # Parse Command line arguments
 while getopts "hE:A:a:l:fb:v:x:D:d:c" OPTION
@@ -258,78 +335,11 @@ if [ -e $indir/mcImg.nii.gz ]; then
     rm nonfiltered*nii.gz thr1000Img.nii.gz thr400Img
     rm 3dTqual.png
 
-
-    ########## Motion Correction ###################
-    # Going to run with AFNI's 3dvolreg over FSL's mcflirt.  Output pics will have same names to be drop-in replacments
-    echo "...Applying motion correction."
-
-    # Determine halfway point of dataset to use as a target for registration
-    halfPoint=$(fslhd $epiData | grep "^dim4" | awk '{print int($2/2)}')
-
-    # Run 3dvolreg, save matrices and parameters
-    # Saving "raw" AFNI output for possible use later (motionscrubbing?)
     clobber $indir/mcImg.nii.gz &&\
-    3dvolreg -verbose -tshift 0 -Fourier -zpad 4 -prefix mcImg.nii.gz -base $halfPoint -dfile mcImg_raw.par -1Dmatrix_save mcImg.mat $epiData
-
-    # Create a mean volume
-    clobber mcImgMean.nii.gz &&\
-    fslmaths mcImg.nii.gz -Tmean mcImgMean.nii.gz
-
-    # Save out mcImg.par (like fsl) with only the translations and rotations
-    # mcflirt appears to have a different rotation/translation order.  Reorder 3dvolreg output to match "RPI" FSL ordering
-    # AFNI ordering
-	   # roll  = rotation about the I-S axis }
-	   # pitch = rotation about the R-L axis } degrees CCW
-	   # yaw   = rotation about the A-P axis }
-	   # dS  = displacement in the Superior direction  }
-	   # dL  = displacement in the Left direction      } mm
-	   # dP  = displacement in the Posterior direction }
-
-    cat mcImg_raw.par | awk '{print ($3 " " $4 " " $2 " " $6 " " $7 " " $5)}' >> mcImg_deg.par
-
-    # Need to convert rotational parameters from degrees to radians
-    # rotRad= (rotDeg*pi)/180
-	  # pi=3.14159
-
-    cat mcImg_deg.par | awk -v pi=3.14159 '{print (($1*pi)/180) " " (($2*pi)/180) " " (($3*pi)/180) " " $4 " " $5 " " $6}' > mcImg.par
-
-    # Need to create a version where ALL (rotations and translations) measurements are in mm.  Going by Power 2012 Neuroimage paper, radius of 50mm.
-    # Convert degrees to mm, leave translations alone.
-    # rotDeg= ((2r*Pi)/360) * Degrees = Distance (mm)
-	  # d=2r=2*50=100
-	  # pi=3.14159
-
-    cat mcImg_deg.par | awk -v pi=3.14159 -v d=100 '{print (((d*pi)/360)*$1) " " (((d*pi)/360)*$2) " " (((d*pi)/360)*$3) " " $4 " " $5 " " $6}' > mcImg_mm.par
+    motionCorrection ${epiData}
 
 
-    # Cut motion parameter file into 6 distinct TR parameter files
-    for i in 1 2 3 4 5 6; do
-	     cat mcImg.par | awk -v var=${i} '{print $var}' > mc${i}.par
-    done
 
-    # Need to create the absolute and relative displacement RMS measurement files
-    # From the FSL mailing list (https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=FSL;2ce58db1.1202):
-	  # rms = sqrt(0.2*R^2*((cos(theta_x)-1)^2+(sin(theta_x))^2 + (cos(theta_y)-1)^2 + (sin(theta_y))^2 + (cos(theta_z)-1)^2 + (sin(theta_z)^2)) + transx^2+transy^2+transz^2)
-	  # where R=radius of spherical ROI = 80mm used in rmsdiff; theta_x, theta_y, theta_z are the three rotation angles from the .par file; and transx, transy, transz are the three translations from the .par file.
-
-    # Absolute Displacement
-    cat mcImg.par | awk '{print (sqrt(0.2*80^2*((cos($1)-1)^2+(sin($1))^2 + (cos($2)-1)^2 + (sin($2))^2 + (cos($3)-1)^2 + (sin($3)^2)) + $4^2+$5^2+$6^2))}' >> mcImg_abs.rms
-
-    # Relative Displacement
-    # Create the relative displacement .par file from the input using AFNI's 1d_tool.py to first calculate the derivatives
-    1d_tool.py -infile mcImg.par -set_nruns 1 -derivative -write mcImg_deriv.par
-    cat mcImg_deriv.par | awk '{print (sqrt(0.2*80^2*((cos($1)-1)^2+(sin($1))^2 + (cos($2)-1)^2 + (sin($2))^2 + (cos($3)-1)^2 + (sin($3)^2)) + $4^2+$5^2+$6^2))}' >> mcImg_rel.rms
-
-
-    # Create images of the motion correction (translation, rotations, displacement), mm and radians
-    # switched from "MCFLIRT estimated...." title
-    fsl_tsplot -i mcImg.par -t '3dvolreg estimated rotations (radians)' -u 1 --start=1 --finish=3 -a x,y,z -w 800 -h 300 -o rot.png
-    fsl_tsplot -i mcImg.par -t '3dvolreg estimated translations (mm)' -u 1 --start=4 --finish=6 -a x,y,z -w 800 -h 300 -o trans.png
-    fsl_tsplot -i mcImg_mm.par -t '3dvolreg estimated rotations (mm)' -u 1 --start=1 --finish=3 -a x,y,z -w 800 -h 300 -o rot_mm.png
-    fsl_tsplot -i mcImg_mm.par -t '3dvolreg estimated rotations and translations (mm)' -u 1 --start=1 --finish=6 -a "x(rot),y(rot),z(rot),x(trans),y(trans),z(trans)" -w 800 -h 300 -o rot_trans.png
-    fsl_tsplot -i mcImg_abs.rms,mcImg_rel.rms -t '3dvolreg estimated mean displacement (mm)' -u 1 -w 800 -h 300 -a absolute,relative -o disp.png
-
-    ################################################################
 
 
 
@@ -849,75 +859,10 @@ else    ##### CASE 2: IF NOT Clobbering #####
 
   cd $indir
 
-  ########## Motion Correction ###################
-  # Going to run with AFNI's 3dvolreg over FSL's mcflirt.  Output pics will have same names to be drop-in replacments
-  echo "...Applying motion correction."
-
-  # Determine halfway point of dataset to use as a target for registration
-  halfPoint=$(fslhd $epiData | grep "^dim4" | awk '{print int($2/2)}')
-
-  # Run 3dvolreg, save matrices and parameters
-  # Saving "raw" AFNI output for possible use later (motionscrubbing?)
-  3dvolreg -verbose -tshift 0 -Fourier -zpad 4 -prefix mcImg.nii.gz -base $halfPoint -dfile mcImg_raw.par -1Dmatrix_save mcImg.mat $epiData
-
-  # Create a mean volume
-  fslmaths mcImg.nii.gz -Tmean mcImgMean.nii.gz
-
-  # Save out mcImg.par (like fsl) with only the translations and rotations
-  # mcflirt appears to have a different rotation/translation order.  Reorder 3dvolreg output to match "RPI" FSL ordering
-  # AFNI ordering
-      # roll  = rotation about the I-S axis }
-      # pitch = rotation about the R-L axis } degrees CCW
-      # yaw   = rotation about the A-P axis }
-      # dS  = displacement in the Superior direction  }
-      # dL  = displacement in the Left direction      } mm
-      # dP  = displacement in the Posterior direction }
-
-  cat mcImg_raw.par | awk '{print ($3 " " $4 " " $2 " " $6 " " $7 " " $5)}' >> mcImg_deg.par
-
-  # Need to convert rotational parameters from degrees to radians
-  # rotRad= (rotDeg*pi)/180
-  # pi=3.14159
-
-  cat mcImg_deg.par | awk -v pi=3.14159 '{print (($1*pi)/180) " " (($2*pi)/180) " " (($3*pi)/180) " " $4 " " $5 " " $6}' > mcImg.par
-
-  # Need to create a version where ALL (rotations and translations) measurements are in mm.  Going by Power 2012 Neuroimage paper, radius of 50mm.
-  # Convert degrees to mm, leave translations alone.
-  # rotDeg= ((2r*Pi)/360) * Degrees = Distance (mm)
-  # d=2r=2*50=100
-  # pi=3.14159
-
-  cat mcImg_deg.par | awk -v pi=3.14159 -v d=100 '{print (((d*pi)/360)*$1) " " (((d*pi)/360)*$2) " " (((d*pi)/360)*$3) " " $4 " " $5 " " $6}' > mcImg_mm.par
-
-  # Cut motion parameter file into 6 distinct TR parameter files
-  for i in 1 2 3 4 5 6
-  do
-      cat mcImg.par | awk -v var=${i} '{print $var}' > mc${i}.par
-  done
-
-  # Need to create the absolute and relative displacement RMS measurement files
-  # From the FSL mailing list (https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=FSL;2ce58db1.1202):
-  # rms = sqrt(0.2*R^2*((cos(theta_x)-1)^2+(sin(theta_x))^2 + (cos(theta_y)-1)^2 + (sin(theta_y))^2 + (cos(theta_z)-1)^2 + (sin(theta_z)^2)) + transx^2+transy^2+transz^2)
-  # where R=radius of spherical ROI = 80mm used in rmsdiff; theta_x, theta_y, theta_z are the three rotation angles from the .par file; and transx, transy, transz are the three translations from the .par file.
-
-  # Absolute Displacement
-  cat mcImg.par | awk '{print (sqrt(0.2*80^2*((cos($1)-1)^2+(sin($1))^2 + (cos($2)-1)^2 + (sin($2))^2 + (cos($3)-1)^2 + (sin($3)^2)) + $4^2+$5^2+$6^2))}' >> mcImg_abs.rms
-
-  # Relative Displacement
-  # Create the relative displacement .par file from the input using AFNI's 1d_tool.py to first calculate the derivatives
-  1d_tool.py -infile mcImg.par -set_nruns 1 -derivative -write mcImg_deriv.par
-  cat mcImg_deriv.par | awk '{print (sqrt(0.2*80^2*((cos($1)-1)^2+(sin($1))^2 + (cos($2)-1)^2 + (sin($2))^2 + (cos($3)-1)^2 + (sin($3)^2)) + $4^2+$5^2+$6^2))}' >> mcImg_rel.rms
+  clobber $indir/mcImg.nii.gz &&\
+  motionCorrection ${epiData}
 
 
-  # Create images of the motion correction (translation, rotations, displacement), mm and radians
-  # switched from "MCFLIRT estimated...." title
-  fsl_tsplot -i mcImg.par -t '3dvolreg estimated rotations (radians)' -u 1 --start=1 --finish=3 -a x,y,z -w 800 -h 300 -o rot.png
-  fsl_tsplot -i mcImg.par -t '3dvolreg estimated translations (mm)' -u 1 --start=4 --finish=6 -a x,y,z -w 800 -h 300 -o trans.png
-  fsl_tsplot -i mcImg_mm.par -t '3dvolreg estimated rotations (mm)' -u 1 --start=1 --finish=3 -a x,y,z -w 800 -h 300 -o rot_mm.png
-  fsl_tsplot -i mcImg_mm.par -t '3dvolreg estimated rotations and translations (mm)' -u 1 --start=1 --finish=6 -a "x(rot),y(rot),z(rot),x(trans),y(trans),z(trans)" -w 800 -h 300 -o rot_trans.png
-  fsl_tsplot -i mcImg_abs.rms,mcImg_rel.rms -t '3dvolreg estimated mean displacement (mm)' -u 1 -w 800 -h 300 -a absolute,relative -o disp.png
-
-  ################################################################
 
 
 
@@ -1055,28 +1000,36 @@ else    ##### CASE 2: IF NOT Clobbering #####
     # Warp using FieldMap correction
     # Output will be a (warp) .nii.gz file
 
+    clobber $epiWarpDir/EPItoT1.nii.gz &&\
     epi_reg --epi=${indir}/mcImgMean.nii.gz --t1=${t1SkullData} --t1brain=${t1Data}  --out=$epiWarpDir/EPItoT1 --fmap=${fieldMap} --fmapmag=${fieldMapMagSkull} --fmapmagbrain=${fieldMapMag} --echospacing=${dwellTime} --pedir=${peDir} --noclean -v
 
     # Invert the affine registration (to get T1toEPI)
+    clobber $epiWarpDir/T1toEPI.mat &&\
     convert_xfm -omat $epiWarpDir/T1toEPI.mat -inverse $epiWarpDir/EPItoT1.mat
 
     # Invert the nonlinear warp (to get T1toEPI)
+    clobber $epiWarpDir/T1toEPI_warp.nii.gz &&\
     invwarp -w $epiWarpDir/EPItoT1_warp.nii.gz -r ${indir}/mcImgMean.nii.gz -o $epiWarpDir/T1toEPI_warp.nii.gz
 
     # Apply the inverted (T1toEPI) warp to the brain mask
+    clobber ${indir}/mcImgMean_mask.nii.gz &&\
     applywarp --ref=${indir}/mcImgMean.nii.gz --in=${T1mask} --out=${indir}/mcImgMean_mask.nii.gz --warp=${epiWarpDir}/T1toEPI_warp.nii.gz --datatype=char --interp=nn
 
     # Create a stripped version of the EPI (mcImg) file, apply the warp
+    clobber $epiWarpDir/EPIstrippedtoT1.nii.gz &&\
     fslmaths ${indir}/mcImgMean.nii.gz -mas ${indir}/mcImgMean_mask.nii.gz ${indir}/mcImgMean_stripped.nii.gz
     applywarp --ref=${t1Data} --in=${indir}/mcImgMean_stripped.nii.gz --out=$epiWarpDir/EPIstrippedtoT1.nii.gz --warp=$epiWarpDir/EPItoT1_warp.nii.gz
 
     # Sum the nonlinear warp (MNItoT1_warp.nii.gz) with the second nonlinear warp (T1toEPI_warp.nii.gz) to get a warp from MNI to EPI
+    clobber ${epiWarpDir}/MNItoEPI_warp.nii.gz &&\
     convertwarp --ref=${indir}/mcImgMean.nii.gz --warp1=${t1WarpDir}/MNItoT1_warp.nii.gz --warp2=${epiWarpDir}/T1toEPI_warp.nii.gz --out=${epiWarpDir}/MNItoEPI_warp.nii.gz --relout
 
     # Invert the warp to get EPItoMNI_warp.nii.gz
+    clobber ${epiWarpDir}/EPItoMNI_warp.nii.gz &&\
     invwarp -w ${epiWarpDir}/MNItoEPI_warp.nii.gz -r $fslDir/data/standard/MNI152_T1_2mm.nii.gz -o ${epiWarpDir}/EPItoMNI_warp.nii.gz
 
     # Apply EPItoMNI warp to EPI file
+    clobber $epiWarpDir/EPItoMNI.nii.gz &&\
     applywarp --ref=$fslDir/data/standard/MNI152_T1_2mm.nii.gz --in=${indir}/mcImgMean_stripped.nii.gz --out=$epiWarpDir/EPItoMNI.nii.gz --warp=${epiWarpDir}/EPItoMNI_warp.nii.gz
 
     # Echo out warp files, wmedge to log
@@ -1091,6 +1044,10 @@ else    ##### CASE 2: IF NOT Clobbering #####
 
   else
     echo "......Registration Without FieldMap Correction."  ##### WITHOUT Field Map ########
+
+    epiWarpDir=${indir}/EPItoT1optimized_nofmap
+    cp $t1Dir/T1_MNI_brain_wmseg.nii.gz ${epiWarpDir}/EPItoT1_wmseg.nii.gz
+
     # Warp without FieldMap correction
     # Ouput will be a .mat file
 
