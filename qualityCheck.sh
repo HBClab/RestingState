@@ -323,6 +323,10 @@ function EPItoT1reg() {
     mkdir -p ${epiWarpDir}
   fi
 
+  mv $indir/FM_UD* ${epiWarpDir}
+  mv $indir/fmap* ${epiWarpDir}
+  mv $indir/grot.nii.gz ${epiWarpDir}
+
   cp $t1Dir/T1_MNI_brain_wmseg.nii.gz ${epiWarpDir}/EPItoT1_wmseg.nii.gz
   # epi_reg will not link to this file well, have epi_reg create it from T1_brain
 
@@ -347,9 +351,9 @@ function EPItoT1reg() {
       --t1=${t1SkullData} \
       --t1brain=${t1Data} \
       --out=$epiWarpDir/EPItoT1 \
-      --fmap=${fieldMap} \
-      --fmapmag=${fieldMapMagSkull} \
-      --fmapmagbrain=${fieldMapMag} \
+      --fmap=FM_UD_fmap_mag \
+      --fmapmag=FM_UD_fmap_mag \
+      --fmapmagbrain=FM_UD_fmap_mag_brain \
       --echospacing=${dwellTime} \
       --pedir=${peDir} --noclean -v
     else
@@ -376,9 +380,7 @@ function EPItoT1reg() {
       if [ $peDir = "y-" ] ; then fdir="y-"; fi
       if [ $peDir = "z-" ] ; then fdir="z-"; fi
 
-      mv $indir/FM_UD* ${epiWarpDir}
-      mv $indir/fmap* ${epiWarpDir}
-      mv $indir/grot.nii.gz ${epiWarpDir}
+
       cd ${epiWarpDir}
 
       # epi_reg L284-L300
@@ -722,6 +724,40 @@ echo "epiMC=$indir/mcImg_stripped.nii.gz" >> $indir/rsParams
 
 ################################################################
 
+################CompCor Regressors##############################
+echo "...Creating tissue-based masks for CompCor regression."
+
+# Create tissue masks from eroded partial volume estimates (pve)
+# The WM pve mask was restricted using a 99% probability threshold and eroded at the 2-voxel level (8 mm)
+# The CSF pve mask was restricted using a 90% probability threshold.
+
+if [ "${fieldMapFlag}" == "1" ]; then
+	clobber $preprocDir/rois/WM_FAST_ts.txt &&\
+	applywarp --in=$segDir/T1_pve_2.nii.gz --out=$snrDir/WM_pve_to_RS.nii.gz --ref=${indir}/mcImgMean.nii.gz --warp=${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn &&\
+	fslmaths $snrDir/WM_pve_to_RS.nii.gz -thr .99 -bin -kernel box 8 -ero $snrDir/WM_pve_to_RS_thresh_ero.nii.gz
+
+	clobber $preprocDir/rois/GM_FAST_ts.txt &&\
+	applywarp --in=$segDir/T1_pve_1.nii.gz --out=$snrDir/GM_pve_to_RS.nii.gz --ref=${indir}/mcImgMean.nii.gz --warp=${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn &&\
+	fslmaths $snrDir/GM_pve_to_RS.nii.gz -thr .90 -bin $snrDir/GM_pve_to_RS_thresh.nii.gz -odt char
+
+	clobber $preprocDir/rois/CSF_FAST_ts.txt &&\
+	applywarp --in=$segDir/T1_pve_0.nii.gz --out=$snrDir/CSF_pve_to_RS.nii.gz --ref=${indir}/mcImgMean.nii.gz --warp=${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn &&\
+	fslmaths $snrDir/CSF_pve_to_RS.nii.gz -thr .99 -bin $snrDir/CSF_pve_to_RS_thresh.nii.gz
+else
+	clobber $preprocDir/rois/WM_FAST_ts.txt &&\
+	flirt -in $segDir/T1_pve_2.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/WM_pve_to_RS.nii.gz -interp nearestneighbour &&\
+	fslmaths $snrDir/WM_pve_to_RS.nii.gz -thr .99 -bin -kernel box 8 -ero $snrDir/WM_pve_to_RS_thresh_ero.nii.gz
+
+	clobber $preprocDir/rois/GM_FAST_ts.txt &&\
+	flirt -in $segDir/T1_pve_1.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/GM_pve_to_RS.nii.gz -interp nearestneighbour &&\
+	fslmaths $snrDir/GM_pve_to_RS.nii.gz -thr .90 -bin $snrDir/GM_pve_to_RS_thresh.nii.gz -odt char
+
+	clobber $preprocDir/rois/CSF_FAST_ts.txt &&\
+	flirt -in $segDir/T1_pve_0.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/CSF_pve_to_RS.nii.gz -interp nearestneighbour &&\
+	fslmaths $snrDir/CSF_pve_to_RS.nii.gz -thr .99 -bin $snrDir/CSF_pve_to_RS_thresh.nii.gz
+fi
+################################################################
+
 
 
 ########## SNR Estimation ######################
@@ -803,6 +839,7 @@ fi
 fslmaths $snrDir/RestingState_GMsmooth.nii.gz -add $snrDir/RestingState_GM.nii.gz -bin $snrDir/RestingState_GMfinal.nii.gz -odt char
 
 # Strip out GM from EPI
+clobber $snrDir/RestingState_GM4d.nii.gz &&\
 fslmaths $indir/mcImg.nii.gz -mul $snrDir/RestingState_GMfinal.nii.gz $snrDir/RestingState_GM4d.nii.gz
 
 
