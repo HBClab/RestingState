@@ -21,7 +21,7 @@ fsf2=${analysis2}.fsf
 ##Check of all ROIs (from ROIs directory), that can be used for nuisance regression
 scriptPath=$(perl -e 'use Cwd "abs_path";print abs_path(shift)' "$0")
 scriptDir=$(dirname "$scriptPath")
-knownNuisanceRois=$(echo "$scriptDir"/ROIs/*nii* | awk -F"/" '{print $NF}' | awk -F"." '{print $1}')
+knownNuisanceRois=$(find "$scriptPath" -name "*.nii.gz" -exec basename {} .nii.gz \;)
 
 SGE_ROOT='';export SGE_ROOT
 
