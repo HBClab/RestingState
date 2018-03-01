@@ -292,24 +292,24 @@ ${FSLDIR}/bin/fslmaths FM_UD_fmap -sub $medianValue -mas FM_UD_fmap_mag_brain_ma
 # create report picture of fmap overlaid onto whole-head mag image
 fmapmin=$(${FSLDIR}/bin/fslstats FM_UD_fmap -R | awk '{ print $1 }')
 ${FSLDIR}/bin/fslmaths FM_UD_fmap -sub $fmapmin -add 10 -mas FM_UD_fmap_mag_brain_mask grot
-fmapminmax=${FSLDIR}/bin/fslstats grot -l 1 -p 0.1 -p 95
+fmapminmax=$(${FSLDIR}/bin/fslstats grot -l 1 -p 0.1 -p 95)
 ${FSLDIR}/bin/overlay 0 0 FM_UD_fmap_mag -a grot $fmapminmax fmap+mag
 
 createSmallSliceReport fmap+mag $2 $1 "<p>Brain-masked B0 fieldmap in colour, overlaid on top of fieldmap magnitude image<br>
 <a href=\"reg/unwarp/fmap+mag.png\"><IMG BORDER=0 SRC=\"reg/unwarp/fmap+mag.png\" WIDTH=1200></a>"
 
 # get a sigloss estimate and make a siglossed mag for forward warp
-epi_te=`awk "BEGIN {print $echoTime / 1000.0}"`
-${FSLDIR}/bin/sigloss -i FM_UD_fmap --te=$epi_te -m FM_UD_fmap_mag_brain_mask -s FM_UD_fmap_sigloss
-siglossthresh=`awk "BEGIN {print 1.0 - ( $signalLossThreshold / 100.0 )}"`
+# TODO: assumes TE=30 now
+${FSLDIR}/bin/sigloss -i FM_UD_fmap --te=30 -m FM_UD_fmap_mag_brain_mask -s FM_UD_fmap_sigloss
+siglossthresh=`awk "BEGIN {print 1.0 - ( 10 / 100.0 )}"`
 ${FSLDIR}/bin/fslmaths FM_UD_fmap_sigloss -mul FM_UD_fmap_mag_brain FM_UD_fmap_mag_brain_siglossed -odt float
 
 
 ${FSLDIR}/bin/fslmaths FM_UD_fmap_sigloss -thr $siglossthresh FM_UD_fmap_sigloss -odt float
 ${FSLDIR}/bin/overlay 1 0 FM_UD_fmap_mag_brain -a FM_UD_fmap_sigloss 0 1 FM_UD_sigloss+mag
 
-createSmallSliceReport FM_UD_sigloss+mag $2 $1  "<p>Thresholded signal loss weighting image<br>
-<a href=\"reg/unwarp/FM_UD_sigloss+mag.png\"><IMG BORDER=0 SRC=\"reg/unwarp/FM_UD_sigloss+mag.png\" WIDTH=1200></a>"
+${FSLDIR}/bin/slicer FM_UD_sigloss+mag  -s 3 -x 0.35 sla.png -x 0.45 slb.png -x 0.55 slc.png -x 0.65 sld.png -y 0.35 sle.png -y 0.45 slf.png -y 0.55 slg.png -y 0.65 slh.png -z 0.35 sli.png -z 0.45 slj.png -z 0.55 slk.png -z 0.65 sll.png ; ${FSLDIR}/bin/pngappend sla.png + slb.png + slc.png + sld.png + sle.png + slf.png + slg.png + slh.png + sli.png + slj.png + slk.png + sll.png FM_UD_sigloss+mag.png; rm sl?.png
+
 }
 
 
