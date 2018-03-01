@@ -18,7 +18,7 @@ get_opt1() {
 
 get_imarg1() {
     arg=`get_arg1 $1`;
-    arg=`$FSLDIR/bin/remove_ext $arg`;
+    arg=`$fslDir/bin/remove_ext $arg`;
     echo $arg
 }
 
@@ -389,7 +389,7 @@ function EPItoT1reg() {
       if [ $peDir = "z-" ] ; then fdir="z-"; fi
 
 
-      cd ${epiWarpDir}
+      cd ${epiWarpDir} || exit
 
       # epi_reg L284-L300
       # register fmap to structural image
@@ -698,6 +698,7 @@ fi
 
 #Setting variable for FSL base directory
 fslDir=$FSLDIR
+export fslDir
 
 
 indir=$logDir
@@ -792,7 +793,7 @@ echo "...SNR mask creation."
 # Calculate a few dimensions
 xdim=$(fslhd $indir/mcImg.nii.gz | grep ^dim1 | awk '{print $2}')
 ydim=$(fslhd $indir/mcImg.nii.gz | grep ^dim2 | awk '{print $2}')
-zdim=$(fslhd $indir/mcImg.nii.gz | grep ^dim3 | awk '{print $2}')
+# zdim=$(fslhd $indir/mcImg.nii.gz | grep ^dim3 | awk '{print $2}')
 tdim=$(fslhd $indir/mcImg.nii.gz | grep ^dim4 | awk '{print $2}')
 xydimTenth=$(echo $xdim 0.06 | awk '{print int($1*$2)}')
 ydimMaskAnt=$(echo $ydim 0.93 | awk '{print int($1*$2)}')
@@ -1047,7 +1048,7 @@ rm tmpPlot
 
 spikeCount=$(cat ${indir}/evspikes.txt | awk '/1/{n++}; END {print n+0}')
 
-cd ${indir}
+cd ${indir} || exit
 
 ################################################################
 
