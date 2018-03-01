@@ -10,30 +10,37 @@
 #       b. EPI to T1 (BBR or 6DOF), with/without FieldMap correction
 ##################################################################################################################
 
-scriptPath=$(perl -e 'use Cwd "abs_path";print abs_path(shift)' $0)
-scriptDir=$(dirname $scriptPath)
-spikeThreshInt=300
-spikeThresh=$(echo $spikeThreshInt 100 | awk '{print ($1/$2)}')
+########## FSL's arg parsing functions ###################
+get_opt1() {
+    arg=`echo $1 | sed 's/=.*//'`
+    echo $arg
+}
+
+get_imarg1() {
+    arg=`get_arg1 $1`;
+    arg=`$FSLDIR/bin/remove_ext $arg`;
+    echo $arg
+}
 
 
-function printCommandLine {
-  echo "Usage: qualityCheck.sh -E restingStateImage -a T1Image -A T1SkullImage -l lesionMask -f -b fieldMapPrepped -v fieldMapMagSkull -x fieldMapMag -D 0.00056 -d PhaseEncDir -c"
+function Usage {
+  echo "Usage: qualityCheck.sh --epi=restingStateImage --t1=T1withSkull --t1brain=T1brain --lesionmask=lesionMask --regmode=6dof --fmap=fieldMapPrepped --fmapmag=fieldMapMagSkull --fmapmagbrain=fieldMapMagbrain --dwelltime=0.00056 --pedir=PhaseEncDir -c"
   echo ""
   echo "   where:"
-  echo "   -E Resting State file"
-  echo "   -A T1 file"
-  echo "   -a T1 (with skull) file"
+  echo "   --epi Resting State file"
+  echo "   --t1brain T1 file"
+  echo "   -t1 T1 (with skull) file"
   echo "     *Both EPI and T1 (with and without skull) should be from output of dataPrep script"
-  echo "   -l Binary lesion mask"
-  echo "   -r registration mode (BBR or 6DOF)"
-  echo "   -f (fieldMap registration correction)"
-  echo "   -b fieldMapPrepped (B0 correction image from dataPrep/fsl_prepare_fieldmap)"
-  echo "   -v fieldMapMagSkull (FieldMap Magnitude image, with skull (from dataPrep))"
-  echo "   -x fieldMapMag (FieldMap Magnitude image, skull-stripped (from dataPrep))"
-  echo "   -D dwell time (in seconds)"
+  echo "   --lesionmask Binary lesion mask"
+  echo "   --regmode registration mode (BBR or 6DOF)"
+  echo "   --fmap fieldMapPrepped (B0 correction image from dataPrep/fsl_prepare_fieldmap)"
+  echo "   --fmapmag fieldMapMagSkull (FieldMap Magnitude image, with skull (from dataPrep))"
+  echo "   --fmapmagbrain fieldMapMag (FieldMap Magnitude image, skull-stripped (from dataPrep))"
+  echo "   --dwell dwell time (in seconds)"
   echo "       *dwell time is from the EPI but is only set if FieldMap correction ('-f') is chosen."
+  echo "       *dwell time is the echoSpacing corrected by Acceleration Factor."
   echo "       *If not set and FieldMap correction is flagged ('-f'), default is 0.00056"
-  echo "   -d Phase Encoding Direction (from dataPrep)"
+  echo "   --pedir Phase Encoding Direction (from dataPrep)"
   echo "       *Options are x/y/z/-x/-y/-z"
   echo "   -c clobber/overwrite previous results"
   exit 1
@@ -251,7 +258,8 @@ cp $segDir/T1_seg_2.nii.gz $t1Dir/T1_MNI_brain_wmseg.nii.gz
 
 }
 
-
+########## Preprocess Fieldmaps ###########
+# function modified from $(which mainfeatreg) beginning at L102
 preprocessFieldmaps() { # $1 fmap $2 mag_brain $3 mag
 echo "......Preprocessing fieldmaps."
 
@@ -522,6 +530,57 @@ function EPItoT1reg() {
 ## MAIN ##
 ##########
 
+# Parse them baby
+
+if [ $# -lt 4 ] ; then Usage; exit 0; fi
+while [ $# -ge 1 ] ; do
+    iarg=`get_opt1 $1`;
+    case "$iarg"
+	in
+	--epi)
+	    epiData=`get_imarg1 $1`;
+	    shift;;
+	--t1)
+	    t1SkullData=`get_imarg1 $1`;
+	    shift;;
+  --t1brain)
+	    t1Data=`get_imarg1 $1`;
+	    shift;;
+	--fmap)
+	    fieldMap=`get_imarg1 $1`;
+	    fieldMapFlag=1;
+	    shift;;
+	--fmapmag)
+	    fieldMapMagSkull=`get_imarg1 $1`;
+	    shift;;
+	--fmapmagbrain)
+	    fieldMapMag=`get_imarg1 $1`;
+	    shift;;
+  --dwelltime)
+      dwellTime=`get_arg1 $1`;
+      shift;;
+  --pedir)
+      peDir=`get_arg1 $1`;
+      shift;;
+  --regMode)
+      regMode=`get_imarg1 $1`;
+      echo Registration mode = $regMode;
+      shift;;
+  --lesionmask)
+    export lesionMask=`get_imgarg1 $1`;
+    export lesionMaskFlag=1;
+    shift;;
+  -h)
+      Usage;
+      exit 0;;
+  *)
+      echo "Unrecognised option $1" 1>&2
+      Usage
+      exit 1
+
+    esac
+  done
+
 # Parse Command line arguments
 while getopts "hE:A:a:l:r:fb:v:x:D:d:c" OPTION
 do
@@ -574,6 +633,10 @@ do
 done
 
 
+scriptPath=$(perl -e 'use Cwd "abs_path";print abs_path(shift)' $0)
+scriptDir=$(dirname $scriptPath)
+spikeThreshInt=300
+spikeThresh=$(echo $spikeThreshInt 100 | awk '{print ($1/$2)}')
 
 
 # First check for proper input files
