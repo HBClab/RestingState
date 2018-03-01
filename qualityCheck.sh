@@ -618,6 +618,8 @@ fi
 
 # Echo out all input parameters into a log
 logDir=$(dirname $epiData)
+export logDir
+
 echo "$scriptPath" >> $logDir/rsParams_log
 echo "------------------------------------" >> $logDir/rsParams_log
 echo "-E $epiData" >> $logDir/rsParams_log
