@@ -327,7 +327,7 @@ function EPItoT1reg() {
   # epi_reg will not link to this file well, have epi_reg create it from T1_brain
 
   # Source the T1 brain mask (to warp and apply to the EPI image)
-  T1mask=$(cat $logDir/rsParams | grep "t1Mask=" | tail -1 | awk -F"=" '{print $2}')
+  T1mask=$t1Dir/brainMask.nii.gz
 
   # Check for use of a FieldMap correction
 
@@ -558,12 +558,12 @@ if [ "$epiData" == "" ]; then
 fi
 
 if [ "$t1Data" == "" ]; then
-  echo "Error: The T1 data (-a) is a required option"
+  echo "Error: The T1 data (-A) is a required option"
   exit 1
 fi
 
 if [ "$t1SkullData" == "" ]; then
-  echo "Error: The T1 (with skull) data (-A) is a required option"
+  echo "Error: The T1 (with skull) data (-a) is a required option"
   exit 1
 fi
 
@@ -661,13 +661,12 @@ echo "Running $0 ..."
 clobber $indir/mcImg.nii.gz &&\
 motionCorrection ${epiData}
 
-
-
-
 t1Dir=$(dirname $t1Data)
 export t1Dir
 t1WarpDir=$t1Dir/T1forWarp
 export t1WarpDir
+
+fslmaths $t1Data -bin $t1Dir/brainMask.nii.gz -odt char
 
 clobber ${t1WarpDir}/MNItoT1_warp.nii.gz &&\
 T1toMNIreg
