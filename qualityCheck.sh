@@ -12,16 +12,29 @@
 
 ########## FSL's arg parsing functions ###################
 get_opt1() {
-    arg=`echo $1 | sed 's/=.*//'`
+    arg=$(echo $1 | sed 's/=.*//')
     echo $arg
 }
 
 get_imarg1() {
-    arg=`get_arg1 $1`;
-    arg=`$fslDir/bin/remove_ext $arg`;
+    arg=$(get_arg1 $1);
+    arg=$($fslDir/bin/remove_ext $arg);
     echo $arg
 }
 
+get_arg1() {
+    if [ X`echo $1 | grep '='` = X ] ; then
+	echo "Option $1 requires an argument" 1>&2
+	exit 1
+    else
+	arg=`echo $1 | sed 's/.*=//'`
+	if [ X$arg = X ] ; then
+	    echo "Option $1 requires an argument" 1>&2
+	    exit 1
+	fi
+	echo $arg
+    fi
+}
 
 function Usage {
   echo "Usage: qualityCheck.sh --epi=restingStateImage --t1=T1withSkull --t1brain=T1brain --lesionmask=lesionMask --regmode=6dof --fmap=fieldMapPrepped --fmapmag=fieldMapMagSkull --fmapmagbrain=fieldMapMagbrain --dwelltime=0.00056 --pedir=PhaseEncDir -c"
@@ -264,59 +277,59 @@ preprocessFieldmaps() { # $1 fmap $2 mag_brain $3 mag
 echo "......Preprocessing fieldmaps."
 
 cd "$(dirname $1)" || exit
-${FSLDIR}/bin/fslmaths $1 FM_UD_fmap
-${FSLDIR}/bin/fslmaths $2 FM_UD_fmap_mag_brain
-${FSLDIR}/bin/fslmaths $3 FM_UD_fmap_mag
+${fslDir}/bin/fslmaths $1 FM_UD_fmap
+${fslDir}/bin/fslmaths $2 FM_UD_fmap_mag_brain
+${fslDir}/bin/fslmaths $3 FM_UD_fmap_mag
 
 # generate mask for fmap_mag (accounting for the fact that either mag or phase might have been masked in some pre-processing before being enter to FEAT)
-${FSLDIR}/bin/fslmaths FM_UD_fmap_mag_brain -bin FM_UD_fmap_mag_brain_mask -odt short
+${fslDir}/bin/fslmaths FM_UD_fmap_mag_brain -bin FM_UD_fmap_mag_brain_mask -odt short
 # remask by the non-zero voxel mask of the fmap_rads image (as prelude may have masked this differently before)
 # NB: need to use cluster to fill in holes where fmap=0
-${FSLDIR}/bin/fslmaths FM_UD_fmap -abs -bin -mas FM_UD_fmap_mag_brain_mask -mul -1 -add 1 -bin FM_UD_fmap_mag_brain_mask_inv
-${FSLDIR}/bin/cluster -i FM_UD_fmap_mag_brain_mask_inv -t 0.5 --no_table -o FM_UD_fmap_mag_brain_mask_idx
-maxidx=$(${FSLDIR}/bin/fslstats FM_UD_fmap_mag_brain_mask_idx -R | awk '{ print $2 }')
-${FSLDIR}/bin/fslmaths FM_UD_fmap_mag_brain_mask_idx -thr $maxidx -bin -mul -1 -add 1 -bin -mas FM_UD_fmap_mag_brain_mask FM_UD_fmap_mag_brain_mask
+${fslDir}/bin/fslmaths FM_UD_fmap -abs -bin -mas FM_UD_fmap_mag_brain_mask -mul -1 -add 1 -bin FM_UD_fmap_mag_brain_mask_inv
+${fslDir}/bin/cluster -i FM_UD_fmap_mag_brain_mask_inv -t 0.5 --no_table -o FM_UD_fmap_mag_brain_mask_idx
+maxidx=$(${fslDir}/bin/fslstats FM_UD_fmap_mag_brain_mask_idx -R | awk '{ print $2 }')
+${fslDir}/bin/fslmaths FM_UD_fmap_mag_brain_mask_idx -thr $maxidx -bin -mul -1 -add 1 -bin -mas FM_UD_fmap_mag_brain_mask FM_UD_fmap_mag_brain_mask
 
 # refine mask (remove edge voxels where signal is poor)
-meanValue=$(${FSLDIR}/bin/fslstats FM_UD_fmap -k FM_UD_fmap_mag_brain_mask -P 50)
-${FSLDIR}/bin/fslmaths FM_UD_fmap -sub $meanValue -mas FM_UD_fmap_mag_brain_mask FM_UD_fmap
-thresh50=$(${FSLDIR}/bin/fslstats FM_UD_fmap_mag_brain -P 98)
+meanValue=$(${fslDir}/bin/fslstats FM_UD_fmap -k FM_UD_fmap_mag_brain_mask -P 50)
+${fslDir}/bin/fslmaths FM_UD_fmap -sub $meanValue -mas FM_UD_fmap_mag_brain_mask FM_UD_fmap
+thresh50=$(${fslDir}/bin/fslstats FM_UD_fmap_mag_brain -P 98)
 
-thresh50=`awk "BEGIN {print $thresh50 / 2.0}"`
-${FSLDIR}/bin/fslmaths FM_UD_fmap_mag_brain -thr $thresh50 -bin FM_UD_fmap_mag_brain_mask50
-${FSLDIR}/bin/fslmaths FM_UD_fmap_mag_brain_mask -ero FM_UD_fmap_mag_brain_mask_ero
-${FSLDIR}/bin/fslmaths FM_UD_fmap_mag_brain_mask_ero -add FM_UD_fmap_mag_brain_mask50 -thr 0.5 -bin FM_UD_fmap_mag_brain_mask
-${FSLDIR}/bin/fslmaths FM_UD_fmap -mas FM_UD_fmap_mag_brain_mask FM_UD_fmap
-${FSLDIR}/bin/fslmaths FM_UD_fmap_mag_brain -mas FM_UD_fmap_mag_brain_mask FM_UD_fmap_mag_brain
+thresh50=$(awk "BEGIN {print $thresh50 / 2.0}")
+${fslDir}/bin/fslmaths FM_UD_fmap_mag_brain -thr $thresh50 -bin FM_UD_fmap_mag_brain_mask50
+${fslDir}/bin/fslmaths FM_UD_fmap_mag_brain_mask -ero FM_UD_fmap_mag_brain_mask_ero
+${fslDir}/bin/fslmaths FM_UD_fmap_mag_brain_mask_ero -add FM_UD_fmap_mag_brain_mask50 -thr 0.5 -bin FM_UD_fmap_mag_brain_mask
+${fslDir}/bin/fslmaths FM_UD_fmap -mas FM_UD_fmap_mag_brain_mask FM_UD_fmap
+${fslDir}/bin/fslmaths FM_UD_fmap_mag_brain -mas FM_UD_fmap_mag_brain_mask FM_UD_fmap_mag_brain
 # run despiking filter just on the edge voxels
-${FSLDIR}/bin/fslmaths FM_UD_fmap_mag_brain_mask -ero FM_UD_fmap_mag_brain_mask_ero
-$FSLDIR/bin/fugue --loadfmap=FM_UD_fmap --savefmap=FM_UD_fmap_tmp_fmapfilt --mask=FM_UD_fmap_mag_brain_mask --despike --despikethreshold=2.1
-$FSLDIR/bin/fslmaths FM_UD_fmap -sub FM_UD_fmap_tmp_fmapfilt -mas FM_UD_fmap_mag_brain_mask_ero -add FM_UD_fmap_tmp_fmapfilt FM_UD_fmap
+${fslDir}/bin/fslmaths FM_UD_fmap_mag_brain_mask -ero FM_UD_fmap_mag_brain_mask_ero
+$fslDir/bin/fugue --loadfmap=FM_UD_fmap --savefmap=FM_UD_fmap_tmp_fmapfilt --mask=FM_UD_fmap_mag_brain_mask --despike --despikethreshold=2.1
+$fslDir/bin/fslmaths FM_UD_fmap -sub FM_UD_fmap_tmp_fmapfilt -mas FM_UD_fmap_mag_brain_mask_ero -add FM_UD_fmap_tmp_fmapfilt FM_UD_fmap
 /bin/rm -f FM_UD_fmap_tmp_fmapfilt* FM_UD_fmap_mag_brain_mask_ero* FM_UD_fmap_mag_brain_mask50* FM_UD_fmap_mag_brain_i*
 
 # now demedian
-medianValue=$(${FSLDIR}/bin/fslstats FM_UD_fmap -k FM_UD_fmap_mag_brain_mask -P 50)
-${FSLDIR}/bin/fslmaths FM_UD_fmap -sub $medianValue -mas FM_UD_fmap_mag_brain_mask FM_UD_fmap
+medianValue=$(${fslDir}/bin/fslstats FM_UD_fmap -k FM_UD_fmap_mag_brain_mask -P 50)
+${fslDir}/bin/fslmaths FM_UD_fmap -sub $medianValue -mas FM_UD_fmap_mag_brain_mask FM_UD_fmap
 
 # create report picture of fmap overlaid onto whole-head mag image
-fmapmin=$(${FSLDIR}/bin/fslstats FM_UD_fmap -R | awk '{ print $1 }')
-${FSLDIR}/bin/fslmaths FM_UD_fmap -sub $fmapmin -add 10 -mas FM_UD_fmap_mag_brain_mask grot
-fmapminmax=$(${FSLDIR}/bin/fslstats grot -l 1 -p 0.1 -p 95)
-${FSLDIR}/bin/overlay 0 0 FM_UD_fmap_mag -a grot $fmapminmax fmap+mag
+fmapmin=$(${fslDir}/bin/fslstats FM_UD_fmap -R | awk '{ print $1 }')
+${fslDir}/bin/fslmaths FM_UD_fmap -sub $fmapmin -add 10 -mas FM_UD_fmap_mag_brain_mask grot
+fmapminmax=$(${fslDir}/bin/fslstats grot -l 1 -p 0.1 -p 95)
+${fslDir}/bin/overlay 0 0 FM_UD_fmap_mag -a grot $fmapminmax fmap+mag
 
-${FSLDIR}/bin/slicer fmap+mag  -s 3 -x 0.35 sla.png -x 0.45 slb.png -x 0.55 slc.png -x 0.65 sld.png -y 0.35 sle.png -y 0.45 slf.png -y 0.55 slg.png -y 0.65 slh.png -z 0.35 sli.png -z 0.45 slj.png -z 0.55 slk.png -z 0.65 sll.png ; ${FSLDIR}/bin/pngappend sla.png + slb.png + slc.png + sld.png + sle.png + slf.png + slg.png + slh.png + sli.png + slj.png + slk.png + sll.png fmap+mag.png; rm sl?.png
+${fslDir}/bin/slicer fmap+mag  -s 3 -x 0.35 sla.png -x 0.45 slb.png -x 0.55 slc.png -x 0.65 sld.png -y 0.35 sle.png -y 0.45 slf.png -y 0.55 slg.png -y 0.65 slh.png -z 0.35 sli.png -z 0.45 slj.png -z 0.55 slk.png -z 0.65 sll.png ; ${fslDir}/bin/pngappend sla.png + slb.png + slc.png + sld.png + sle.png + slf.png + slg.png + slh.png + sli.png + slj.png + slk.png + sll.png fmap+mag.png; rm sl?.png
 
 # get a sigloss estimate and make a siglossed mag for forward warp
 # TODO: assumes TE=30 now
-${FSLDIR}/bin/sigloss -i FM_UD_fmap --te=.03 -m FM_UD_fmap_mag_brain_mask -s FM_UD_fmap_sigloss
-siglossthresh=`awk "BEGIN {print 1.0 - ( 10 / 100.0 )}"`
-${FSLDIR}/bin/fslmaths FM_UD_fmap_sigloss -mul FM_UD_fmap_mag_brain FM_UD_fmap_mag_brain_siglossed -odt float
+${fslDir}/bin/sigloss -i FM_UD_fmap --te=.03 -m FM_UD_fmap_mag_brain_mask -s FM_UD_fmap_sigloss
+siglossthresh=$(awk "BEGIN {print 1.0 - ( 10 / 100.0 )}")
+${fslDir}/bin/fslmaths FM_UD_fmap_sigloss -mul FM_UD_fmap_mag_brain FM_UD_fmap_mag_brain_siglossed -odt float
 
 
-${FSLDIR}/bin/fslmaths FM_UD_fmap_sigloss -thr $siglossthresh FM_UD_fmap_sigloss -odt float
-${FSLDIR}/bin/overlay 1 0 FM_UD_fmap_mag_brain -a FM_UD_fmap_sigloss 0 1 FM_UD_sigloss+mag
+${fslDir}/bin/fslmaths FM_UD_fmap_sigloss -thr $siglossthresh FM_UD_fmap_sigloss -odt float
+${fslDir}/bin/overlay 1 0 FM_UD_fmap_mag_brain -a FM_UD_fmap_sigloss 0 1 FM_UD_sigloss+mag
 
-${FSLDIR}/bin/slicer FM_UD_sigloss+mag  -s 3 -x 0.35 sla.png -x 0.45 slb.png -x 0.55 slc.png -x 0.65 sld.png -y 0.35 sle.png -y 0.45 slf.png -y 0.55 slg.png -y 0.65 slh.png -z 0.35 sli.png -z 0.45 slj.png -z 0.55 slk.png -z 0.65 sll.png ; ${FSLDIR}/bin/pngappend sla.png + slb.png + slc.png + sld.png + sle.png + slf.png + slg.png + slh.png + sli.png + slj.png + slk.png + sll.png FM_UD_sigloss+mag.png; rm sl?.png
+${fslDir}/bin/slicer FM_UD_sigloss+mag  -s 3 -x 0.35 sla.png -x 0.45 slb.png -x 0.55 slc.png -x 0.65 sld.png -y 0.35 sle.png -y 0.45 slf.png -y 0.55 slg.png -y 0.65 slh.png -z 0.35 sli.png -z 0.45 slj.png -z 0.55 slk.png -z 0.65 sll.png ; ${fslDir}/bin/pngappend sla.png + slb.png + slc.png + sld.png + sle.png + slf.png + slg.png + slh.png + sli.png + slj.png + slk.png + sll.png FM_UD_sigloss+mag.png; rm sl?.png
 
 }
 
@@ -394,31 +407,31 @@ function EPItoT1reg() {
       # epi_reg L284-L300
       # register fmap to structural image
       clobber EPItoT1_fieldmap2str &&\
-      $FSLDIR/bin/flirt -in FM_UD_fmap_mag_brain -ref ${t1Data} -dof 6 -omat EPItoT1_fieldmap2str_init.mat &&\
-      $FSLDIR/bin/flirt -in FM_UD_fmap_mag -ref ${t1SkullData} -dof 6 -init EPItoT1_fieldmap2str_init.mat -omat EPItoT1_fieldmap2str.mat -out EPItoT1_fieldmap2str -nosearch
+      $fslDir/bin/flirt -in FM_UD_fmap_mag_brain -ref ${t1Data} -dof 6 -omat EPItoT1_fieldmap2str_init.mat &&\
+      $fslDir/bin/flirt -in FM_UD_fmap_mag -ref ${t1SkullData} -dof 6 -init EPItoT1_fieldmap2str_init.mat -omat EPItoT1_fieldmap2str.mat -out EPItoT1_fieldmap2str -nosearch
 
       # unmask the fieldmap (necessary to avoid edge effects)
-      $FSLDIR/bin/fslmaths FM_UD_fmap_mag_brain -abs -bin EPItoT1_fieldmaprads_mask
-      $FSLDIR/bin/fslmaths FM_UD_fmap_mag -abs -bin -mul EPItoT1_fieldmaprads_mask EPItoT1_fieldmaprads_mask
-      $FSLDIR/bin/fugue --loadfmap=FM_UD_fmap --mask=EPItoT1_fieldmaprads_mask --unmaskfmap --savefmap=EPItoT1_fieldmaprads_unmasked --unwarpdir=${fdir}   # the direction here should take into account the initial affine (it needs to be the direction in the EPI)
+      $fslDir/bin/fslmaths FM_UD_fmap_mag_brain -abs -bin EPItoT1_fieldmaprads_mask
+      $fslDir/bin/fslmaths FM_UD_fmap_mag -abs -bin -mul EPItoT1_fieldmaprads_mask EPItoT1_fieldmaprads_mask
+      $fslDir/bin/fugue --loadfmap=FM_UD_fmap --mask=EPItoT1_fieldmaprads_mask --unmaskfmap --savefmap=EPItoT1_fieldmaprads_unmasked --unwarpdir=${fdir}   # the direction here should take into account the initial affine (it needs to be the direction in the EPI)
 
       # the following is a NEW HACK to fix extrapolation when fieldmap is too small
       clobber EPItoT1_fieldmaprads2str_pad0.nii.gz &&\
-      $FSLDIR/bin/applywarp -i EPItoT1_fieldmaprads_unmasked -r ${t1SkullData} --premat=EPItoT1_fieldmap2str.mat -o EPItoT1_fieldmaprads2str_pad0
-      $FSLDIR/bin/fslmaths EPItoT1_fieldmaprads2str_pad0 -abs -bin EPItoT1_fieldmaprads2str_innermask
-      $FSLDIR/bin/fugue --loadfmap=EPItoT1_fieldmaprads2str_pad0 --mask=EPItoT1_fieldmaprads2str_innermask --unmaskfmap --unwarpdir=${fdir} --savefmap=EPItoT1_fieldmaprads2str_dilated
-      $FSLDIR/bin/fslmaths EPItoT1_fieldmaprads2str_dilated EPItoT1_fieldmaprads2str
+      $fslDir/bin/applywarp -i EPItoT1_fieldmaprads_unmasked -r ${t1SkullData} --premat=EPItoT1_fieldmap2str.mat -o EPItoT1_fieldmaprads2str_pad0
+      $fslDir/bin/fslmaths EPItoT1_fieldmaprads2str_pad0 -abs -bin EPItoT1_fieldmaprads2str_innermask
+      $fslDir/bin/fugue --loadfmap=EPItoT1_fieldmaprads2str_pad0 --mask=EPItoT1_fieldmaprads2str_innermask --unmaskfmap --unwarpdir=${fdir} --savefmap=EPItoT1_fieldmaprads2str_dilated
+      $fslDir/bin/fslmaths EPItoT1_fieldmaprads2str_dilated EPItoT1_fieldmaprads2str
 
       # epi_reg L308-L315:
       echo "......Making warp fields and applying registration to EPI series"
-      $FSLDIR/bin/convert_xfm -omat EPItoT1_inv.mat -inverse EPItoT1.mat
-      $FSLDIR/bin/convert_xfm -omat EPItoT1_fieldmaprads2epi.mat -concat EPItoT1_inv.mat EPItoT1_fieldmap2str.mat
-      $FSLDIR/bin/applywarp -i EPItoT1_fieldmaprads_unmasked -r ${indir}/mcImgMean.nii.gz --premat=EPItoT1_fieldmaprads2epi.mat -o EPItoT1_fieldmaprads2epi
-      $FSLDIR/bin/fslmaths EPItoT1_fieldmaprads2epi -abs -bin EPItoT1_fieldmaprads2epi_mask
-      $FSLDIR/bin/fugue --loadfmap=EPItoT1_fieldmaprads2epi --mask=EPItoT1_fieldmaprads2epi_mask --saveshift=EPItoT1_fieldmaprads2epi_shift --unmaskshift --dwell=${dwellTime} --unwarpdir=${fdir}
+      $fslDir/bin/convert_xfm -omat EPItoT1_inv.mat -inverse EPItoT1.mat
+      $fslDir/bin/convert_xfm -omat EPItoT1_fieldmaprads2epi.mat -concat EPItoT1_inv.mat EPItoT1_fieldmap2str.mat
+      $fslDir/bin/applywarp -i EPItoT1_fieldmaprads_unmasked -r ${indir}/mcImgMean.nii.gz --premat=EPItoT1_fieldmaprads2epi.mat -o EPItoT1_fieldmaprads2epi
+      $fslDir/bin/fslmaths EPItoT1_fieldmaprads2epi -abs -bin EPItoT1_fieldmaprads2epi_mask
+      $fslDir/bin/fugue --loadfmap=EPItoT1_fieldmaprads2epi --mask=EPItoT1_fieldmaprads2epi_mask --saveshift=EPItoT1_fieldmaprads2epi_shift --unmaskshift --dwell=${dwellTime} --unwarpdir=${fdir}
       clobber EPItoT1_warp.nii.gz &&\
-      $FSLDIR/bin/convertwarp -r ${t1SkullData} -s EPItoT1_fieldmaprads2epi_shift --postmat=EPItoT1.mat -o EPItoT1_warp --shiftdir=${fdir} --relout
-      $FSLDIR/bin/applywarp -i ${indir}/mcImgMean.nii.gz -r ${t1SkullData} -o EPItoT1 -w EPItoT1_warp --interp=spline --rel
+      $fslDir/bin/convertwarp -r ${t1SkullData} -s EPItoT1_fieldmaprads2epi_shift --postmat=EPItoT1.mat -o EPItoT1_warp --shiftdir=${fdir} --relout
+      $fslDir/bin/applywarp -i ${indir}/mcImgMean.nii.gz -r ${t1SkullData} -o EPItoT1 -w EPItoT1_warp --interp=spline --rel
     fi
 
     # Invert the affine registration (to get T1toEPI)
@@ -534,7 +547,7 @@ function EPItoT1reg() {
 
 if [ $# -lt 4 ] ; then Usage; exit 0; fi
 while [ $# -ge 1 ] ; do
-    iarg=`get_opt1 $1`;
+    iarg=$(get_opt1 $1);
     case "$iarg"
 	in
 	--epi)
@@ -697,7 +710,7 @@ fi
 
 
 #Setting variable for FSL base directory
-fslDir=$FSLDIR
+fslDir=$fslDir
 export fslDir
 
 
