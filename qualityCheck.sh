@@ -542,6 +542,9 @@ function EPItoT1reg() {
 ##########
 ## MAIN ##
 ##########
+#Setting variable for FSL base directory
+fslDir=$fslDir
+export fslDir
 
 # Parse them baby
 
@@ -585,7 +588,7 @@ while [ $# -ge 1 ] ; do
       export peDir;
       shift;;
   --regMode)
-      regMode=`get_imarg1 $1`;
+      regMode=`get_arg1 $1`;
       export regMode
       echo Registration mode = $regMode;
       shift;;
@@ -709,9 +712,6 @@ if [[ $overwriteFlag == 1 ]]; then
 fi
 
 
-#Setting variable for FSL base directory
-fslDir=$fslDir
-export fslDir
 
 
 indir=$logDir
