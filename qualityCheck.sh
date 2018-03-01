@@ -299,7 +299,7 @@ ${FSLDIR}/bin/slicer fmap+mag  -s 3 -x 0.35 sla.png -x 0.45 slb.png -x 0.55 slc.
 
 # get a sigloss estimate and make a siglossed mag for forward warp
 # TODO: assumes TE=30 now
-${FSLDIR}/bin/sigloss -i FM_UD_fmap --te=30 -m FM_UD_fmap_mag_brain_mask -s FM_UD_fmap_sigloss
+${FSLDIR}/bin/sigloss -i FM_UD_fmap --te=.03 -m FM_UD_fmap_mag_brain_mask -s FM_UD_fmap_sigloss
 siglossthresh=`awk "BEGIN {print 1.0 - ( 10 / 100.0 )}"`
 ${FSLDIR}/bin/fslmaths FM_UD_fmap_sigloss -mul FM_UD_fmap_mag_brain FM_UD_fmap_mag_brain_siglossed -odt float
 
@@ -704,10 +704,10 @@ EPItoT1reg
 
 # skull-strip mcImgMean volume, write output to rsParams file
 mcMask=$(cat $logDir/rsParams | grep "epiMask=" | awk -F"=" '{print $2}' | tail -1)
-fslmaths mcImg.nii.gz -mas $mcMask mcImg_stripped.nii.gz
+fslmaths $indir/mcImg.nii.gz -mas $mcMask $indir/mcImg_stripped.nii.gz
 
 # Leftover section from dataPrep (to create "RestingState.nii.gz")
-fslmaths ${epiData} -mas $mcMask RestingState.nii.gz
+fslmaths $indir/${epiData} -mas $mcMask $indir/RestingState.nii.gz
 
 echo "epiStripped=$indir/RestingState.nii.gz" >> $indir/rsParams
 echo "epiMC=$indir/mcImg_stripped.nii.gz" >> $indir/rsParams
