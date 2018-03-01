@@ -265,7 +265,7 @@ ${FSLDIR}/bin/fslmaths FM_UD_fmap_mag_brain -bin FM_UD_fmap_mag_brain_mask -odt 
 # NB: need to use cluster to fill in holes where fmap=0
 ${FSLDIR}/bin/fslmaths FM_UD_fmap -abs -bin -mas FM_UD_fmap_mag_brain_mask -mul -1 -add 1 -bin FM_UD_fmap_mag_brain_mask_inv
 ${FSLDIR}/bin/cluster -i FM_UD_fmap_mag_brain_mask_inv -t 0.5 --no_table -o FM_UD_fmap_mag_brain_mask_idx
-maxidx=$(${FSLDIR}/bin/fslstats FM_UD_fmap_mag_brain_mask_idx -R | awk '{ print \$2 }')
+maxidx=$(${FSLDIR}/bin/fslstats FM_UD_fmap_mag_brain_mask_idx -R | awk '{ print $2 }')
 ${FSLDIR}/bin/fslmaths FM_UD_fmap_mag_brain_mask_idx -thr $maxidx -bin -mul -1 -add 1 -bin -mas FM_UD_fmap_mag_brain_mask FM_UD_fmap_mag_brain_mask
 
 # refine mask (remove edge voxels where signal is poor)
@@ -290,7 +290,7 @@ medianValue=$(${FSLDIR}/bin/fslstats FM_UD_fmap -k FM_UD_fmap_mag_brain_mask -P 
 ${FSLDIR}/bin/fslmaths FM_UD_fmap -sub $medianValue -mas FM_UD_fmap_mag_brain_mask FM_UD_fmap
 
 # create report picture of fmap overlaid onto whole-head mag image
-fmapmin=$(${FSLDIR}/bin/fslstats FM_UD_fmap -R | awk '{ print \$1 }')
+fmapmin=$(${FSLDIR}/bin/fslstats FM_UD_fmap -R | awk '{ print $1 }')
 ${FSLDIR}/bin/fslmaths FM_UD_fmap -sub $fmapmin -add 10 -mas FM_UD_fmap_mag_brain_mask grot
 fmapminmax=${FSLDIR}/bin/fslstats grot -l 1 -p 0.1 -p 95
 ${FSLDIR}/bin/overlay 0 0 FM_UD_fmap_mag -a grot $fmapminmax fmap+mag
@@ -540,7 +540,7 @@ do
       export peDir=$OPTARG
       ;;
     c)
-      overwriteFlag=1
+      clob=true
       ;;
     ?)
       echo "ERROR: Invalid option"
@@ -661,27 +661,18 @@ clobber $indir/mcImg.nii.gz &&\
 motionCorrection ${epiData}
 
 
-########## In vs. Out of Brain SNR Calculation #
-echo "...SNR mask creation."
 
-# Calculate a few dimensions
-xdim=$(fslhd mcImg.nii.gz | grep ^dim1 | awk '{print $2}')
-ydim=$(fslhd mcImg.nii.gz | grep ^dim2 | awk '{print $2}')
-zdim=$(fslhd mcImg.nii.gz | grep ^dim3 | awk '{print $2}')
-tdim=$(fslhd mcImg.nii.gz | grep ^dim4 | awk '{print $2}')
-xydimTenth=$(echo $xdim 0.06 | awk '{print int($1*$2)}')
-ydimMaskAnt=$(echo $ydim 0.93 | awk '{print int($1*$2)}')
-ydimMaskPost=$(echo $ydim 0.07 | awk '{print int($1*$2)}')
 
-################################################################
-
-export t1Dir=$(dirname $t1Data)
-export t1WarpDir=$t1Dir/T1forWarp
+t1Dir=$(dirname $t1Data)
+export t1Dir
+t1WarpDir=$t1Dir/T1forWarp
+export t1WarpDir
 
 clobber ${t1WarpDir}/MNItoT1_warp.nii.gz &&\
 T1toMNIreg
 
-export segDir=${t1Dir}/tissueSeg
+segDir=${t1Dir}/tissueSeg
+export segDir
 
 clobber ${t1Dir}/T1_MNI_brain_wmseg.nii.gz &&\
 tissueSeg
@@ -711,6 +702,20 @@ echo "epiMC=$indir/mcImg_stripped.nii.gz" >> $indir/rsParams
 ########## SNR Estimation ######################
 echo "...Estimating SNR."
 
+########## In vs. Out of Brain SNR Calculation #
+echo "...SNR mask creation."
+
+# Calculate a few dimensions
+xdim=$(fslhd mcImg.nii.gz | grep ^dim1 | awk '{print $2}')
+ydim=$(fslhd mcImg.nii.gz | grep ^dim2 | awk '{print $2}')
+zdim=$(fslhd mcImg.nii.gz | grep ^dim3 | awk '{print $2}')
+tdim=$(fslhd mcImg.nii.gz | grep ^dim4 | awk '{print $2}')
+xydimTenth=$(echo $xdim 0.06 | awk '{print int($1*$2)}')
+ydimMaskAnt=$(echo $ydim 0.93 | awk '{print int($1*$2)}')
+ydimMaskPost=$(echo $ydim 0.07 | awk '{print int($1*$2)}')
+
+################################################################
+
 # Create a folder to dump temp data into
 if [ ! -e SNR ]; then
   mkdir SNR
@@ -720,6 +725,7 @@ snrDir=${indir}/SNR
 
 
 # Create a GM segmentation mask (copy data from FAST processing)
+clobber $snrDir/T1_GM.nii.gz &&\
 fslmaths $segDir/T1_seg_1.nii.gz -bin $snrDir/T1_GM.nii.gz -odt char
 
 
@@ -731,11 +737,15 @@ echo "...Warping GM/WM/CSF mask to EPI space"
 # Check for FieldMap correction.  If used, will have to applywarp, othewise use flirt with the .mat file
 if [[ $fieldMapFlag == 1 ]]; then
   # Apply the warp file
+  clobber $snrDir/RestingState_GM.nii.gz &&\
   applywarp -i $snrDir/T1_GM.nii.gz -o $snrDir/RestingState_GM.nii.gz -r ${indir}/mcImgMean.nii.gz -w ${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn --datatype=char
 
   # Transfer over GM/WM/CSF from original segmentation, without binarizing/conversion to 8bit
+  clobber $snrDir/CSF_to_RS.nii.gz &&\
   applywarp -i $segDir/T1_seg_0.nii.gz -o $snrDir/CSF_to_RS.nii.gz -r ${indir}/mcImgMean.nii.gz -w ${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn
+  clobber $snrDir/GM_to_RS.nii.gz &&\
   applywarp -i $segDir/T1_seg_1.nii.gz -o $snrDir/GM_to_RS.nii.gz -r ${indir}/mcImgMean.nii.gz -w ${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn
+  clobber $snrDir/WM_to_RS.nii.gz &&\
   applywarp -i $segDir/T1_seg_2.nii.gz -o $snrDir/WM_to_RS.nii.gz -r ${indir}/mcImgMean.nii.gz -w ${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn
 
   # Echo out location of GM/WM/CSF (EPI) to rsParams file
@@ -745,11 +755,15 @@ if [[ $fieldMapFlag == 1 ]]; then
 
 else
   # Apply the affine .mat file
+  clobber $snrDir/RestingState_GM.nii.gz &&\
   flirt -in $snrDir/T1_GM.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/RestingState_GM.nii.gz -interp nearestneighbour -datatype char
 
   # Transfer over GM/WM/CSF from original segmentation, without binarizing/conversion to 8bit
+  clobber $snrDir/CSF_to_RS.nii.gz &&\
   flirt -in $segDir/T1_seg_0.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/CSF_to_RS.nii.gz -interp nearestneighbour
+  clobber $snrDir/GM_to_RS.nii.gz &&\
   flirt -in $segDir/T1_seg_1.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/GM_to_RS.nii.gz -interp nearestneighbour
+  clobber $snrDir/WM_to_RS.nii.gz &&\
   flirt -in $segDir/T1_seg_2.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/WM_to_RS.nii.gz -interp nearestneighbour
 
   # Echo out location of GM/WM/CSF (EPI) to rsParams file
