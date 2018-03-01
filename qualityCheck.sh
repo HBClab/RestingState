@@ -40,8 +40,9 @@ function printCommandLine {
 
 function motionCorrection {
   local epiData=$1
-  local indir="$(dirname ${epiData})"
-
+  local indir
+  indir=$(dirname ${epiData})
+  
   ########## Motion Correction ###################
   # Going to run with AFNI's 3dvolreg over FSL's mcflirt.  Output pics will have same names to be drop-in replacments
   echo "...Applying motion correction."
