@@ -376,9 +376,15 @@ function EPItoT1reg() {
       if [ $peDir = "y-" ] ; then fdir="y-"; fi
       if [ $peDir = "z-" ] ; then fdir="z-"; fi
 
+      cd ${epiWarpDir}
+
+      # epi_reg L284-L286
+      # register fmap to structural image
+      $FSLDIR/bin/flirt -in ${fieldMapMag} -ref ${t1Data} -dof 6 -omat EPItoT1_fieldmap2str_init.mat
+      $FSLDIR/bin/flirt -in ${fieldMapMagSkull} -ref ${t1SkullData} -dof 6 -init EPItoT1_fieldmap2str_init.mat -omat EPItoT1_fieldmap2str.mat -out EPItoT1_fieldmap2str -nosearch
+
       # epi_reg L308-L315:
       echo "Making warp fields and applying registration to EPI series"
-
       $FSLDIR/bin/convert_xfm -omat EPItoT1_inv.mat -inverse EPItoT1.mat
       $FSLDIR/bin/convert_xfm -omat EPItoT1_fieldmaprads2epi.mat -concat EPItoT1_inv.mat EPItoT1_fieldmap2str.mat
       $FSLDIR/bin/applywarp -i EPItoT1_fieldmaprads_unmasked -r ${indir}/mcImgMean.nii.gz --premat=EPItoT1_fieldmaprads2epi.mat -o EPItoT1_fieldmaprads2epi
