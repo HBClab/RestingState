@@ -253,6 +253,7 @@ cp $segDir/T1_seg_2.nii.gz $t1Dir/T1_MNI_brain_wmseg.nii.gz
 
 
 preprocessFieldmaps() { # $1 fmap $2 mag_brain $3 mag
+echo "......Preprocessing fieldmaps."
 
 cd "$(dirname $1)" || exit
 ${FSLDIR}/bin/fslmaths $1 FM_UD_fmap
@@ -398,7 +399,7 @@ function EPItoT1reg() {
       $FSLDIR/bin/fslmaths EPItoT1_fieldmaprads2str_dilated EPItoT1_fieldmaprads2str
 
       # epi_reg L308-L315:
-      echo "Making warp fields and applying registration to EPI series"
+      echo "......Making warp fields and applying registration to EPI series"
       $FSLDIR/bin/convert_xfm -omat EPItoT1_inv.mat -inverse EPItoT1.mat
       $FSLDIR/bin/convert_xfm -omat EPItoT1_fieldmaprads2epi.mat -concat EPItoT1_inv.mat EPItoT1_fieldmap2str.mat
       $FSLDIR/bin/applywarp -i EPItoT1_fieldmaprads_unmasked -r ${indir}/mcImgMean.nii.gz --premat=EPItoT1_fieldmaprads2epi.mat -o EPItoT1_fieldmaprads2epi
@@ -697,20 +698,18 @@ export segDir
 clobber ${t1Dir}/T1_MNI_brain_wmseg.nii.gz &&\
 tissueSeg
 
+clobber $epiWarpDir/EPItoMNI.nii.gz &&\
 EPItoT1reg
-
-
-
-
 
 ########## Skullstrip the EPI data ######################
 
 # skull-strip mcImgMean volume, write output to rsParams file
 mcMask=$(cat $logDir/rsParams | grep "epiMask=" | awk -F"=" '{print $2}' | tail -1)
+clobber $indir/mcImg_stripped.nii.gz &&\
 fslmaths $indir/mcImg.nii.gz -mas $mcMask $indir/mcImg_stripped.nii.gz
 
 # Leftover section from dataPrep (to create "RestingState.nii.gz")
-fslmaths $indir/${epiData} -mas $mcMask $indir/RestingState.nii.gz
+fslmaths ${epiData} -mas $mcMask $indir/RestingState.nii.gz
 
 echo "epiStripped=$indir/RestingState.nii.gz" >> $indir/rsParams
 echo "epiMC=$indir/mcImg_stripped.nii.gz" >> $indir/rsParams
@@ -726,10 +725,10 @@ echo "...Estimating SNR."
 echo "...SNR mask creation."
 
 # Calculate a few dimensions
-xdim=$(fslhd mcImg.nii.gz | grep ^dim1 | awk '{print $2}')
-ydim=$(fslhd mcImg.nii.gz | grep ^dim2 | awk '{print $2}')
-zdim=$(fslhd mcImg.nii.gz | grep ^dim3 | awk '{print $2}')
-tdim=$(fslhd mcImg.nii.gz | grep ^dim4 | awk '{print $2}')
+xdim=$(fslhd $indir/mcImg.nii.gz | grep ^dim1 | awk '{print $2}')
+ydim=$(fslhd $indir/mcImg.nii.gz | grep ^dim2 | awk '{print $2}')
+zdim=$(fslhd $indir/mcImg.nii.gz | grep ^dim3 | awk '{print $2}')
+tdim=$(fslhd $indir/mcImg.nii.gz | grep ^dim4 | awk '{print $2}')
 xydimTenth=$(echo $xdim 0.06 | awk '{print int($1*$2)}')
 ydimMaskAnt=$(echo $ydim 0.93 | awk '{print int($1*$2)}')
 ydimMaskPost=$(echo $ydim 0.07 | awk '{print int($1*$2)}')
