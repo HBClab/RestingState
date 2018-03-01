@@ -726,7 +726,7 @@ echo "epiMC=$indir/mcImg_stripped.nii.gz" >> $indir/rsParams
 
 ########## SNR Estimation ######################
 echo "...Estimating SNR."
-
+cd $indir
 ########## In vs. Out of Brain SNR Calculation #
 echo "...SNR mask creation."
 
