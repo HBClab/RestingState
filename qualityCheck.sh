@@ -317,7 +317,6 @@ ${FSLDIR}/bin/slicer FM_UD_sigloss+mag  -s 3 -x 0.35 sla.png -x 0.45 slb.png -x 
 function EPItoT1reg() {
   echo "...Optimizing EPI (func) to T1 (highres) registration."
 
-  epiWarpDir=${indir}/EPItoT1optimized_${regMode}
 
   # Look for output directory for EPI to T1 (create if necessary).
   if [[ ! -d ${epiWarpDir} ]]; then
@@ -384,7 +383,8 @@ function EPItoT1reg() {
 
       # epi_reg L284-L300
       # register fmap to structural image
-      $FSLDIR/bin/flirt -in FM_UD_fmap_mag_brain -ref ${t1Data} -dof 6 -omat EPItoT1_fieldmap2str_init.mat
+      clobber EPItoT1_fieldmap2str &&\
+      $FSLDIR/bin/flirt -in FM_UD_fmap_mag_brain -ref ${t1Data} -dof 6 -omat EPItoT1_fieldmap2str_init.mat &&\
       $FSLDIR/bin/flirt -in FM_UD_fmap_mag -ref ${t1SkullData} -dof 6 -init EPItoT1_fieldmap2str_init.mat -omat EPItoT1_fieldmap2str.mat -out EPItoT1_fieldmap2str -nosearch
 
       # unmask the fieldmap (necessary to avoid edge effects)
@@ -393,6 +393,7 @@ function EPItoT1reg() {
       $FSLDIR/bin/fugue --loadfmap=FM_UD_fmap --mask=EPItoT1_fieldmaprads_mask --unmaskfmap --savefmap=EPItoT1_fieldmaprads_unmasked --unwarpdir=${fdir}   # the direction here should take into account the initial affine (it needs to be the direction in the EPI)
 
       # the following is a NEW HACK to fix extrapolation when fieldmap is too small
+      clobber EPItoT1_fieldmaprads2str_pad0.nii.gz &&\
       $FSLDIR/bin/applywarp -i EPItoT1_fieldmaprads_unmasked -r ${t1SkullData} --premat=EPItoT1_fieldmap2str.mat -o EPItoT1_fieldmaprads2str_pad0
       $FSLDIR/bin/fslmaths EPItoT1_fieldmaprads2str_pad0 -abs -bin EPItoT1_fieldmaprads2str_innermask
       $FSLDIR/bin/fugue --loadfmap=EPItoT1_fieldmaprads2str_pad0 --mask=EPItoT1_fieldmaprads2str_innermask --unmaskfmap --unwarpdir=${fdir} --savefmap=EPItoT1_fieldmaprads2str_dilated
@@ -405,6 +406,7 @@ function EPItoT1reg() {
       $FSLDIR/bin/applywarp -i EPItoT1_fieldmaprads_unmasked -r ${indir}/mcImgMean.nii.gz --premat=EPItoT1_fieldmaprads2epi.mat -o EPItoT1_fieldmaprads2epi
       $FSLDIR/bin/fslmaths EPItoT1_fieldmaprads2epi -abs -bin EPItoT1_fieldmaprads2epi_mask
       $FSLDIR/bin/fugue --loadfmap=EPItoT1_fieldmaprads2epi --mask=EPItoT1_fieldmaprads2epi_mask --saveshift=EPItoT1_fieldmaprads2epi_shift --unmaskshift --dwell=${dwellTime} --unwarpdir=${fdir}
+      clobber EPItoT1_warp.nii.gz &&\
       $FSLDIR/bin/convertwarp -r ${t1SkullData} -s EPItoT1_fieldmaprads2epi_shift --postmat=EPItoT1.mat -o EPItoT1_warp --shiftdir=${fdir} --relout
       $FSLDIR/bin/applywarp -i ${indir}/mcImgMean.nii.gz -r ${t1SkullData} -o EPItoT1 -w EPItoT1_warp --interp=spline --rel
     fi
@@ -698,6 +700,9 @@ export segDir
 clobber ${t1Dir}/T1_MNI_brain_wmseg.nii.gz &&\
 tissueSeg
 
+epiWarpDir=${indir}/EPItoT1optimized_${regMode}
+export epiWarpDir
+
 clobber $epiWarpDir/EPItoMNI.nii.gz &&\
 EPItoT1reg
 
@@ -709,6 +714,7 @@ clobber $indir/mcImg_stripped.nii.gz &&\
 fslmaths $indir/mcImg.nii.gz -mas $mcMask $indir/mcImg_stripped.nii.gz
 
 # Leftover section from dataPrep (to create "RestingState.nii.gz")
+clobber $indir/RestingState.nii.gz &&\
 fslmaths ${epiData} -mas $mcMask $indir/RestingState.nii.gz
 
 echo "epiStripped=$indir/RestingState.nii.gz" >> $indir/rsParams
@@ -797,7 +803,7 @@ fi
 fslmaths $snrDir/RestingState_GMsmooth.nii.gz -add $snrDir/RestingState_GM.nii.gz -bin $snrDir/RestingState_GMfinal.nii.gz -odt char
 
 # Strip out GM from EPI
-fslmaths mcImg.nii.gz -mul $snrDir/RestingState_GMfinal.nii.gz $snrDir/RestingState_GM4d.nii.gz
+fslmaths $indir/mcImg.nii.gz -mul $snrDir/RestingState_GMfinal.nii.gz $snrDir/RestingState_GM4d.nii.gz
 
 
 echo "...Calculating SNR measurements per TR."
@@ -818,8 +824,8 @@ $scriptDir/makeROI_Noise.sh $ydimMaskAnt $xydimTenth mcImgMean.nii.gz $snrDir/No
 $scriptDir/makeROI_Noise.sh $ydimMaskPost $xydimTenth mcImgMean.nii.gz $snrDir/NoisePostMask
 
 # Strip out Anterior/Posterior Noise from EPI
-fslmaths mcImg.nii.gz -mul $snrDir/NoiseAntMask.nii.gz $snrDir/RestingState_NoiseAntMask.nii.gz
-fslmaths mcImg.nii.gz -mul $snrDir/NoisePostMask.nii.gz $snrDir/RestingState_NoisePostMask.nii.gz
+fslmaths $indir/mcImg.nii.gz -mul $snrDir/NoiseAntMask.nii.gz $snrDir/RestingState_NoiseAntMask.nii.gz
+fslmaths $indir/mcImg.nii.gz -mul $snrDir/NoisePostMask.nii.gz $snrDir/RestingState_NoisePostMask.nii.gz
 
 # Split 4D (Anterior/Posterior Noise) into separate files (for calculating mean of each TR)
 if [ ! -e $snrDir/Noisetsplit ]; then
