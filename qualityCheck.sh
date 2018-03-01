@@ -378,10 +378,21 @@ function EPItoT1reg() {
 
       cd ${epiWarpDir}
 
-      # epi_reg L284-L286
+      # epi_reg L284-L300
       # register fmap to structural image
       $FSLDIR/bin/flirt -in ${fieldMapMag} -ref ${t1Data} -dof 6 -omat EPItoT1_fieldmap2str_init.mat
       $FSLDIR/bin/flirt -in ${fieldMapMagSkull} -ref ${t1SkullData} -dof 6 -init EPItoT1_fieldmap2str_init.mat -omat EPItoT1_fieldmap2str.mat -out EPItoT1_fieldmap2str -nosearch
+
+      # unmask the fieldmap (necessary to avoid edge effects)
+      $FSLDIR/bin/fslmaths ${fieldMapMag} -abs -bin EPItoT1_fieldmaprads_mask
+      $FSLDIR/bin/fslmaths ${fieldMap} -abs -bin -mul EPItoT1_fieldmaprads_mask EPItoT1_fieldmaprads_mask
+      $FSLDIR/bin/fugue --loadfmap=${fieldMap} --mask=EPItoT1_fieldmaprads_mask --unmaskfmap --savefmap=EPItoT1_fieldmaprads_unmasked --unwarpdir=${fdir}   # the direction here should take into account the initial affine (it needs to be the direction in the EPI)
+
+      # the following is a NEW HACK to fix extrapolation when fieldmap is too small
+      $FSLDIR/bin/applywarp -i EPItoT1_fieldmaprads_unmasked -r ${t1SkullData} --premat=EPItoT1_fieldmap2str.mat -o EPItoT1_fieldmaprads2str_pad0
+      $FSLDIR/bin/fslmaths EPItoT1_fieldmaprads2str_pad0 -abs -bin EPItoT1_fieldmaprads2str_innermask
+      $FSLDIR/bin/fugue --loadfmap=EPItoT1_fieldmaprads2str_pad0 --mask=EPItoT1_fieldmaprads2str_innermask --unmaskfmap --unwarpdir=${fdir} --savefmap=EPItoT1_fieldmaprads2str_dilated
+      $FSLDIR/bin/fslmaths EPItoT1_fieldmaprads2str_dilated EPItoT1_fieldmaprads2str
 
       # epi_reg L308-L315:
       echo "Making warp fields and applying registration to EPI series"
