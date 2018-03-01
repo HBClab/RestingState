@@ -10,30 +10,37 @@
 #       b. EPI to T1 (BBR or 6DOF), with/without FieldMap correction
 ##################################################################################################################
 
-scriptPath=$(perl -e 'use Cwd "abs_path";print abs_path(shift)' $0)
-scriptDir=$(dirname $scriptPath)
-spikeThreshInt=300
-spikeThresh=$(echo $spikeThreshInt 100 | awk '{print ($1/$2)}')
+########## FSL's arg parsing functions ###################
+get_opt1() {
+    arg=`echo $1 | sed 's/=.*//'`
+    echo $arg
+}
+
+get_imarg1() {
+    arg=`get_arg1 $1`;
+    arg=`$FSLDIR/bin/remove_ext $arg`;
+    echo $arg
+}
 
 
-function printCommandLine {
-  echo "Usage: qualityCheck.sh -E restingStateImage -a T1Image -A T1SkullImage -l lesionMask -f -b fieldMapPrepped -v fieldMapMagSkull -x fieldMapMag -D 0.00056 -d PhaseEncDir -c"
+function Usage {
+  echo "Usage: qualityCheck.sh --epi=restingStateImage --t1=T1withSkull --t1brain=T1brain --lesionmask=lesionMask --regmode=6dof --fmap=fieldMapPrepped --fmapmag=fieldMapMagSkull --fmapmagbrain=fieldMapMagbrain --dwelltime=0.00056 --pedir=PhaseEncDir -c"
   echo ""
   echo "   where:"
-  echo "   -E Resting State file"
-  echo "   -A T1 file"
-  echo "   -a T1 (with skull) file"
+  echo "   --epi Resting State file"
+  echo "   --t1brain T1 file"
+  echo "   --t1 T1 (with skull) file"
   echo "     *Both EPI and T1 (with and without skull) should be from output of dataPrep script"
-  echo "   -l Binary lesion mask"
-  echo "   -r registration mode (BBR or 6DOF)"
-  echo "   -f (fieldMap registration correction)"
-  echo "   -b fieldMapPrepped (B0 correction image from dataPrep/fsl_prepare_fieldmap)"
-  echo "   -v fieldMapMagSkull (FieldMap Magnitude image, with skull (from dataPrep))"
-  echo "   -x fieldMapMag (FieldMap Magnitude image, skull-stripped (from dataPrep))"
-  echo "   -D dwell time (in seconds)"
+  echo "   --lesionmask Binary lesion mask"
+  echo "   --regmode registration mode (BBR or 6DOF)"
+  echo "   --fmap fieldMapPrepped (B0 correction image from dataPrep/fsl_prepare_fieldmap)"
+  echo "   --fmapmag fieldMapMagSkull (FieldMap Magnitude image, with skull (from dataPrep))"
+  echo "   --fmapmagbrain fieldMapMag (FieldMap Magnitude image, skull-stripped (from dataPrep))"
+  echo "   --dwell dwell time (in seconds)"
   echo "       *dwell time is from the EPI but is only set if FieldMap correction ('-f') is chosen."
+  echo "       *dwell time is the echoSpacing corrected by Acceleration Factor."
   echo "       *If not set and FieldMap correction is flagged ('-f'), default is 0.00056"
-  echo "   -d Phase Encoding Direction (from dataPrep)"
+  echo "   --pedir Phase Encoding Direction (from dataPrep)"
   echo "       *Options are x/y/z/-x/-y/-z"
   echo "   -c clobber/overwrite previous results"
   exit 1
@@ -251,7 +258,8 @@ cp $segDir/T1_seg_2.nii.gz $t1Dir/T1_MNI_brain_wmseg.nii.gz
 
 }
 
-
+########## Preprocess Fieldmaps ###########
+# function modified from $(which mainfeatreg) beginning at L102
 preprocessFieldmaps() { # $1 fmap $2 mag_brain $3 mag
 echo "......Preprocessing fieldmaps."
 
@@ -522,58 +530,73 @@ function EPItoT1reg() {
 ## MAIN ##
 ##########
 
-# Parse Command line arguments
-while getopts "hE:A:a:l:r:fb:v:x:D:d:c" OPTION
-do
-  case $OPTION in
-    h)
-      printCommandLine
-      ;;
-    E)
-      export epiData=$OPTARG
-      ;;
-    A)
-      export t1Data=$OPTARG
-      ;;
-    a)
-      export t1SkullData=$OPTARG
-      ;;
-    l)
-      export lesionMask=$OPTARG
-      export lesionMaskFlag=1
-      ;;
-    r)
-      export regMode=$OPTARG
-      ;;
-    f)
-      export fieldMapFlag=1
-      ;;
-    b)
-      export fieldMap=$OPTARG
-      ;;
-    v)
-      export fieldMapMagSkull=$OPTARG
-      ;;
-    x)
-      export fieldMapMag=$OPTARG
-      ;;
-    D)
-      export dwellTime=$OPTARG
-      ;;
-    d)
-      export peDir=$OPTARG
-      ;;
-    c)
-      clob=true
-      ;;
-    ?)
-      echo "ERROR: Invalid option"
-      printCommandLine
-      ;;
-     esac
-done
+# Parse them baby
+
+if [ $# -lt 4 ] ; then Usage; exit 0; fi
+while [ $# -ge 1 ] ; do
+    iarg=`get_opt1 $1`;
+    case "$iarg"
+	in
+	--epi)
+	    epiData=`get_imarg1 $1`;
+      export epiData;
+	    shift;;
+	--t1)
+	    t1SkullData=`get_imarg1 $1`;
+      export t1SkullData;
+	    shift;;
+  --t1brain)
+	    t1Data=`get_imarg1 $1`;
+      export t1Data;
+	    shift;;
+	--fmap)
+	    fieldMap=`get_imarg1 $1`;
+      export fieldMap;
+	    fieldMapFlag=1;
+      export fieldMapFlag;
+	    shift;;
+	--fmapmag)
+	    fieldMapMagSkull=`get_imarg1 $1`;
+      export fieldMapMagSkull;
+	    shift;;
+	--fmapmagbrain)
+	    fieldMapMag=`get_imarg1 $1`;
+      export fieldMapMag;
+	    shift;;
+  --dwelltime)
+      dwellTime=`get_arg1 $1`;
+      export dwellTime;
+      shift;;
+  --pedir)
+      peDir=`get_arg1 $1`;
+      export peDir;
+      shift;;
+  --regMode)
+      regMode=`get_imarg1 $1`;
+      export regMode
+      echo Registration mode = $regMode;
+      shift;;
+  --lesionmask)
+    lesionMask=`get_imgarg1 $1`;
+    export lesionMask;
+    export lesionMaskFlag=1;
+    shift;;
+  -h)
+      Usage;
+      exit 0;;
+  *)
+      echo "Unrecognised option $1" 1>&2
+      Usage
+      exit 1
+
+    esac
+  done
 
 
+scriptPath=$(perl -e 'use Cwd "abs_path";print abs_path(shift)' $0)
+scriptDir=$(dirname $scriptPath)
+spikeThreshInt=300
+spikeThresh=$(echo $spikeThreshInt 100 | awk '{print ($1/$2)}')
 
 
 # First check for proper input files
@@ -732,27 +755,27 @@ echo "...Creating tissue-based masks for CompCor regression."
 # The CSF pve mask was restricted using a 90% probability threshold.
 
 if [ "${fieldMapFlag}" == "1" ]; then
-	clobber $preprocDir/rois/WM_FAST_ts.txt &&\
+	clobber $snrDir/WM_pve_to_RS_thresh_ero.nii.gz &&\
 	applywarp --in=$segDir/T1_pve_2.nii.gz --out=$snrDir/WM_pve_to_RS.nii.gz --ref=${indir}/mcImgMean.nii.gz --warp=${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn &&\
 	fslmaths $snrDir/WM_pve_to_RS.nii.gz -thr .99 -bin -kernel box 8 -ero $snrDir/WM_pve_to_RS_thresh_ero.nii.gz
 
-	clobber $preprocDir/rois/GM_FAST_ts.txt &&\
+	clobber $snrDir/GM_pve_to_RS_thresh.nii.gz &&\
 	applywarp --in=$segDir/T1_pve_1.nii.gz --out=$snrDir/GM_pve_to_RS.nii.gz --ref=${indir}/mcImgMean.nii.gz --warp=${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn &&\
 	fslmaths $snrDir/GM_pve_to_RS.nii.gz -thr .90 -bin $snrDir/GM_pve_to_RS_thresh.nii.gz -odt char
 
-	clobber $preprocDir/rois/CSF_FAST_ts.txt &&\
+	clobber $snrDir/CSF_pve_to_RS_thresh.nii.gz &&\
 	applywarp --in=$segDir/T1_pve_0.nii.gz --out=$snrDir/CSF_pve_to_RS.nii.gz --ref=${indir}/mcImgMean.nii.gz --warp=${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn &&\
 	fslmaths $snrDir/CSF_pve_to_RS.nii.gz -thr .99 -bin $snrDir/CSF_pve_to_RS_thresh.nii.gz
 else
-	clobber $preprocDir/rois/WM_FAST_ts.txt &&\
+	clobber $snrDir/WM_pve_to_RS_thresh_ero.nii.gz &&\
 	flirt -in $segDir/T1_pve_2.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/WM_pve_to_RS.nii.gz -interp nearestneighbour &&\
 	fslmaths $snrDir/WM_pve_to_RS.nii.gz -thr .99 -bin -kernel box 8 -ero $snrDir/WM_pve_to_RS_thresh_ero.nii.gz
 
-	clobber $preprocDir/rois/GM_FAST_ts.txt &&\
+	clobber $snrDir/GM_pve_to_RS_thresh.nii.gz &&\
 	flirt -in $segDir/T1_pve_1.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/GM_pve_to_RS.nii.gz -interp nearestneighbour &&\
 	fslmaths $snrDir/GM_pve_to_RS.nii.gz -thr .90 -bin $snrDir/GM_pve_to_RS_thresh.nii.gz -odt char
 
-	clobber $preprocDir/rois/CSF_FAST_ts.txt &&\
+	clobber  $snrDir/CSF_pve_to_RS_thresh.nii.gz &&\
 	flirt -in $segDir/T1_pve_0.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/CSF_pve_to_RS.nii.gz -interp nearestneighbour &&\
 	fslmaths $snrDir/CSF_pve_to_RS.nii.gz -thr .99 -bin $snrDir/CSF_pve_to_RS_thresh.nii.gz
 fi
@@ -762,7 +785,7 @@ fi
 
 ########## SNR Estimation ######################
 echo "...Estimating SNR."
-cd $indir
+cd $indir || exit
 ########## In vs. Out of Brain SNR Calculation #
 echo "...SNR mask creation."
 
