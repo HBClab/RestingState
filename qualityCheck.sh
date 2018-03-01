@@ -376,17 +376,20 @@ function EPItoT1reg() {
       if [ $peDir = "y-" ] ; then fdir="y-"; fi
       if [ $peDir = "z-" ] ; then fdir="z-"; fi
 
+      mv $indir/FM_UD* ${epiWarpDir}
+      mv $indir/fmap* ${epiWarpDir}
+      mv $indir/grot.nii.gz ${epiWarpDir}
       cd ${epiWarpDir}
 
       # epi_reg L284-L300
       # register fmap to structural image
-      $FSLDIR/bin/flirt -in ${fieldMapMag} -ref ${t1Data} -dof 6 -omat EPItoT1_fieldmap2str_init.mat
-      $FSLDIR/bin/flirt -in ${fieldMapMagSkull} -ref ${t1SkullData} -dof 6 -init EPItoT1_fieldmap2str_init.mat -omat EPItoT1_fieldmap2str.mat -out EPItoT1_fieldmap2str -nosearch
+      $FSLDIR/bin/flirt -in FM_UD_fmap_mag_brain -ref ${t1Data} -dof 6 -omat EPItoT1_fieldmap2str_init.mat
+      $FSLDIR/bin/flirt -in FM_UD_fmap_mag -ref ${t1SkullData} -dof 6 -init EPItoT1_fieldmap2str_init.mat -omat EPItoT1_fieldmap2str.mat -out EPItoT1_fieldmap2str -nosearch
 
       # unmask the fieldmap (necessary to avoid edge effects)
-      $FSLDIR/bin/fslmaths ${fieldMapMag} -abs -bin EPItoT1_fieldmaprads_mask
-      $FSLDIR/bin/fslmaths ${fieldMap} -abs -bin -mul EPItoT1_fieldmaprads_mask EPItoT1_fieldmaprads_mask
-      $FSLDIR/bin/fugue --loadfmap=${fieldMap} --mask=EPItoT1_fieldmaprads_mask --unmaskfmap --savefmap=EPItoT1_fieldmaprads_unmasked --unwarpdir=${fdir}   # the direction here should take into account the initial affine (it needs to be the direction in the EPI)
+      $FSLDIR/bin/fslmaths FM_UD_fmap_mag_brain -abs -bin EPItoT1_fieldmaprads_mask
+      $FSLDIR/bin/fslmaths FM_UD_fmap_mag -abs -bin -mul EPItoT1_fieldmaprads_mask EPItoT1_fieldmaprads_mask
+      $FSLDIR/bin/fugue --loadfmap=FM_UD_fmap --mask=EPItoT1_fieldmaprads_mask --unmaskfmap --savefmap=EPItoT1_fieldmaprads_unmasked --unwarpdir=${fdir}   # the direction here should take into account the initial affine (it needs to be the direction in the EPI)
 
       # the following is a NEW HACK to fix extrapolation when fieldmap is too small
       $FSLDIR/bin/applywarp -i EPItoT1_fieldmaprads_unmasked -r ${t1SkullData} --premat=EPItoT1_fieldmap2str.mat -o EPItoT1_fieldmaprads2str_pad0
