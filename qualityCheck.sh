@@ -761,39 +761,7 @@ echo "epiMC=$indir/mcImg_stripped.nii.gz" >> $indir/rsParams
 
 ################################################################
 
-################CompCor Regressors##############################
-echo "...Creating tissue-based masks for CompCor regression."
 
-# Create tissue masks from eroded partial volume estimates (pve)
-# The WM pve mask was restricted using a 99% probability threshold and eroded at the 2-voxel level (8 mm)
-# The CSF pve mask was restricted using a 90% probability threshold.
-
-if [ "${fieldMapFlag}" == "1" ]; then
-	clobber $snrDir/WM_pve_to_RS_thresh_ero.nii.gz &&\
-	applywarp --in=$segDir/T1_pve_2.nii.gz --out=$snrDir/WM_pve_to_RS.nii.gz --ref=${indir}/mcImgMean.nii.gz --warp=${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn &&\
-	fslmaths $snrDir/WM_pve_to_RS.nii.gz -thr .99 -bin -kernel box 8 -ero $snrDir/WM_pve_to_RS_thresh_ero.nii.gz
-
-	clobber $snrDir/GM_pve_to_RS_thresh.nii.gz &&\
-	applywarp --in=$segDir/T1_pve_1.nii.gz --out=$snrDir/GM_pve_to_RS.nii.gz --ref=${indir}/mcImgMean.nii.gz --warp=${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn &&\
-	fslmaths $snrDir/GM_pve_to_RS.nii.gz -thr .90 -bin $snrDir/GM_pve_to_RS_thresh.nii.gz -odt char
-
-	clobber $snrDir/CSF_pve_to_RS_thresh.nii.gz &&\
-	applywarp --in=$segDir/T1_pve_0.nii.gz --out=$snrDir/CSF_pve_to_RS.nii.gz --ref=${indir}/mcImgMean.nii.gz --warp=${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn &&\
-	fslmaths $snrDir/CSF_pve_to_RS.nii.gz -thr .99 -bin $snrDir/CSF_pve_to_RS_thresh.nii.gz
-else
-	clobber $snrDir/WM_pve_to_RS_thresh_ero.nii.gz &&\
-	flirt -in $segDir/T1_pve_2.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/WM_pve_to_RS.nii.gz -interp nearestneighbour &&\
-	fslmaths $snrDir/WM_pve_to_RS.nii.gz -thr .99 -bin -kernel box 8 -ero $snrDir/WM_pve_to_RS_thresh_ero.nii.gz
-
-	clobber $snrDir/GM_pve_to_RS_thresh.nii.gz &&\
-	flirt -in $segDir/T1_pve_1.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/GM_pve_to_RS.nii.gz -interp nearestneighbour &&\
-	fslmaths $snrDir/GM_pve_to_RS.nii.gz -thr .90 -bin $snrDir/GM_pve_to_RS_thresh.nii.gz -odt char
-
-	clobber  $snrDir/CSF_pve_to_RS_thresh.nii.gz &&\
-	flirt -in $segDir/T1_pve_0.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/CSF_pve_to_RS.nii.gz -interp nearestneighbour &&\
-	fslmaths $snrDir/CSF_pve_to_RS.nii.gz -thr .99 -bin $snrDir/CSF_pve_to_RS_thresh.nii.gz
-fi
-################################################################
 
 
 
@@ -851,6 +819,22 @@ if [[ $fieldMapFlag == 1 ]]; then
   echo "epiGM=${snrDir}/GM_to_RS.nii.gz" >> $indir/rsParams
   echo "epiWM=${snrDir}/WM_to_RS.nii.gz" >> $indir/rsParams
 
+  echo "...Creating tissue-based masks for CompCor regression."
+
+  # Create tissue masks from eroded partial volume estimates (pve)
+  # The WM pve mask was restricted using a 99% probability threshold and eroded at the 2-voxel level (8 mm)
+  # The CSF pve mask was restricted using a 90% probability threshold.
+  clobber $snrDir/WM_pve_to_RS_thresh_ero.nii.gz &&\
+  applywarp --in=$segDir/T1_pve_2.nii.gz --out=$snrDir/WM_pve_to_RS.nii.gz --ref=${indir}/mcImgMean.nii.gz --warp=${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn &&\
+  fslmaths $snrDir/WM_pve_to_RS.nii.gz -thr .99 -bin -kernel box 8 -ero $snrDir/WM_pve_to_RS_thresh_ero.nii.gz
+
+  clobber $snrDir/GM_pve_to_RS_thresh.nii.gz &&\
+  applywarp --in=$segDir/T1_pve_1.nii.gz --out=$snrDir/GM_pve_to_RS.nii.gz --ref=${indir}/mcImgMean.nii.gz --warp=${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn &&\
+  fslmaths $snrDir/GM_pve_to_RS.nii.gz -thr .90 -bin $snrDir/GM_pve_to_RS_thresh.nii.gz -odt char
+
+  clobber $snrDir/CSF_pve_to_RS_thresh.nii.gz &&\
+  applywarp --in=$segDir/T1_pve_0.nii.gz --out=$snrDir/CSF_pve_to_RS.nii.gz --ref=${indir}/mcImgMean.nii.gz --warp=${epiWarpDir}/T1toEPI_warp.nii.gz --interp=nn &&\
+  fslmaths $snrDir/CSF_pve_to_RS.nii.gz -thr .99 -bin $snrDir/CSF_pve_to_RS_thresh.nii.gz
 else
   # Apply the affine .mat file
   clobber $snrDir/RestingState_GM.nii.gz &&\
@@ -868,6 +852,23 @@ else
   echo "epiCSF=${snrDir}/CSF_to_RS.nii.gz" >> $indir/rsParams
   echo "epiGM=${snrDir}/GM_to_RS.nii.gz" >> $indir/rsParams
   echo "epiWM=${snrDir}/WM_to_RS.nii.gz" >> $indir/rsParams
+
+  echo "...Creating tissue-based masks for CompCor regression."
+
+  # Create tissue masks from eroded partial volume estimates (pve)
+  # The WM pve mask was restricted using a 99% probability threshold and eroded at the 2-voxel level (8 mm)
+  # The CSF pve mask was restricted using a 90% probability threshold.
+  clobber $snrDir/WM_pve_to_RS_thresh_ero.nii.gz &&\
+	flirt -in $segDir/T1_pve_2.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/WM_pve_to_RS.nii.gz -interp nearestneighbour &&\
+	fslmaths $snrDir/WM_pve_to_RS.nii.gz -thr .99 -bin -kernel box 8 -ero $snrDir/WM_pve_to_RS_thresh_ero.nii.gz
+
+	clobber $snrDir/GM_pve_to_RS_thresh.nii.gz &&\
+	flirt -in $segDir/T1_pve_1.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/GM_pve_to_RS.nii.gz -interp nearestneighbour &&\
+	fslmaths $snrDir/GM_pve_to_RS.nii.gz -thr .90 -bin $snrDir/GM_pve_to_RS_thresh.nii.gz -odt char
+
+	clobber  $snrDir/CSF_pve_to_RS_thresh.nii.gz &&\
+	flirt -in $segDir/T1_pve_0.nii.gz -ref ${indir}/mcImgMean.nii.gz -applyxfm -init ${epiWarpDir}/T1toEPI.mat -out $snrDir/CSF_pve_to_RS.nii.gz -interp nearestneighbour &&\
+	fslmaths $snrDir/CSF_pve_to_RS.nii.gz -thr .99 -bin $snrDir/CSF_pve_to_RS_thresh.nii.gz
 fi
 
 
