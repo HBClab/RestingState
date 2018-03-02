@@ -543,7 +543,7 @@ function EPItoT1reg() {
 ## MAIN ##
 ##########
 #Setting variable for FSL base directory
-fslDir=$fslDir
+fslDir=$FSLDIR
 export fslDir
 
 # Parse them baby
