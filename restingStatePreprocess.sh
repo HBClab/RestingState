@@ -221,10 +221,10 @@ function smooth {
   smoothSigma=$(echo $smooth | awk '{print ($1/(sqrt(8*log(2))))}')
 
   # Determine 50% intensity of data, thresholded at 75% (for all non-zero voxels)
-  epiThreshVal=$(fslstats $1 -P 50 | awk '{print ($1*0.75)}')
+  epiThreshVal=$(fslstats $epiData -P 50 | awk '{print ($1*0.75)}')
 
   # Create a time-series mean of $epiData
-  fslmaths $1 -Tmean $preprocDir/mean_func.nii.gz
+  fslmaths $epiData -Tmean $preprocDir/mean_func.nii.gz
 
   # Binarize mean image and make a mask
   fslmaths $preprocDir/mean_func.nii.gz -bin $preprocDir/mask.nii.gz -odt char
