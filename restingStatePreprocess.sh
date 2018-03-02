@@ -129,7 +129,7 @@ function feat_regFix()
   # Copy over appropriate files from previous processing
   # T1 (highres)
   fslmaths $t1Data $regDir/highres.nii.gz
-  t1toMNI=$(cat $indir/rsParams | grep "T1toMNI=" | tail -1 | awk -F"=" '{print $2}')
+  t1toMNI=$(find "$(dirname $t1Data)"/T1forWarp -type d -name "T1_brain_to_MNI152.nii.gz")
   fslmaths $t1toMNI $regDir/highres2standard.nii.gz
 
   # EPI (example_func)
@@ -157,8 +157,7 @@ function feat_regFix()
   fi
 
   # T1toMNI
-  T1WarpDirtmp=$(cat $indir/rsParams | grep "MNItoT1IWarp=" | tail -1 | awk -F"=" '{print $2}')
-  T1WarpDir=$(dirname $T1WarpDirtmp)
+  T1WarpDir="$(dirname $t1Data)"/T1forWarp
 
   cp $T1WarpDir/T1_to_MNIaff.mat $regDir/highres2standard.mat
   cp $T1WarpDir/coef_T1_to_MNI152.nii.gz $regDir/highres2standard_warp.nii.gz
@@ -167,7 +166,7 @@ function feat_regFix()
   cp $epiWarpDir/EPItoMNI_warp.nii.gz $regDir/example_func2standard_warp.nii.gz
 
   # MNItoT1
-  cp $T1WarpDirtmp $regDir/standard2highres_warp.nii.gz
+  cp $T1WarpDir/MNItoT1_warp.nii.gz $regDir/standard2highres_warp.nii.gz
 
   # Forgoing "updatefeatreg" and just recreating the appropriate pics with slicer/pngappend
   cd $regDir
