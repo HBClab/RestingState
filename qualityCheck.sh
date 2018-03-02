@@ -973,8 +973,9 @@ done
 
 
 ########## Plot out Ant/Post Noise, Global SNR #
-
+clobber SigNoisePlot.png &&\
 fsl_tsplot -i SigNoise.par -o SigNoisePlot.png -t 'Signal to Noise Ratio per TR' -a Anterior,Posterior,Average -u 1 --start=1 --finish=3 -w 800 -h 300
+clobber NoisePlot.png &&\
 fsl_tsplot -i AntNoise_Mean.par,PostNoise_Mean.par,NoiseAvg.par -o NoisePlot.png -t 'Noise (Mean Intensity) per TR' -a Anterior,Posterior,Average -u 1 -w 800 -h 300
 
 ################################################################
@@ -992,11 +993,15 @@ cp $indir/mcImg.nii.gz $indir/nonfilteredImg.nii.gz
 
 
 ########## Global SNR Estimation ###############
-echo "...Calculating signal to noise measurements"
-
+clobber $indir/nonfilteredMeanImg &&\
+echo "...Calculating signal to noise measurements" &&\
 fslmaths $indir/nonfilteredImg -Tmean $indir/nonfilteredMeanImg
+
+clobber $indir/nonfilteredStdImg &&\
 fslmaths $indir/nonfilteredImg -Tstd $indir/nonfilteredStdImg
-fslmaths $indir/nonfilteredMeanImg -div $indir/nonfilteredStdImg $indir/nonfilteredSNRImg
+
+clobber $indir/nonfilteredSNRImg &&\
+fslmaths $indir/nonfilteredMeanImg -div $indir/nonfilteredStdImg $indir/nonfilteredSNRImg &&\
 fslmaths $indir/nonfilteredSNRImg -mas $indir/mcImgMean_mask $indir/nonfilteredSNRImg
 SNRout=$(fslstats $indir/nonfilteredSNRImg -M)
 
@@ -1023,6 +1028,7 @@ rm -rf ${indir}/tmp
   fi
 
 ####  CALCULATE SPIKES BASED ON NORMALIZED TIMECOURSE OF GLOBAL MEAN ####
+clobber ${indir}/global_mean_ts.dat &&\
 fslstats -t nonfilteredImg.nii.gz -M >> ${indir}/global_mean_ts.dat
 ImgMean=$(fslstats $indir/nonfilteredImg.nii.gz -M)
 echo "Image mean is $ImgMean"
@@ -1040,6 +1046,7 @@ do
   echo $Normscore | awk '{if ($1 < 0) $1 = -$1; if ($1 > 3) print 1; else print 0}' >> ${indir}/evspikes.txt
 done
 
+clobber normscore.png &&\
 fsl_tsplot -i Normscore.par -t 'Normalized global mean timecourse' -u 1 --start=1 -a normedts -w 800 -h 300 -o normscore.png
 
 ################################################################
@@ -1050,8 +1057,9 @@ fsl_tsplot -i Normscore.par -t 'Normalized global mean timecourse' -u 1 --start=
 ########## AFNI QC tool ########################
   # AFNI graphing tool is fugly.  Replacing with FSL
 
-3dTqual -range -automask nonfilteredImg.nii.gz >> tmpPlot
-fsl_tsplot -i tmpPlot -t '3dTqual Results (Difference From Norm)' -u 1 --start=1 -a quality_index -w 800 -h 300 -o 3dTqual.png
+clobber 3dTqual.png &&\
+3dTqual -range -automask nonfilteredImg.nii.gz >> tmpPlot &&\
+fsl_tsplot -i tmpPlot -t '3dTqual Results (Difference From Norm)' -u 1 --start=1 -a quality_index -w 800 -h 300 -o 3dTqual.png &&\
 rm tmpPlot
 
 ################################################################
