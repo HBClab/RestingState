@@ -129,7 +129,7 @@ function feat_regFix()
   # Copy over appropriate files from previous processing
   # T1 (highres)
   fslmaths $t1Data $regDir/highres.nii.gz
-  t1toMNI=$(find "$(dirname $t1Data)"/T1forWarp -type d -name "T1_brain_to_MNI152.nii.gz")
+  t1toMNI=$(find "$(dirname $t1Data)"/T1forWarp -type f -name "T1_brain_to_MNI152.nii.gz")
   fslmaths $t1toMNI $regDir/highres2standard.nii.gz
 
   # EPI (example_func)
@@ -384,7 +384,7 @@ feat ${indir}/${fsf}
 
 
 # spatial smoothing
-clobber $preprocDir/nonfiltered_smooth _data.nii.gz &&\
+clobber $preprocDir/nonfiltered_smooth_data.nii.gz &&\
 smooth
 
 # median scaling (for ICA_AROMA)
