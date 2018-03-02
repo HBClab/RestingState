@@ -60,6 +60,43 @@ get_arg1() {
     fi
 }
 
+# Overwrites material or skips
+function clobber()
+{
+	# Tracking Variables
+	local -i num_existing_files=0
+	local -i num_args=$#
+
+	# Tally all existing outputs
+	for arg in "$@"; do
+		if [ -s "${arg}" ] && [ "${clob}" == true ]; then
+			rm -rf "${arg}"
+		elif [ -s "${arg}" ] && [ "${clob}" == false ]; then
+			num_existing_files=$(( ${num_existing_files} + 1 ))
+			continue
+		elif [ ! -s "${arg}" ]; then
+			continue
+		else
+			echo "How did you get here?"
+		fi
+	done
+
+	# see if the command should be run by seeing if the requisite files exist.
+	# 0=true
+	# 1=false
+	if [ ${num_existing_files} -lt ${num_args} ]; then
+		return 0
+	else
+		return 1
+	fi
+
+	# example usage
+	# clobber test.nii.gz &&\
+	# fslmaths input.nii.gz -mul 10 test.nii.gz
+}
+#default
+clob=false
+export -f clobber
 
 function medianScale()
 {
