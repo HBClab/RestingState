@@ -239,6 +239,11 @@ function smooth {
   echo "epiNonfilt=$preprocDir/nonfiltered_smooth_data.nii.gz" >> $indir/rsParams
 }
 
+indir=$(dirname $epiData)
+export indir
+preprocDir=$indir/${preprocfeat}
+export preprocDir
+
 # Parse Command line arguments
 if [ $# -lt 4 ] ; then Usage; exit 0; fi
 while [ $# -ge 1 ] ; do
@@ -312,10 +317,7 @@ if [[ $fieldMapFlag == "" ]]; then
   fieldMapFlag=0
 fi
 
-indir=$(dirname $epiData)
-export indir
-preprocDir=$indir/${preprocfeat}
-export preprocDir
+
 
 # Echo out all input parameters into a log
 logDir=$(dirname $epiData)
