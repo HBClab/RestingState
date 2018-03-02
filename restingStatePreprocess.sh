@@ -42,7 +42,7 @@ get_opt1() {
 
 get_imarg1() {
     arg=$(get_arg1 $1);
-    arg=$($fslDir/bin/remove_ext $arg);
+    arg=$($FSLDIR/bin/remove_ext $arg);
     echo $arg
 }
 
