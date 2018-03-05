@@ -182,8 +182,8 @@ while [ $# -ge 1 ] ; do
         export t1Data;
   	    shift;;
     --nuisanceList)
-      nuisanceList=( "$(cat "$OPTARG")" )
-      nuisanceInFile=$OPTARG
+      nuisanceList=( "$(cat "$(get_arg1 $1)")" );
+      nuisanceInFile=$(get_arg1 $1);
       shift;;
     --lp)
       lowpassArg=$(get_arg1 $1);
@@ -200,6 +200,10 @@ while [ $# -ge 1 ] ; do
     --te)
       te=$(get_arg1 $1);
       export te;
+      shift;;
+    --compcor)
+      compcorFlag=1;
+      export compcorFlag;
       shift;;
     -a)
       aromaFlag=1;
@@ -346,10 +350,8 @@ echo "Running $0 ..."
 
 roiList=("${nuisanceList[@]}")
 
-# Fix loop to remove directory and redo (if overWrite), first time processing, or echo with exit
-
-cd "$indir" || exit
-
+cd "$indir"/"${preprocfeat}" || exit
+mkdir -p rois
 
 clobber ${indir}/"$(basename "${epiData%%.nii*}")"_bp.nii.gz &&\
 bandpass ${epiData} $indir/mcImgMean_mask.nii.gz .008 .08
@@ -441,21 +443,60 @@ bandpass ${epiData} $indir/mcImgMean_mask.nii.gz .008 .08
 
 
 #### Nuisance ROI mapping ############
-echo "...Warping Nuisance ROIs to EPI space"
 
-for roi in "${roiList[@]}"
-do
-  echo "......Mapping nuisance regressor $roi"
+for roi in "${roiList[@]}"; do
+  roiName=$(basename ${roi} .nii.gz)
 
-  # Need to use warp from MNI to EPI from qualityCheck
-  MNItoEPIwarp=$(grep "MNItoEPIWarp=" "$logDir"/rsParams | tail -1 | awk -F"=" '{print $2}')
-  applywarp --ref="$indir"/mcImgMean_stripped.nii.gz --in="${scriptDir}"/ROIs/"${roi}".nii.gz --out=rois/"${roi}"_native.nii.gz --warp="$MNItoEPIwarp" --datatype=float
-  fslmaths rois/"${roi}"_native.nii.gz -thr 0.5 rois/"${roi}"_native.nii.gz
-  fslmaths rois/"${roi}"_native.nii.gz -bin rois/"${roi}"_native.nii.gz
-  fslmeants -i "$epiDataFilt" -o rois/mean_"${roi}"_ts.txt -m rois/"${roi}"_native.nii.gz
+  #check if roi is in native space
+  if [[ "$(fslinfo ${roi} | grep ^dim1 | awk '{print $2}')" -eq 91 ]]; then
+    # roi is in MNI space
+    clobber rois/"${roiName}"_native.nii.gz &&\
+    MNItoEPIwarp=$(grep "MNItoEPIWarp=" "$logDir"/rsParams | tail -1 | awk -F"=" '{print $2}') &&\
+    applywarp --ref="$indir"/mcImgMean_stripped.nii.gz --in=${roi} --out=rois/"${roiName}"_native.nii.gz --warp="$MNItoEPIwarp" --datatype=float
+
+  elif [[ "$(fslinfo ${roi} | grep ^dim1 | awk '{print $2}')" -eq "$(fslinfo ${epiDataFilt} | grep ^dim1 | awk '{print $2}')" ]]; then
+    # roi is in native space
+    clobber rois/"${roiName}"_native.nii.gz &&\
+    cp ${roi} rois/"${roiName}"_native.nii.gz
+
+  else
+    echo "dimensions of roi not in MNI or EPI space"
+    exit 1
+  fi
+  # check if needs binarize
+  if [[ "$(fslstats rois/"${roiName}"_native.nii.gz)" -ne 1 ]]; then
+    fslmaths rois/"${roiName}"_native.nii.gz -thr 0.5 -bin rois/"${roiName}"_native.nii.gz
+  fi
+
+  if [[ "${compcorFlag}" -eq 1 ]]; then
+    fslmeants -i "$epiDataFilt" -o rois/mean_"${roiName}"_ts.txt -m rois/"${roiName}"_native.nii.gz --eig --order=5
+
+    # separate 5 eigenvectors into single files
+    for i in {1..5}; do
+        awk -v var="$i" '{print $var}' rois/mean_${roiName}_ts.txt > rois/mean_${roiName}_${i}_ts.txt
+    done
+
+  else
+    clobber rois/mean_"${roiName}"_ts.txt &&\
+    fslmeants -i "$epiDataFilt" -o rois/mean_"${roiName}"_ts.txt -m rois/"${roiName}"_native.nii.gz
+  fi
 done
 
-#################################
+# echo "...Warping Nuisance ROIs to EPI space"
+#
+# for roi in "${roiList[@]}"
+# do
+#   echo "......Mapping nuisance regressor $roi"
+#
+#   # Need to use warp from MNI to EPI from qualityCheck
+#   MNItoEPIwarp=$(grep "MNItoEPIWarp=" "$logDir"/rsParams | tail -1 | awk -F"=" '{print $2}')
+#   applywarp --ref="$indir"/mcImgMean_stripped.nii.gz --in="${scriptDir}"/ROIs/"${roi}".nii.gz --out=rois/"${roi}"_native.nii.gz --warp="$MNItoEPIwarp" --datatype=float
+#   fslmaths rois/"${roi}"_native.nii.gz -thr 0.5 rois/"${roi}"_native.nii.gz
+#   fslmaths rois/"${roi}"_native.nii.gz -bin rois/"${roi}"_native.nii.gz
+#   fslmeants -i "$epiDataFilt" -o rois/mean_"${roi}"_ts.txt -m rois/"${roi}"_native.nii.gz
+# done
+#
+# #################################
 
 
 #### FEAT setup ############
@@ -505,6 +546,21 @@ sed -e "s|SUBJECTPATH|${indir}|g" \
 
 
 #### Calculate Nuisance Regressor time-series ############
+
+if [[ "${compcorFlag}" -eq 1 ]]; then
+
+  # reassign nuisanceList array with eigenvectors
+  > $indir/nuisance_rois.txt
+  nuisanceList=( "$(for i in {1..5}; do for roi in "${roiList[@]}"; do echo "$(basename ${roi} .nii.gz)"_${i};done;done)" )
+
+
+  for i in $nuisanceList; do
+    echo $i >> $indir/nuisance_rois.txt
+  done
+
+  nuisanceroiList=$indir/nuisance_rois.txt
+  nuisanceCount=$(cat $nuisanceroiList | awk 'END {print NR}')
+fi
 
 # Create Regressors using Octave
 echo "...Creating Regressors"
@@ -582,7 +638,7 @@ fi
 
 echo "...Plotting Regressor time series"
 
-for roi in "${roiList[@]}"
+for roi in "${nuisanceList[@]}"
 do
   fsl_tsplot -i "$indir"/tsregressorslp/"${roi}"_normalized_ts.txt -t "${roi} Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o "$indir"/"${roi}"_norm.png
   echo "<br><br><img src=\"$indir/${roi}_norm.png\" alt=\"$roi nuisance regressor\"><br>" >> "$indir"/analysisResults.html
