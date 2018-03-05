@@ -245,7 +245,7 @@ function run_aroma() {
   local inFile=$1
 
   clobber $indir/ica_aroma/denoised_func_data_nonaggr.nii.gz &&\
-  ICA_AROMA.py -i $inFile -o $indir/ica_aroma -mc $indir/mcImg.par -w $indir/EPItoT1optimized/EPItoMNI_warp.nii.gz
+  ICA_AROMA.py -i $inFile -o $indir/ica_aroma -mc $indir/mcImg.par -w "$(find ${indir}/EPItoT1* -type f -name "EPItoMNI_warp.nii.gz")"
 
   if [ ! -e $indir/ica_aroma/denoised_func_data_nonaggr.nii.gz ]; then
     >&2 echo "$indir/ica_aroma/denoised_func_data_nonaggr.nii.gz not found! exiting"
