@@ -30,6 +30,7 @@ function Usage {
   echo "   --te TE (milliseconds)"
   echo "   --s spatial smoothing kernel size"
   echo "   --f fieldmap registration correction"
+  echo "   -a run ICA_AROMA"
   echo "   -c clobber/overwrite previous results"
   exit 1
 }
@@ -239,6 +240,33 @@ function smooth {
   echo "epiNonfilt=$preprocDir/nonfiltered_smooth_data.nii.gz" >> $indir/rsParams
 }
 
+###### ICA_AROMA ########################################
+function run_aroma() {
+  local inFile=$1
+
+  clobber $indir/ica_aroma/denoised_func_data_nonaggr.nii.gz &&\
+  ICA_AROMA.py -i $inFile -o $indir/ica_aroma -mc $indir/mcImg.par -w $indir/EPItoT1optimized/EPItoMNI_warp.nii.gz
+
+  if [ ! -e $indir/ica_aroma/denoised_func_data_nonaggr.nii.gz ]; then
+    >&2 echo "$indir/ica_aroma/denoised_func_data_nonaggr.nii.gz not found! exiting"
+    exit 1
+  fi
+
+  # track ratio of noise components/total components
+
+  clobber $indir/ica_aroma/noise_ratio.csv &&\
+  numTotComps=$(tail -n +2 $indir/ica_aroma/classification_overview.txt | wc -l) &&\
+  numNoiseComps=$(sed 's/[^,]//g' $indir/ica_aroma/classified_motion_ICs.txt | wc -c)
+  ratio=$(echo "scale=2; ${numNoiseComps}/${numTotComps}" | bc) &&\
+  echo "$indir,$numNoiseComps,$numTotComps,$ratio" >> $indir/ica_aroma/noise_ratio.csv
+}
+
+###############################################################################
+
+##########
+## MAIN ##
+##########
+
 # Parse Command line arguments
 if [ $# -lt 4 ] ; then Usage; exit 0; fi
 while [ $# -ge 1 ] ; do
@@ -269,10 +297,19 @@ while [ $# -ge 1 ] ; do
       fieldMapFlag=1;
       export fieldMapFlag;
 	    shift;;
+  -a)
+      aromaFlag=1;
+      export aromaFlag;
+      if [ "$(which ICA_AROMA.py)" == "" ]; then
+        echo "ICA_AROMA is either not downloaded or not defined in your path, exiting script"
+        exit 1
+      fi
+      shift;;
   -c)
       clob=true;
       export clob;
       rm -rf "$(dirname ${epiData})"/${preprocfeat};
+      rm -rf "$(dirname ${epiData})"/ica_aroma;
       shift;;
   esac
 done
@@ -387,12 +424,18 @@ feat ${indir}/${fsf}
 clobber $preprocDir/nonfiltered_smooth_data.nii.gz &&\
 smooth
 
+#fix feat registration
+feat_regFix $preprocDir
+
 # median scaling (for ICA_AROMA)
 clobber $preprocDir/nonfiltered_smooth_data_intnorm.nii.gz &&\
 medianScale $preprocDir/nonfiltered_smooth_data.nii.gz $indir/mcImgMean_mask.nii.gz
 
-#fix feat registration
-feat_regFix $preprocDir
+# ICA-AROMA
+if [ ${aromaFlag} == 1 ]; then
+  clobber $indir/ica_aroma/denoised_func_data_nonaggr.nii.gz &&\
+  run_aroma $preprocDir/nonfiltered_smooth_data_intnorm.nii.gz
+fi
 
 cd $indir
 
