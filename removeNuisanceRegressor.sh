@@ -25,34 +25,58 @@ knownNuisanceRois=$(find "$scriptPath" -name "*.nii.gz" -exec basename {} .nii.g
 
 SGE_ROOT='';export SGE_ROOT
 
-function printCommandLine {
-  echo "Usage: removeNuisanceRegressor.sh -E restingStateImage -A T1Image -n nuisanceROI -t tr -T te -H highpass -L lowpass -c"
+function Usage {
+  echo "Usage: removeNuisanceRegressor.sh --epi=restingStateImage --t1brain=T1Image --nuisanceMode=nuisanceMode --tr=tr --te=te --hp=highpass --lp=lowpass -c"
   echo "            -OR-"
   echo "Usage: removeNuisanceRegressor.sh -E restingStateImage -A T1Image -n nuisanceROI -t tr -T te -H highpass -L lowpass -M -c"
   echo ""
   echo " where"
-  echo "  -E Resting State file"
+  echo "  -epi Resting State file"
   echo "     *If using 'Classic' mode (no ICA Denoising), specify 'nonfiltered_func_data.nii.gz' from preproc.feat directory"
   echo "     *If using MELODIC/Denoising, use 'denoised_func_data.nii.gz' from melodic.ica directory"
-  echo "  -A T1 file (skull-stripped)"
+  echo "  --t1brain T1 file (skull-stripped)"
   echo "     *T1 should be from output of dataPrep script, EPI shoule be from output of ICA_denoise script"
-  echo "  -n ROI for nuisance regression (can be used multiple times)"
-  echo "     *e.g. -n global -n latvent -n wmroi"
-  echo "  -N Data file with nuisance ROI list, one seed per line"
-  echo "     **Use ONLY one option, -n or -N, NOT both"
-  echo "  -L lowpass filter frequency (Hz) (e.g. 0.08 Hz (2.5 sigma))"
-  echo "  -H highpass filter frequency (Hz) (e.g. 0.008 Hz (25.5 sigma / 120 s))"
+  echo "  --nuisanceList list of nuisance ROIs"
+  echo "      compcor = ICA-AROMA + WM/CSF regressors derived from FAST segmentation"
+  echo "      classic = global + WM roi + CSF roi"
+  echo "  --lp lowpass filter frequency (Hz) (e.g. 0.08 Hz (2.5 sigma))"
+  echo "  --hp highpass filter frequency (Hz) (e.g. 0.008 Hz (25.5 sigma / 120 s))"
   echo "    *If low/highpass filters are unset (or purposely set to both be '0'), the 0 and Nyquist frequencies will"
   echo "     still be removed (allpass filter)"
-  echo "  -M highpass filter ONLY for Nuisance Regressors"
-  echo "    *Set this flag ONLY if you ran a highpass filter on the EPI data during Melodic proceseing"
-  echo "  -t TR time (seconds)"
-  echo "  -T TE (milliseconds) (default to 30 ms)"
+  echo "  --tr TR time (seconds)"
+  echo "  --te TE (milliseconds) (default to 30 ms)"
+  echo "  --aroma flag if using ICA_AROMA denoised data as input to nuisancereg"
   echo "  -c clobber/overwrite previous results"
   echo ""
   echo "Existing nuisance ROIs:"
   echo "$knownNuisanceRois"
   exit 1
+}
+
+########## FSL's arg parsing functions ###################
+get_opt1() {
+    arg=$(echo $1 | sed 's/=.*//')
+    echo $arg
+}
+
+get_imarg1() {
+    arg=$(get_arg1 $1);
+    arg=$($FSLDIR/bin/remove_ext $arg);
+    echo $arg
+}
+
+get_arg1() {
+    if [ X`echo $1 | grep '='` = X ] ; then
+	echo "Option $1 requires an argument" 1>&2
+	exit 1
+    else
+	arg=`echo $1 | sed 's/.*=//'`
+	if [ X$arg = X ] ; then
+	    echo "Option $1 requires an argument" 1>&2
+	    exit 1
+	fi
+	echo $arg
+    fi
 }
 
 #Overwrites material or skips
@@ -93,45 +117,92 @@ function clobber()
 clob=false
 export -f clobber
 
+function Usage {
+  echo "Usage: removeNuisanceRegressor.sh --epi=restingStateImage --t1brain=T1Image --nuisanceMode=nuisanceMode --tr=tr --te=te --hp=highpass --lp=lowpass -c"
+  echo "            -OR-"
+  echo "Usage: removeNuisanceRegressor.sh -E restingStateImage -A T1Image -n nuisanceROI -t tr -T te -H highpass -L lowpass -M -c"
+  echo ""
+  echo " where"
+  echo "  -epi Resting State file"
+  echo "     *If using 'Classic' mode (no ICA Denoising), specify 'nonfiltered_func_data.nii.gz' from preproc.feat directory"
+  echo "     *If using MELODIC/Denoising, use 'denoised_func_data.nii.gz' from melodic.ica directory"
+  echo "  --t1brain T1 file (skull-stripped)"
+  echo "     *T1 should be from output of dataPrep script, EPI shoule be from output of ICA_denoise script"
+  echo "  --nuisanceMode compcor or classic"
+  echo "      compcor = ICA-AROMA + WM/CSF regressors derived from FAST segmentation"
+  echo "      classic = global + WM roi + CSF roi"
+  echo "  --lp lowpass filter frequency (Hz) (e.g. 0.08 Hz (2.5 sigma))"
+  echo "  --hp highpass filter frequency (Hz) (e.g. 0.008 Hz (25.5 sigma / 120 s))"
+  echo "    *If low/highpass filters are unset (or purposely set to both be '0'), the 0 and Nyquist frequencies will"
+  echo "     still be removed (allpass filter)"
+  echo "  --tr TR time (seconds)"
+  echo "  --teT TE (milliseconds) (default to 30 ms)"
+  echo "  -c clobber/overwrite previous results"
+  echo ""
+  echo "Existing nuisance ROIs:"
+  echo "$knownNuisanceRois"
+  exit 1
+}
+
+
 # Parse Command line arguments
-while getopts "hE:A:n:N:L:H:Mt:T:c" OPTION
-do
-  case $OPTION in
-    h)
-      printCommandLine
-      ;;
-    E)
-      epiData=$OPTARG
-      ;;
-    A)
-      t1Data=$OPTARG
-      ;;
-    n)
-      nuisanceList=("$nuisanceList" "$OPTARG")
-      nuisanceInd=1
-      ;;
-    N)
+
+if [ $# -lt 4 ] ; then Usage; exit 0; fi
+while [ $# -ge 1 ] ; do
+    iarg=$(get_opt1 $1);
+    case "$iarg"
+	in
+    -h)
+        Usage;
+        exit 0;;
+    --epi)
+  	    epiData=`get_imarg1 $1`;
+        export epiData;
+        if [ "$epiData" == "" ]; then
+          echo "Error: The restingStateImage (-E) is a required option"
+          exit 1
+        fi
+  	    shift;;
+  	--t1)
+  	    t1SkullData=`get_imarg1 $1`;
+        export t1SkullData;
+        if [ "$t1Data" == "" ]; then
+          echo "Error: The T1 image (-A) is a required option"
+          exit 1
+        fi
+  	    shift;;
+    --t1brain)
+  	    t1Data=`get_imarg1 $1`;
+        export t1Data;
+  	    shift;;
+    --nuisanceList)
       nuisanceList=( "$(cat "$OPTARG")" )
       nuisanceInFile=$OPTARG
-      ;;
-    L)
-      lowpassArg=$OPTARG
-      ;;
-    H)
-      highpassArg=$OPTARG
-      ;;
-    M)
-      highpassMelodic=1
-      ;;
-    t)
-      tr=$OPTARG
-      ;;
-    T)
-      te=$OPTARG
-      ;;
-    c)
-      overwriteFlag=1
-      ;;
+      shift;;
+    --lp)
+      lowpassArg=$(get_arg1 $1);
+      export lowpassArg;
+      shift;;
+    --hp)
+      highpassArg=$(get_arg1 $1);
+      export highpassArg;
+      shift;;
+    --tr)
+      tr=$(get_arg1 $1);
+      export tr;
+      shift;;
+    --te)
+      te=$(get_arg1 $1);
+      export te;
+      shift;;
+    -a)
+      aromaFlag=1;
+      export aromaFlag;
+      shift;;
+    -c)
+      clob=true;
+      export clob;
+      shift;;
     ?)
       echo "ERROR: Invalid option"
       printCommandLine
@@ -144,15 +215,7 @@ done
 
 
 #Check for required input
-if [ "$epiData" == "" ]; then
-  echo "Error: The restingStateImage (-E) is a required option"
-  exit 1
-fi
 
-if [ "$t1Data" == "" ]; then
-  echo "Error: The T1 image (-A) is a required option"
-  exit 1
-fi
 
 if [ "$FSLDIR" == "" ]; then
   echo "Error: The Environmental variable FSLDIR must be set"
@@ -198,9 +261,7 @@ if [[ "${highpassArg}" == "" ]]; then
   highpassArg=0
 fi
 
-if [[ "${highpassMelodic}" == "" ]]; then
-  highpassMelodic=0
-fi
+
 
 # Vanilla settings for filtering: L=.08, H=.008
 
