@@ -21,7 +21,6 @@ fsf2=${analysis2}.fsf
 ##Check of all ROIs (from ROIs directory), that can be used for nuisance regression
 scriptPath=$(perl -e 'use Cwd "abs_path";print abs_path(shift)' "$0")
 scriptDir=$(dirname "$scriptPath")
-knownNuisanceRois=$(find "$scriptPath" -name "*.nii.gz" -exec basename {} .nii.gz \;)
 
 SGE_ROOT='';export SGE_ROOT
 
@@ -31,12 +30,12 @@ function Usage {
   echo "Usage: removeNuisanceRegressor.sh -E restingStateImage -A T1Image -n nuisanceROI -t tr -T te -H highpass -L lowpass -M -c"
   echo ""
   echo " where"
-  echo "  -epi Resting State file"
+  echo "  -epi preprocessed Resting State file"
   echo "     *If using 'Classic' mode (no ICA Denoising), specify 'nonfiltered_func_data.nii.gz' from preproc.feat directory"
-  echo "     *If using MELODIC/Denoising, use 'denoised_func_data.nii.gz' from melodic.ica directory"
+  echo "     *If using ICA_AROMA, use denoised_func_data_aggr.nii.gz from ica_aroma directory"
   echo "  --t1brain T1 file (skull-stripped)"
   echo "     *T1 should be from output of dataPrep script, EPI shoule be from output of ICA_denoise script"
-  echo "  --nuisanceList list of nuisance ROIs"
+  echo "  --nuisanceList list containing paths to nuisance ROIs"
   echo "      compcor = ICA-AROMA + WM/CSF regressors derived from FAST segmentation"
   echo "      classic = global + WM roi + CSF roi"
   echo "  --lp lowpass filter frequency (Hz) (e.g. 0.08 Hz (2.5 sigma))"
@@ -45,7 +44,7 @@ function Usage {
   echo "     still be removed (allpass filter)"
   echo "  --tr TR time (seconds)"
   echo "  --te TE (milliseconds) (default to 30 ms)"
-  echo "  --aroma flag if using ICA_AROMA denoised data as input to nuisancereg"
+  echo "  -a flag if using ICA_AROMA denoised data as input to nuisancereg"
   echo "  -c clobber/overwrite previous results"
   echo ""
   echo "Existing nuisance ROIs:"
@@ -117,32 +116,39 @@ function clobber()
 clob=false
 export -f clobber
 
-function Usage {
-  echo "Usage: removeNuisanceRegressor.sh --epi=restingStateImage --t1brain=T1Image --nuisanceMode=nuisanceMode --tr=tr --te=te --hp=highpass --lp=lowpass -c"
-  echo "            -OR-"
-  echo "Usage: removeNuisanceRegressor.sh -E restingStateImage -A T1Image -n nuisanceROI -t tr -T te -H highpass -L lowpass -M -c"
-  echo ""
-  echo " where"
-  echo "  -epi Resting State file"
-  echo "     *If using 'Classic' mode (no ICA Denoising), specify 'nonfiltered_func_data.nii.gz' from preproc.feat directory"
-  echo "     *If using MELODIC/Denoising, use 'denoised_func_data.nii.gz' from melodic.ica directory"
-  echo "  --t1brain T1 file (skull-stripped)"
-  echo "     *T1 should be from output of dataPrep script, EPI shoule be from output of ICA_denoise script"
-  echo "  --nuisanceMode compcor or classic"
-  echo "      compcor = ICA-AROMA + WM/CSF regressors derived from FAST segmentation"
-  echo "      classic = global + WM roi + CSF roi"
-  echo "  --lp lowpass filter frequency (Hz) (e.g. 0.08 Hz (2.5 sigma))"
-  echo "  --hp highpass filter frequency (Hz) (e.g. 0.008 Hz (25.5 sigma / 120 s))"
-  echo "    *If low/highpass filters are unset (or purposely set to both be '0'), the 0 and Nyquist frequencies will"
-  echo "     still be removed (allpass filter)"
-  echo "  --tr TR time (seconds)"
-  echo "  --teT TE (milliseconds) (default to 30 ms)"
-  echo "  -c clobber/overwrite previous results"
-  echo ""
-  echo "Existing nuisance ROIs:"
-  echo "$knownNuisanceRois"
-  exit 1
+function bandpass()
+{
+	local inData=$1
+	local mask=$2
+  local inDir
+  inDir=$(dirname ${inData})
+
+  # defaults
+  if [ "$hp" == "" ]; then
+    hp=.008
+  fi
+
+  if [ "$lp" == "" ]; then
+    lp=.08
+  fi
+
+  clobber ${inDir}/"$(basename "${inData%%.nii*}")"_bp.nii.gz &&\
+  rm -rf ${inDir}/*_mean.nii.gz 2> /dev/null &&\
+  rm -rf ${inDir}/tmp_bp.nii.gz 2> /dev/null &&\
+	3dBandpass -prefix $inDir/tmp_bp.nii.gz -mask ${mask} ${hp} ${lp} ${inData} &&\
+	3dTstat -mean -prefix $inDir/orig_mean.nii.gz ${inData} &&\
+	3dTstat -mean -prefix $inDir/bp_mean.nii.gz $inDir/tmp_bp.nii.gz &&\
+	3dcalc -a $inDir/tmp_bp.nii.gz -b $inDir/orig_mean.nii.gz -c $inDir/bp_mean.nii.gz -expr "a+b-c" -prefix ${inDir}/"$(basename "${inData%%.nii*}")"_bp.nii.gz
+  epiDataFilt=${inDir}/"$(basename "${inData%%.nii*}")"_bp.nii.gz
+  export epiDataFilt
 }
+export -f bandpass
+
+###############################################################################
+
+##########
+## MAIN ##
+##########
 
 
 # Parse Command line arguments
@@ -202,6 +208,9 @@ while [ $# -ge 1 ] ; do
     -c)
       clob=true;
       export clob;
+      rm -- *_norm.png run_normseedregressors.m;
+      rm -rf nuisancereg.*;
+      rm -rf tsregressorslp;
       shift;;
     ?)
       echo "ERROR: Invalid option"
@@ -215,7 +224,6 @@ done
 
 
 #Check for required input
-
 
 if [ "$FSLDIR" == "" ]; then
   echo "Error: The Environmental variable FSLDIR must be set"
@@ -354,89 +362,93 @@ if [[ -e ${nuisancefeat} ]]; then
       mkdir rois
     fi
 
-    # Check to see if Melodic highpass filtering had already been run.  Don't want to highpass filter the EPI data twice
-    if [[ $highpassMelodic == 1 ]]; then
-      # ONLY lowpass (or allpass) filtering possible for EPI
+    clobber ${indir}/"$(basename "${epiData%%.nii*}")"_bp.nii.gz &&\
+    bandpass ${epiData} $epiDir/mcImgMean_mask.nii.gz .008 .08
+    # bandpassed data is exported to variable $epiDataFilt
 
-      #### Bandpass EPI Data With AFNI Tools, before nuisance regression ############
-      # Vanilla settings for filtering: L=.08, H=.008 (2.5 sigma to 25.5 sigma / 120 s)
-      # Since filtereing was removed from previous steps, a new file:
-      # If filtering is set, filtered_func_data must be created
-      # If filtering is not set, nonfiltered_func_data must be scaled by 1000
-      echo "...Bandpass Filtering EPI data"
-
-      if [ $lowpassArg == 0 ]; then
-        # Allpass filter (only 0 and Nyquist frequencies are removed)
-        # Scale data by 1000
-
-        3dBandpass -prefix bandpass.nii.gz 0 99999 "${epiData}"
-        mv bandpass.nii.gz filtered_func_data.nii.gz
-        fslmaths "$indir"/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
-        fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
-        epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
-
-        # Log filtered file
-        { echo "lowpassFilt=$lowpassArg"; \
-        echo "_allpassFilt"; \
-        echo "epiDataFilt=$epiDataFilt"; } >> "$logDir"/rsParams
-      else
-        # Filtering and scaling (lowpass)
-        # Scale data by 1000
-
-        3dBandpass -prefix bandpass.nii.gz 0 $lowpassArg "${epiData}"
-        mv bandpass.nii.gz filtered_func_data.nii.gz
-        fslmaths "$indir"/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
-        fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
-        epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
-
-        # Log filtered file
-        echo "lowpassFilt=$lowpassArg" >> "$logDir"/rsParams
-        echo "epiDataFilt=$epiDataFilt" >> "$logDir"/rsParams
-      fi
-
-    else
-      # Highpass filtering an option for EPI data
-
-      #### Bandpass EPI Data With AFNI Tools, before nuisance regression ############
-      # Vanilla settings for filtering: L=.08, H=.008 (2.5 sigma to 25.5 sigma / 120 s)
-      # Since filtereing was removed from previous steps, a new file:
-      # If filtering is set, filtered_func_data must be created
-      # If filtering is not set, nonfiltered_func_data must be scaled by 1000
-      echo "...Bandpass Filtering EPI data"
-
-      if [ $lowpassArg == 0 ] && [ $highpassArg == 0 ]; then
-        # Allpass filter (only 0 and Nyquist frequencies are removed)
-        # Scale data by 1000
-
-        3dBandpass -prefix bandpass.nii.gz 0 99999 "${epiData}"
-        mv bandpass.nii.gz filtered_func_data.nii.gz
-        fslmaths "$indir"/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
-        fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
-        epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
-
-       # Log filtered file
-        { echo "lowpassFilt=$lowpassArg"; \
-        echo "highpassFilt=$highpassArg"; \
-        echo "_allpassFilt"; \
-        echo "epiDataFilt=$epiDataFilt"; } >> "$logDir"/rsParams
-      else
-        # Filtering and scaling (either lowpass, highpass or both)
-        # Scale data by 1000
-
-        3dBandpass -prefix bandpass.nii.gz "$highpassArg" "$lowpassArg" "${epiData}"
-        mv bandpass.nii.gz filtered_func_data.nii.gz
-        fslmaths "$indir"/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
-        fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
-        epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
-
-        # Log filtered file
-        { echo "lowpassFilt=$lowpassArg"; \
-        echo "highpassFilt=$highpassArg"; \
-        echo "epiDataFilt=$epiDataFilt"; } >> "$logDir"/rsParams
-      fi
-    fi
-
-    #################################
+    # # Check to see if Melodic highpass filtering had already been run.  Don't want to highpass filter the EPI data twice
+    # if [[ $highpassMelodic == 1 ]]; then
+    #   # ONLY lowpass (or allpass) filtering possible for EPI
+    #
+    #   #### Bandpass EPI Data With AFNI Tools, before nuisance regression ############
+    #   # Vanilla settings for filtering: L=.08, H=.008 (2.5 sigma to 25.5 sigma / 120 s)
+    #   # Since filtereing was removed from previous steps, a new file:
+    #   # If filtering is set, filtered_func_data must be created
+    #   # If filtering is not set, nonfiltered_func_data must be scaled by 1000
+    #   echo "...Bandpass Filtering EPI data"
+    #
+    #   if [ $lowpassArg == 0 ]; then
+    #     # Allpass filter (only 0 and Nyquist frequencies are removed)
+    #     # Scale data by 1000
+    #
+    #     3dBandpass -prefix bandpass.nii.gz 0 99999 "${epiData}"
+    #     mv bandpass.nii.gz filtered_func_data.nii.gz
+    #     fslmaths "$indir"/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
+    #     fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
+    #     epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
+    #
+    #     # Log filtered file
+    #     { echo "lowpassFilt=$lowpassArg"; \
+    #     echo "_allpassFilt"; \
+    #     echo "epiDataFilt=$epiDataFilt"; } >> "$logDir"/rsParams
+    #   else
+    #     # Filtering and scaling (lowpass)
+    #     # Scale data by 1000
+    #
+    #     3dBandpass -prefix bandpass.nii.gz 0 $lowpassArg "${epiData}"
+    #     mv bandpass.nii.gz filtered_func_data.nii.gz
+    #     fslmaths "$indir"/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
+    #     fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
+    #     epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
+    #
+    #     # Log filtered file
+    #     echo "lowpassFilt=$lowpassArg" >> "$logDir"/rsParams
+    #     echo "epiDataFilt=$epiDataFilt" >> "$logDir"/rsParams
+    #   fi
+    #
+    # else
+    #   # Highpass filtering an option for EPI data
+    #
+    #   #### Bandpass EPI Data With AFNI Tools, before nuisance regression ############
+    #   # Vanilla settings for filtering: L=.08, H=.008 (2.5 sigma to 25.5 sigma / 120 s)
+    #   # Since filtereing was removed from previous steps, a new file:
+    #   # If filtering is set, filtered_func_data must be created
+    #   # If filtering is not set, nonfiltered_func_data must be scaled by 1000
+    #   echo "...Bandpass Filtering EPI data"
+    #
+    #   if [ $lowpassArg == 0 ] && [ $highpassArg == 0 ]; then
+    #     # Allpass filter (only 0 and Nyquist frequencies are removed)
+    #     # Scale data by 1000
+    #
+    #     3dBandpass -prefix bandpass.nii.gz 0 99999 "${epiData}"
+    #     mv bandpass.nii.gz filtered_func_data.nii.gz
+    #     fslmaths "$indir"/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
+    #     fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
+    #     epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
+    #
+    #    # Log filtered file
+    #     { echo "lowpassFilt=$lowpassArg"; \
+    #     echo "highpassFilt=$highpassArg"; \
+    #     echo "_allpassFilt"; \
+    #     echo "epiDataFilt=$epiDataFilt"; } >> "$logDir"/rsParams
+    #   else
+    #     # Filtering and scaling (either lowpass, highpass or both)
+    #     # Scale data by 1000
+    #
+    #     3dBandpass -prefix bandpass.nii.gz "$highpassArg" "$lowpassArg" "${epiData}"
+    #     mv bandpass.nii.gz filtered_func_data.nii.gz
+    #     fslmaths "$indir"/mcImgMean_mask.nii.gz -mul 1000 mask1000.nii.gz -odt float
+    #     fslmaths filtered_func_data.nii.gz -add mask1000 filtered_func_data.nii.gz -odt float
+    #     epiDataFilt=$indir/${preprocfeat}/filtered_func_data.nii.gz
+    #
+    #     # Log filtered file
+    #     { echo "lowpassFilt=$lowpassArg"; \
+    #     echo "highpassFilt=$highpassArg"; \
+    #     echo "epiDataFilt=$epiDataFilt"; } >> "$logDir"/rsParams
+    #   fi
+    # fi
+    #
+    # #################################
 
 
     #### Nuisance ROI mapping ############
