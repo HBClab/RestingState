@@ -187,14 +187,14 @@ else
       -v ${fmap_mag} \
       -x ${fmap_mag_stripped} \
       -D ${dwellTime} \
-      -d -y -c
+      -d -y
 
     ${scriptdir}/restingStatePreprocess.sh -E ${rsOut}/mcImg_stripped.nii.gz \
       -A ${T1_RPI_brain} \
       -t 2 \
       -T 30 \
       -s 6 \
-      -f -c
+      -f
 
     ${scriptdir}/removeNuisanceRegressor.sh -E $rsOut/preproc.feat/nonfiltered_smooth_data.nii.gz \
       -A ${T1_RPI_brain} \
@@ -202,7 +202,7 @@ else
       -L .08 \
       -H .008 \
       -t 2 \
-      -T 30 -c
+      -T 30
 
     ${scriptdir}/motionScrub.sh -E $rsOut/RestingState.nii.gz
 
@@ -216,14 +216,13 @@ else
       -A ${T1_RPI_brain} \
       -a ${T1_RPI} \
       -D ${dwellTime} \
-      -d -y -c
+      -d -y
 
     ${scriptdir}/restingStatePreprocess.sh -E ${rsOut}/mcImg_stripped.nii.gz \
       -A ${T1_RPI_brain} \
       -t 2 \
       -T 30 \
       -s 6 \
-      -c
 
     ${scriptdir}/removeNuisanceRegressor.sh -E $rsOut/preproc.feat/nonfiltered_smooth_data.nii.gz \
       -A ${T1_RPI_brain} \
@@ -231,7 +230,7 @@ else
       -L .08 \
       -H .008 \
       -t 2 \
-      -T 30 -c
+      -T 30
 
     ${scriptdir}/motionScrub.sh -E $rsOut/RestingState.nii.gz
 
