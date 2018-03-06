@@ -170,8 +170,8 @@ while [ $# -ge 1 ] ; do
         fi
   	    shift;;
   	--t1)
-  	    t1SkullData=`get_imarg1 $1`;
-        export t1SkullData;
+  	    t1Data=`get_imarg1 $1`;
+        export t1Data;
         if [ "$t1Data" == "" ]; then
           echo "Error: The T1 image (-A) is a required option"
           exit 1
