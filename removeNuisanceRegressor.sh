@@ -32,7 +32,7 @@ function Usage {
   echo " where"
   echo "  -epi preprocessed Resting State file"
   echo "     *If using 'Classic' mode (no ICA Denoising), specify 'nonfiltered_func_data.nii.gz' from preproc.feat directory"
-  echo "     *If using ICA_AROMA, use denoised_func_data_aggr.nii.gz from ica_aroma directory"
+  echo "     *If using ICA_AROMA, use denoised_func_data_nonaggr.nii.gz from ica_aroma directory"
   echo "  --t1brain T1 file (skull-stripped)"
   echo "     *T1 should be from output of dataPrep script, EPI shoule be from output of ICA_denoise script"
   echo "  --nuisanceList list containing paths to nuisance ROIs"
@@ -163,7 +163,7 @@ while [ $# -ge 1 ] ; do
         Usage;
         exit 0;;
     --epi)
-  	    epiData=`get_imarg1 $1`;
+  	    epiData=`get_arg1 $1`;
         export epiData;
         if [ "$epiData" == "" ]; then
           echo "Error: The restingStateImage (-E) is a required option"
