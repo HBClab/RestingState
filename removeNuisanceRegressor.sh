@@ -44,7 +44,8 @@ function Usage {
   echo "     still be removed (allpass filter)"
   echo "  --tr TR time (seconds)"
   echo "  --te TE (milliseconds) (default to 30 ms)"
-  echo "  -a flag if using ICA_AROMA denoised data as input to nuisancereg"
+  echo "  --aroma flag if using ICA_AROMA denoised data as input to nuisancereg"
+  echo "  --compcor flag if using CompCor nuisancereg"
   echo "  -c clobber/overwrite previous results"
   echo ""
   echo "Existing nuisance ROIs:"
@@ -201,7 +202,7 @@ while [ $# -ge 1 ] ; do
       compcorFlag=1;
       export compcorFlag;
       shift;;
-    -a)
+    --aroma)
       aromaFlag=1;
       export aromaFlag;
       shift;;
@@ -230,15 +231,6 @@ if [ "$FSLDIR" == "" ]; then
   exit 1
 fi
 
-for roi in "${nuisanceList[@]}"
-do
-  testRoi=$(echo "$knownNuisanceRois" | grep "$roi")
-  if [ "$testRoi" == "" ]; then
-    echo "Error: Invalid Nuisance ROI specified (${roi})"
-    echo "Valid Nuisance ROIs: $knownNuisanceRois"
-    exit 1
-  fi
-done
 
 if [[ "${nuisanceList[*]}" == "" ]]; then
   echo "Error: At least one Nuisance ROI must be specified using the -n options"
