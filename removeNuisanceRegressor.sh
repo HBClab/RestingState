@@ -48,8 +48,6 @@ function Usage {
   echo "  --compcor flag if using CompCor nuisancereg"
   echo "  -c clobber/overwrite previous results"
   echo ""
-  echo "Existing nuisance ROIs:"
-  echo "$knownNuisanceRois"
   exit 1
 }
 
@@ -140,8 +138,6 @@ function bandpass()
 	3dTstat -mean -prefix $inDir/orig_mean.nii.gz ${inData} &&\
 	3dTstat -mean -prefix $inDir/bp_mean.nii.gz $inDir/tmp_bp.nii.gz &&\
 	3dcalc -a $inDir/tmp_bp.nii.gz -b $inDir/orig_mean.nii.gz -c $inDir/bp_mean.nii.gz -expr "a+b-c" -prefix ${inDir}/"$(basename "${inData%%.nii*}")"_bp.nii.gz
-  epiDataFilt=${inDir}/"$(basename "${inData%%.nii*}")"_bp.nii.gz
-  export epiDataFilt
 }
 export -f bandpass
 
@@ -179,8 +175,8 @@ while [ $# -ge 1 ] ; do
         fi
   	    shift;;
     --nuisanceList)
-      nuisanceList=( "$(cat "$(get_arg1 $1)")" );
       nuisanceInFile=$(get_arg1 $1);
+      declare -a nuisanceList=( "$(cat "${nuisanceInFile}")" );
       shift;;
     --lp)
       lowpassArg=$(get_arg1 $1);
@@ -266,10 +262,9 @@ fi
 # Vanilla settings for filtering: L=.08, H=.008
 
 # Source input (~func) directory
-indirTmp=$(dirname "$epiData")
-indir=$(dirname "$indirTmp")
-preprocfeat=$(echo "$indirTmp" | awk -F"/" '{print $NF}')
-logDir=$indir
+indir=$(dirname "$epiData")
+preprocfeat=$(x=$indir; while [ "$x" != "/" ] ; do x=`dirname "$x"`; find "$x" -maxdepth 1 -type d -name preproc.feat; done)
+logDir=$(dirname ${preprocfeat})
 
 # Set flag depending on whether Melodic was run or not (to determine which directory to pull "reg" files from)
 # "Classic" processing = nonfiltered_smooth_data.nii.gz ('nonfiltered')
@@ -313,11 +308,7 @@ nuisanceCount=$(awk 'END {print NR}' "$nuisanceroiList")
 echo "------------------------------------"; \
 echo "-E $epiData"; \
 echo "-A $t1Data"; } >> "$logDir"/rsParams_log
-if [[ $nuisanceInd == 1 ]]; then
-  echo "$nuisanceROI" >> "$logDir"/rsParams_log
-else
   echo "-N $nuisanceInFile" >> "$logDir"/rsParams_log
-fi
 { echo "-L $lowpassArg"; \
 echo "-H $highpassArg"; \
 echo "-t $tr"; \
@@ -337,14 +328,14 @@ fi
 echo "Running $0 ..."
 
 roiList=("${nuisanceList[@]}")
-
-cd "$indir"/"${preprocfeat}" || exit
+cd "${preprocfeat}" || exit
 mkdir -p rois
 
 clobber ${indir}/"$(basename "${epiData%%.nii*}")"_bp.nii.gz &&\
 bandpass ${epiData} $indir/mcImgMean_mask.nii.gz .008 .08
-# bandpassed data is exported to variable $epiDataFilt
 
+epiDataFilt=${indir}/"$(basename "${epiData%%.nii*}")"_bp.nii.gz
+export epiDataFilt
 # # Check to see if Melodic highpass filtering had already been run.  Don't want to highpass filter the EPI data twice
 # if [[ $highpassMelodic == 1 ]]; then
 #   # ONLY lowpass (or allpass) filtering possible for EPI
@@ -428,39 +419,39 @@ bandpass ${epiData} $indir/mcImgMean_mask.nii.gz .008 .08
 # fi
 #
 # #################################
-
-
 #### Nuisance ROI mapping ############
-
-for roi in "${roiList[@]}"; do
-  roiName=$(basename ${roi} .nii.gz)
-
+for roi in $(cat $nuisanceInFile)
+do
+  echo "${roi}" here
+  roiName=${roi##*/}
+  roiName=${roiName%%.*}
   #check if roi is in native space
-  if [[ "$(fslinfo ${roi} | grep ^dim1 | awk '{print $2}')" -eq 91 ]]; then
-    # roi is in MNI space
+  if [[ "$(fslinfo "${roi}" | grep ^dim1 | awk '{print $2}')" == 91 ]]; then
+    echo "${roi} is in MNI space"
     clobber rois/"${roiName}"_native.nii.gz &&\
     MNItoEPIwarp=$(grep "MNItoEPIWarp=" "$logDir"/rsParams | tail -1 | awk -F"=" '{print $2}') &&\
-    applywarp --ref="$indir"/mcImgMean_stripped.nii.gz --in=${roi} --out=rois/"${roiName}"_native.nii.gz --warp="$MNItoEPIwarp" --datatype=float
+    applywarp --ref="$indir"/mcImgMean_stripped.nii.gz --in="${roi}" --out=rois/"${roiName}"_native.nii.gz --warp="$MNItoEPIwarp" --datatype=float
 
-  elif [[ "$(fslinfo ${roi} | grep ^dim1 | awk '{print $2}')" -eq "$(fslinfo ${epiDataFilt} | grep ^dim1 | awk '{print $2}')" ]]; then
-    # roi is in native space
+  elif [[ "$(fslinfo "${roi}" | grep ^dim1 | awk '{print $2}')" == "$(fslinfo ${epiDataFilt} | grep ^dim1 | awk '{print $2}')" ]]; then
+    echo "${roi} is in native space"
     clobber rois/"${roiName}"_native.nii.gz &&\
-    cp ${roi} rois/"${roiName}"_native.nii.gz
+    cp "${roi}" rois/"${roiName}"_native.nii.gz
 
   else
     echo "dimensions of roi not in MNI or EPI space"
     exit 1
   fi
   # check if needs binarize
-  if [[ "$(fslstats rois/"${roiName}"_native.nii.gz)" -ne 1 ]]; then
+  if [[ "$(printf %.0f $(fslstats rois/"${roiName}"_native.nii.gz -M))" -ne 1 ]]; then
     fslmaths rois/"${roiName}"_native.nii.gz -thr 0.5 -bin rois/"${roiName}"_native.nii.gz
   fi
 
   if [[ "${compcorFlag}" -eq 1 ]]; then
+    clobber rois/mean_"${roiName}"_ts.txt &&\
     fslmeants -i "$epiDataFilt" -o rois/mean_"${roiName}"_ts.txt -m rois/"${roiName}"_native.nii.gz --eig --order=5
-
     # separate 5 eigenvectors into single files
     for i in {1..5}; do
+        clobber rois/mean_${roiName}_${i}_ts.txt &&\
         awk -v var="$i" '{print $var}' rois/mean_${roiName}_ts.txt > rois/mean_${roiName}_${i}_ts.txt
     done
 
@@ -469,7 +460,6 @@ for roi in "${roiList[@]}"; do
     fslmeants -i "$epiDataFilt" -o rois/mean_"${roiName}"_ts.txt -m rois/"${roiName}"_native.nii.gz
   fi
 done
-
 # echo "...Warping Nuisance ROIs to EPI space"
 #
 # for roi in "${roiList[@]}"
@@ -542,7 +532,7 @@ if [[ "${compcorFlag}" -eq 1 ]]; then
   nuisanceList=( "$(for i in {1..5}; do for roi in "${roiList[@]}"; do echo "$(basename ${roi} .nii.gz)"_${i};done;done)" )
 
 
-  for i in $nuisanceList; do
+  for i in "${nuisanceList[@]}"; do
     echo $i >> $indir/nuisance_rois.txt
   done
 
