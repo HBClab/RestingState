@@ -432,20 +432,18 @@ export regressorsFile
 clobber ${indir}/"$(basename "${epiData%%.nii*}")"_bp_res4d.nii.gz &&\
 SimultBandpassNuisanceReg ${epiData} $indir/mcImgMean_mask.nii.gz
 
-epiDataFilt=${indir}/"$(basename "${epiData%%.nii*}")"_bp.nii.gz
-export epiDataFilt
+epiDataFiltReg=${indir}/"$(basename "${epiData%%.nii*}")"_bp_res4d.nii.gz
+export epiDataFiltReg
 
 
 
 
 
-###### Post-FEAT data-scaling ########################################
-
-cd "$indir"/"${nuisancefeat}"/stats || exit
+###### Post-regression data-scaling ########################################
 
 # Backup file
 echo "...Scaling data by 1000"
-cp res4d.nii.gz res4d_orig.nii.gz
+cp ${epiDataFiltReg} ${epiDataFiltReg/res4d/res4d_orig}
 
 # For some reason, this mask isn't very good.  Use the good mask top-level
 echo "...Copy Brain mask"
@@ -454,14 +452,14 @@ fslmaths mask -mul 1000 mask1000 -odt float
 
 # normalize res4d here
 echo "...Normalize Data"
-fslmaths res4d -Tmean res4d_tmean
-fslmaths res4d -Tstd res4d_std
-fslmaths res4d -sub res4d_tmean res4d_dmean
-fslmaths res4d_dmean -div res4d_std res4d_normed
-fslmaths res4d_normed -add mask1000 res4d_normandscaled -odt float
+fslmaths ${epiDataFiltReg} -Tmean ${epiDataFiltReg/res4d/res4d_tmean} res4d_tmean
+fslmaths ${epiDataFiltReg} -Tstd ${epiDataFiltReg/res4d/res4d_std}res4d_std
+fslmaths ${epiDataFiltReg} -sub ${epiDataFiltReg/res4d/res4d_tmean} ${epiDataFiltReg/res4d/res4d_dmean} res4d_tmean res4d_dmean
+fslmaths ${epiDataFiltReg/res4d/res4d_dmean} -div ${epiDataFiltReg/res4d/res4d_std} ${epiDataFiltReg/res4d/res4d_normed}
+fslmaths ${epiDataFiltReg/res4d/res4d_normed} -add mask1000 ${epiDataFiltReg/res4d/res4d_normandscaled} -odt float
 
 # Echo out final file to rsParams file
-echo "epiNorm=$indir/$nuisancefeat/stats/res4d_normandscaled.nii.gz" >> "$logDir"/rsParams
+echo "epiNorm=${epiDataFiltReg/res4d/res4d_normed}" >> "$logDir"/rsParams
 
 #################################
 
