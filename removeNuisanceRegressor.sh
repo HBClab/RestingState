@@ -118,15 +118,6 @@ function SimultBandpassNuisanceReg()
   local inDir
   inDir=$(dirname ${inData})
 
-  # defaults
-  if [ "$hp" == "" ]; then
-    hp=.008
-  fi
-
-  if [ "$lp" == "" ]; then
-    lp=.08
-  fi
-
   #If neither lowpass or highpass is set, do an allpass filter (fbot=0 ftop=99999)
    #If ONLY highpass is set, do a highpass filter (fbot=${hp} ftop=99999)
    #If ONLY lowpass is set, do a lowpass filter (fbot=0 ftop=${hp})
@@ -281,23 +272,11 @@ if [[ ${te} == "" ]]; then
   te=30
 fi
 
-if [[ "${lp}" == "" ]]; then
-  lp=0
-fi
-
-if [[ "${hp}" == "" ]]; then
-  hp=0
-fi
-
-
-
-# Vanilla settings for filtering: L=.08, H=.008
-
 # Source input (~func) directory
 indir=$(dirname "$epiData")
 preprocfeat=$(x=$indir; while [ "$x" != "/" ] ; do x=`dirname "$x"`; find "$x" -maxdepth 1 -type d -name preproc.feat; done)
 logDir=$(dirname ${preprocfeat})
-
+rawEpiDir=$(dirname "$preprocfeat")
 
 # If new nuisance regressors were added, echo them out to the rsParams file (only if they don't already exist in the file)
 # Making a *strong* assumption that any nuisanceROI lists added after initial processing won't reuse the first ROI (e.g. pccrsp)
@@ -316,13 +295,13 @@ fi
 
 # Echo out nuisance ROIs to a text file in input directory.
 
-if [ -e "$indir"/nuisance_rois.txt ]; then
-  rm "$indir"/nuisance_rois.txt
+if [ -e "$rawEpiDir"/nuisance_rois.txt ]; then
+  rm "$rawEpiDir"/nuisance_rois.txt
 fi
 
 for i in "${nuisanceList[@]}"
 do
-  echo "$i" >> "$indir"/nuisance_rois.txt
+  echo "$i" >> "$rawEpiDir"/nuisance_rois.txt
 done
 
 
@@ -357,8 +336,9 @@ mkdir -p rois
 #### Nuisance ROI mapping ############
 for roi in $(cat $nuisanceInFile)
 do
-  roiName="$(get_filename "${i}")"
-
+  roiName="$(get_filename "${roi}")"
+  echo $roi
+  echo $roiName
   #check if roi is in native space
   if [[ "$(fslinfo "${roi}" | grep ^dim1 | awk '{print $2}')" == 91 ]]; then
     echo "${roi} is in MNI space"
@@ -383,6 +363,7 @@ do
   # extract regressor timeseries from unfiltered epi
   if [[ "${compcorFlag}" -eq 1 ]]; then
     clobber rois/mean_"${roiName}"_ts.txt &&\
+    echo "extracting timeseries for $roiName" &&\
     fslmeants -i "$epiData" -o rois/mean_"${roiName}"_ts.txt -m rois/"${roiName}"_native.nii.gz --eig --order=5
 
   else
@@ -436,18 +417,20 @@ done
 ###### simultaneous bandpass + regression #####
 
 # paste regressor timeseries into one file
-paste -d' ' "$(for i in $(cat $nuisanceInFile); do echo ${preprocfeat}/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' ')" > "$(dirname ${preprocfeat})"/NuisanceRegressor_ts.txt
+# paste -d' ' < $(for i in $(cat $nuisanceInFile); do echo ${preprocfeat}/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' ') > "$rawEpiDir"/NuisanceRegressor_ts.txt
+IFS=" " read -r -a arr <<< "$(for i in $(cat $nuisanceInFile); do echo ${preprocfeat}/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' ')"
+paste "${arr[@]}" > "$rawEpiDir"/NuisanceRegressor_ts.txt
 
-if [[ "${compcorFlag}" -ne 1 ]]; then
-  paste -d' ' "$(dirname ${preprocfeat})"/NuisanceRegressor_ts.txt "$(dirname ${preprocfeat})"/mcImg.par > "$(dirname ${preprocfeat})"/NuisanceRegressor_ts.txt
+if [[ "${compcorFlag}" -ne 1 ]]; then # append motion parameters to regressor list
+  paste -d' ' "$rawEpiDir"/NuisanceRegressor_ts.txt "$rawEpiDir"/mcImg.par > "$rawEpiDir"/NuisanceRegressor_ts.txt
 fi
 
-regressorsFile="$(dirname ${preprocfeat})"/NuisanceRegressor_ts.txt
+regressorsFile="$rawEpiDir"/NuisanceRegressor_ts.txt
 export regressorsFile
 
 # simultaneous bandpass + regression
 clobber ${indir}/"$(basename "${epiData%%.nii*}")"_bp_res4d.nii.gz &&\
-SimultBandpassNuisanceReg ${epiData} $indir/mcImgMean_mask.nii.gz
+SimultBandpassNuisanceReg ${epiData} "$rawEpiDir"/mcImgMean_mask.nii.gz
 
 epiDataFiltReg=${indir}/"$(basename "${epiData%%.nii*}")"_bp_res4d.nii.gz
 export epiDataFiltReg
@@ -464,13 +447,13 @@ cp ${epiDataFiltReg} ${epiDataFiltReg/res4d/res4d_orig}
 
 # For some reason, this mask isn't very good.  Use the good mask top-level
 echo "...Copy Brain mask"
-cp "$indir"/mcImgMean_mask.nii.gz mask.nii.gz
+cp "$(dirname ${preprocfeat})"/mcImgMean_mask.nii.gz mask.nii.gz
 fslmaths mask -mul 1000 mask1000 -odt float
 
 # normalize res4d here
 echo "...Normalize Data"
-fslmaths ${epiDataFiltReg} -Tmean ${epiDataFiltReg/res4d/res4d_tmean} res4d_tmean
-fslmaths ${epiDataFiltReg} -Tstd ${epiDataFiltReg/res4d/res4d_std}res4d_std
+fslmaths ${epiDataFiltReg} -Tmean ${epiDataFiltReg/res4d/res4d_tmean}
+fslmaths ${epiDataFiltReg} -Tstd ${epiDataFiltReg/res4d/res4d_std}
 fslmaths ${epiDataFiltReg} -sub ${epiDataFiltReg/res4d/res4d_tmean} ${epiDataFiltReg/res4d/res4d_dmean}
 fslmaths ${epiDataFiltReg/res4d/res4d_dmean} -div ${epiDataFiltReg/res4d/res4d_std} ${epiDataFiltReg/res4d/res4d_normed}
 fslmaths ${epiDataFiltReg/res4d/res4d_normed} -add mask1000 ${epiDataFiltReg/res4d/res4d_normandscaled} -odt float
