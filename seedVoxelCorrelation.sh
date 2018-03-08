@@ -12,12 +12,11 @@
 # Check of all ROIs (from ROIs directory), that can be used for seeding
 scriptPath=$(perl -e 'use Cwd "abs_path";print abs_path(shift)' $0)
 scriptDir=$(dirname $scriptPath)
-# knownRois=`ls -1 $scriptDir/ROIs/*nii* | awk -F"/" '{print $NF}' | awk -F"." '{print $1}'`
 
 VossLabMount="$(mount | grep vosslabhpc | awk '{print $3}')"
 
 
-function printCommandLine {
+function Usage {
   echo "Usage: seedVoxelCorrelation.sh -E restingStateImage -r roi -m motionscrubFlag -n -f"
   echo " where"
   echo "   -E resting state image"
@@ -37,6 +36,38 @@ function printCommandLine {
   echo "        **This affects only the EPI to T1 QC images"
   echo ""
   exit 1
+}
+
+########## FSL's arg parsing functions ###################
+get_opt1() {
+    arg=$(echo $1 | sed 's/=.*//')
+    echo $arg
+}
+
+get_imarg1() {
+    arg=$(get_arg1 $1);
+    arg=$($FSLDIR/bin/remove_ext $arg);
+    echo $arg
+}
+
+get_arg1() {
+    if [ X"`echo $1 | grep '='`" = X ] ; then
+	echo "Option $1 requires an argument" 1>&2
+	exit 1
+    else
+	arg=`echo $1 | sed 's/.*=//'`
+	if [ X$arg = X ] ; then
+	    echo "Option $1 requires an argument" 1>&2
+	    exit 1
+	fi
+	echo $arg
+    fi
+}
+
+function get_filename() {
+  local input=$1
+  file=${input##*/}
+  echo ${file%%.*}
 }
 
 function clobber()
@@ -77,36 +108,57 @@ clob=false
 export -f clobber
 
 # Parse Command line arguments
-while getopts "hE:m:r:R:n:f" OPTION
-do
-  case $OPTION in
-    h)
-      printCommandLine
-      ;;
-    E)
-      epiData=$OPTARG
-      ;;
-    m)
-      motionscrubFlag=$OPTARG
-      ;;
-    r)
-      roiList=$(echo $roiList $OPTARG)
-      roiInd=1
-      ;;
-    R)
-      roiList="$(cat $OPTARG | sed "s|VOSSLABMOUNT|${VossLabMount}|g")"
-      roiInFile=$OPTARG
-      ;;
-    n)
-      nuisancefeat=$OPTARG
-      ;;
-    f)
-      fieldMapFlag=1
-      ;;
-    ?)
-      echo "ERROR: Invalid option"
-      printCommandLine
-      ;;
+
+##########
+## MAIN ##
+##########
+
+
+# Parse Command line arguments
+
+if [ $# -lt 4 ] ; then Usage; exit 0; fi
+while [ $# -ge 1 ] ; do
+    iarg=$(get_opt1 $1);
+    case "$iarg"
+	in
+    --epi)
+  	    epiData=`get_arg1 $1`;
+        export epiData;
+        if [ "$epiData" == "" ]; then
+          echo "Error: The restingStateImage (-E) is a required option"
+          exit 1
+        fi
+  	    shift;;
+    --roiList)
+      roiInFile=$(get_arg1 $1);
+      declare -a roiList=( "$(cat "${nuisanceInFile}")" );
+      shift;;
+    --compcor)
+      compcorFlag=1;
+      export compcorFlag;
+      shift;;
+
+    --seedmaps)
+      seedmapFlag=1;
+      export seedmapFlag;
+      shift;;
+    --motionscrub)
+      motionscrubFlag=1;
+      export motionscrubFlag;
+      shift;;
+    -f)
+      fieldMapFlag=1;
+      shift;;
+    -c)
+      clob=true;
+      export clob;
+      shift;;
+    -h)
+      Usage;
+      exit 0;;
+    *)
+      echo "Unrecognised option $1" 1>&2
+      exit 1
      esac
 done
 
