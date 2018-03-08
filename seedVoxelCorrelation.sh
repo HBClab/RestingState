@@ -19,18 +19,13 @@ VossLabMount="$(mount | grep vosslabhpc | awk '{print $3}')"
 function Usage {
   echo "Usage: seedVoxelCorrelation.sh -E restingStateImage -r roi -m motionscrubFlag -n -f"
   echo " where"
-  echo "   -E resting state image"
+  echo "   --epi resting state image"
   echo "        *Top-level RestingState.nii.gz image"
-  echo "   -m use MotionScrub EPI: O,1 or 2 (default is 0/no)"
-  echo "      0 = use non-motionscrubbed EPI only (default)"
-  echo "      1 = use motionscrubbed EPI only"
-  echo "      2 = use motionscrubbed and non-motionscrubbed EPI (parallel output)"
-  echo "   -r roi for seed voxel (can be used multiple times)"
-  echo "        *e.g. -r pccrsp -r icalc"
-  echo "   -R Data file with seed list, one seed per line"
+  echo "   --motionscrub use motionscrubbed and non-motionscrubbed EPI (parallel output)"
+  echo "   --roiList Data file with seed list, one seed per line"
   echo "        **Use ONLY one option, -r or -R, NOT both"
-  echo "   -n Nuisance regression feat directory"
-  echo "        e.g., nuisancereg_compcor.feat"
+  echo "   --compcor"
+  echo "   --seedmaps print seedmaps (default is off)"
   echo "   -f (fieldMap registration correction)"
   echo "        *Only set this flag if FieldMap correction was used during qualityCheck"
   echo "        **This affects only the EPI to T1 QC images"
@@ -137,7 +132,6 @@ while [ $# -ge 1 ] ; do
       compcorFlag=1;
       export compcorFlag;
       shift;;
-
     --seedmaps)
       seedmapFlag=1;
       export seedmapFlag;
