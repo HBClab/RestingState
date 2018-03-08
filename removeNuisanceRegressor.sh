@@ -139,14 +139,52 @@ function SimultBandpassNuisanceReg()
     lp=.08
   fi
 
+  #If neither lowpass or highpass is set, do an allpass filter (fbot=0 ftop=99999)
+   #If ONLY highpass is set, do a highpass filter (fbot=${highpassArg} ftop=99999)
+   #If ONLY lowpass is set, do a lowpass filter (fbot=0 ftop=${highpassArg})
+   #If both lowpass and highpass are set, do a bandpass filter (fbot=${highpassArg} ftop=${lowpassArg})
+  if [[ $lp == ""  &&  $hp == "" ]]; then
+    ##allpass filter
+    fbot=0
+    ftop=99999
+    highpassArg=0
+    lowpassArg=99999
+    filtType=allpass
+    echo "Performing an 'allpass' filter.  Removal of '0' and Nyquist only."
+  elif [[ $lp == ""  &&  $hp != "" ]]; then
+    ##highpass filter
+    fbot=${hp}
+    ftop=99999
+    lowpassArg=99999
+    filtType=highpass
+    echo "Performing a 'highpass' filter.  Frequencies below ${hp} will be filtered."
+  elif [[ $lp != ""  &&  $hp == "" ]]; then
+    ##lowpass filter
+    fbot=0
+    ftop=${lp}
+    highpassArg=0
+    filtType=lowpass
+    echo "Performing a 'lowpass' filter.  Frequencies above ${lp} will be filtered."
+  else
+    ##bandpass filter (low and high)
+    fbot=${hp}
+    ftop=${lp}
+    filtType=bandpass
+    echo "Performing a 'bandpass' filter.  Frequencies between ${lp} & ${hp} will be filtered."
+  fi
+
   clobber ${inDir}/"$(basename "${inData%%.nii*}")"_bp.nii.gz &&\
   rm -rf ${inDir}/*_mean.nii.gz 2> /dev/null &&\
   rm -rf ${inDir}/tmp_bp.nii.gz 2> /dev/null &&\
-	3dTproject -input ${inData} -prefix $inDir/tmp_bp.nii.gz -mask ${mask} -bandpass ${hp} ${lp} -ort ${regressors} -verb &&\
+	3dTproject -input ${inData} -prefix $inDir/tmp_bp.nii.gz -mask ${mask} -bandpass ${fbot} ${ftop} -ort ${regressorsFile} -verb &&\
   # add mean back in
 	3dTstat -mean -prefix $inDir/orig_mean.nii.gz ${inData} &&\
 	3dTstat -mean -prefix $inDir/bp_mean.nii.gz $inDir/tmp_bp.nii.gz &&\
 	3dcalc -a $inDir/tmp_bp.nii.gz -b $inDir/orig_mean.nii.gz -c $inDir/bp_mean.nii.gz -expr "a+b-c" -prefix ${inDir}/"$(basename "${inData%%.nii*}")"_bp_res4d.nii.gz
+
+  echo "lowpassFilt=$ftop" >> $logDir/aromaParams
+  echo "highpassFilt=$fbot" >> $logDir/aromaParams
+  echo "_${filtType}" >> $logDir/aromaParams
 }
 export -f SimultBandpassNuisanceReg
 
