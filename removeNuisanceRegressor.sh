@@ -154,7 +154,7 @@ function SimultBandpassNuisanceReg()
 
   clobber ${inDir}/"$(basename "${inData%%.nii*}")"_bp_res4d.nii.gz &&\
   rm -rf ${inDir}/*_mean.nii.gz 2> /dev/null &&\
-  rm -rf ${inDir}/tmp_bp.nii.gz 2> /dev/null &&\
+  rm -rf ${inDir}/tmp_bp* 2> /dev/null &&\
 	3dTproject -input ${inData} -prefix $inDir/tmp_bp.nii.gz -mask ${mask} -bandpass ${fbot} ${ftop} -ort ${regressorsFile} -verb &&\
   # add mean back in
 	3dTstat -mean -prefix $inDir/orig_mean.nii.gz ${inData} &&\
