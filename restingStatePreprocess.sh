@@ -44,16 +44,16 @@ get_opt1() {
 
 
 get_arg1() {
-    if [ X`echo $1 | grep '='` = X ] ; then 
+    if [ X`echo $1 | grep '='` = X ] ; then
 	echo "Option $1 requires an argument" 1>&2
 	exit 1
     else
-	arg=`echo $1 | sed 's/.*=//'`
-	if [ X$arg = X ] ; then
+	arg="${1//=.*//}"
+	if [ X"$arg" = X ] ; then
 	    echo "Option $1 requires an argument" 1>&2
 	    exit 1
 	fi
-	echo $arg
+	echo "$arg"
     fi
 }
 
@@ -273,29 +273,29 @@ function run_aroma() {
 # Parse Command line arguments
 if [ $# -lt 4 ] ; then Usage; exit 0; fi
 while [ $# -ge 1 ] ; do
-    iarg=$(get_opt1 "$1");
+    iarg=$(get_opt1 $1);
     case "$iarg"
 	in
 	--epi)
-	    epiData=$(get_imarg1 "$1");
+	    epiData=$(get_imarg1 $1);
       export epiData;
       indir=$(dirname "$epiData");
       export indir;
 	    shift;;
 	--t1brain)
-	    t1Data=$(get_imarg1 "$1");
+	    t1Data=$(get_imarg1 $1);
       export t1SkullData;
 	    shift;;
   --tr)
-	    tr=$(get_arg1 "$1");
+	    tr=$(get_arg1 $1);
       export tr;
 	    shift;;
   --te)
-	    te=$(get_arg1 "$1");
+	    te=$(get_arg1 $1);
       export te;
 	    shift;;
   --s)
-	    smooth=$(get_arg1 "$1");
+	    smooth=$(get_arg1 $1);
       export smooth;
 	    shift;;
   -f)
