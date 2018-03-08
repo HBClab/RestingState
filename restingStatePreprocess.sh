@@ -44,7 +44,11 @@ get_opt1() {
 
 
 get_arg1() {
+<<<<<<< HEAD
     if [ X`echo $1 | grep '='` = X ] ; then
+=======
+    if [ X`echo $1 | grep '='` = X ] ; then 
+>>>>>>> cf2a505db9f730221edff2a891205231a6558026
 	echo "Option $1 requires an argument" 1>&2
 	exit 1
     else
