@@ -506,53 +506,55 @@ done
 
 
 #### Seed Voxel Correlation (Setup) ############
-echo "...Seed Voxel Correlation Setup"
+if [ "${seedmapFlag}" -eq 1 ]; then
 
-# Dimensions of EPI data
-numXdim=$(fslinfo $epiData | grep ^dim1 | awk '{print $2}')
-numYdim=$(fslinfo $epiData | grep ^dim2 | awk '{print $2}')
-numZdim=$(fslinfo $epiData | grep ^dim3 | awk '{print $2}')
+  echo "...Seed Voxel Correlation Setup"
 
-cp "$indir"/seeds.txt "$indir"/seeds_orig.txt
-> "$indir"/seeds_ms.txt
-> "$indir"/seeds.txt
+  # Dimensions of EPI data
+  numXdim=$(fslinfo $epiData | grep ^dim1 | awk '{print $2}')
+  numYdim=$(fslinfo $epiData | grep ^dim2 | awk '{print $2}')
+  numZdim=$(fslinfo $epiData | grep ^dim3 | awk '{print $2}')
 
-# check if seeding results exist, re-populate seeds.txt with non existing seeds
-for roi in $(cat "$indir"/seeds_orig.txt); do
-	if [[ $motionscrubFlag == 1 ]] && [ ! -f "$indir"/$nuisancefeat/stats/${roi}_ms/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_ms_standard_zmap.nii.gz ]; then
-		echo $roi >> "$indir"/seeds_ms.txt
-	fi
-	if [[ $motionscrubFlag == 0 ]] && [ ! -f "$indir"/$nuisancefeat/stats/${roi}/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_standard_zmap.nii.gz ]; then
-		echo $roi >> "$indir"/seeds.txt
-	fi
-	if [[ $motionscrubFlag == 2 ]]; then
-		if [ ! -f "$indir"/$nuisancefeat/stats/${roi}/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_standard_zmap.nii.gz ]; then
-			echo $roi >> "$indir"/seeds.txt
-		fi
-		if [ ! -f "$indir"/$nuisancefeat/stats/${roi}_ms/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_ms_standard_zmap.nii.gz ]; then
-			echo $roi >> "$indir"/seeds_ms.txt
-		fi
-	fi
-done
+  cp "$indir"/seeds.txt "$indir"/seeds_orig.txt
+  > "$indir"/seeds_ms.txt
+  > "$indir"/seeds.txt
 
-
-# Perform the Correlation
-# Take into account $motionscrubFlag
-
-# Check into matlab about fixing motion-scrubbing (Power method)
+  # check if seeding results exist, re-populate seeds.txt with non existing seeds
+  for roi in $(cat "$indir"/seeds_orig.txt); do
+  	if [[ $motionscrubFlag == 1 ]] && [ ! -f "$indir"/$nuisancefeat/stats/${roi}_ms/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_ms_standard_zmap.nii.gz ]; then
+  		echo $roi >> "$indir"/seeds_ms.txt
+  	fi
+  	if [[ $motionscrubFlag == 0 ]] && [ ! -f "$indir"/$nuisancefeat/stats/${roi}/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_standard_zmap.nii.gz ]; then
+  		echo $roi >> "$indir"/seeds.txt
+  	fi
+  	if [[ $motionscrubFlag == 2 ]]; then
+  		if [ ! -f "$indir"/$nuisancefeat/stats/${roi}/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_standard_zmap.nii.gz ]; then
+  			echo $roi >> "$indir"/seeds.txt
+  		fi
+  		if [ ! -f "$indir"/$nuisancefeat/stats/${roi}_ms/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_ms_standard_zmap.nii.gz ]; then
+  			echo $roi >> "$indir"/seeds_ms.txt
+  		fi
+  	fi
+  done
 
 
-if [[ $motionscrubFlag == 0 ]]; then
+  # Perform the Correlation
+  # Take into account $motionscrubFlag
 
-# If $motionscrubFlag == 0 (no motionscrub), res4dnormandscaled never gets unzipped
-if [ -e "$indir"/$nuisancefeat/stats/res4d_normandscaled.nii.gz ] && [ "$indir"/$nuisancefeat/stats/res4d_normandscaled.nii ]; then
-	rm "$indir"/$nuisancefeat/stats/res4d_normandscaled.nii
-	gunzip -f "$indir"/$nuisancefeat/stats/res4d_normandscaled.nii.gz
-fi
+  # Check into matlab about fixing motion-scrubbing (Power method)
 
 
-echo "...Creating Octave script"
-cat > $filename << EOF
+  if [[ $motionscrubFlag == 0 ]]; then
+
+  # If $motionscrubFlag == 0 (no motionscrub), res4dnormandscaled never gets unzipped
+  if [ -e "$indir"/$nuisancefeat/stats/res4d_normandscaled.nii.gz ] && [ "$indir"/$nuisancefeat/stats/res4d_normandscaled.nii ]; then
+  	rm "$indir"/$nuisancefeat/stats/res4d_normandscaled.nii
+  	gunzip -f "$indir"/$nuisancefeat/stats/res4d_normandscaled.nii.gz
+  fi
+
+
+  echo "...Creating Octave script"
+  cat > $filename << EOF
 % It is matlab script
 addpath('${scriptDir}')
 statsScripts=['${scriptDir}','/Octave/nifti'];
@@ -569,10 +571,10 @@ input='res4d_normandscaled.nii';
 firstlevelseeding_parallel('"$indir"',roiList,'$nuisancefeat',funcvoldim,input,motion_scrub,doFisherZ)
 quit
 EOF
-elif [[ $motionscrubFlag == 1 ]]; then
+  elif [[ $motionscrubFlag == 1 ]]; then
 
-echo "...Creating Octave script (motionscrubbed data)"
-cat > $filename2 << EOF
+  echo "...Creating Octave script (motionscrubbed data)"
+  cat > $filename2 << EOF
 % It is matlab script
 addpath('${scriptDir}')
 statsScripts=['${scriptDir}','/Octave/nifti'];
@@ -589,10 +591,10 @@ input='res4d_normandscaled_motionscrubbed.nii';
 firstlevelseeding_parallel('"$indir"',roiList,'$nuisancefeat',funcvoldim,input,motion_scrub,doFisherZ)
 quit
 EOF
-else
+  else
 
-echo "...Creating Octave script"
-cat > $filename << EOF
+  echo "...Creating Octave script"
+  cat > $filename << EOF
 % It is matlab script
 addpath('${scriptDir}')
 statsScripts=['${scriptDir}','/Octave/nifti'];
@@ -610,8 +612,8 @@ firstlevelseeding_parallel('"$indir"',roiList,'$nuisancefeat',funcvoldim,input,m
 quit
 EOF
 
-echo "...Creating Octave script (motionscrubbed data)"
-cat > ${filename2} << EOF
+  echo "...Creating Octave script (motionscrubbed data)"
+  cat > ${filename2} << EOF
 % It is matlab script
 addpath('${scriptDir}')
 statsScripts=['${scriptDir}','/Octave/nifti'];
@@ -628,358 +630,358 @@ input='res4d_normandscaled_motionscrubbed.nii';
 firstlevelseeding_parallel('"$indir"',roiList,'$nuisancefeat',funcvoldim,input,motion_scrub,doFisherZ)
 quit
 EOF
-fi
+  fi
 
 #################################
 
-if [ ! "$(head -n 1 "$indir"/seeds.txt 2> /dev/null)" = ""  ] || [ ! "$(head -n 1 "$indir"/seeds_ms.txt 2> /dev/null)" = ""  ]; then
-    #### Seed Voxel Correlation (Execution) ############
-    echo "...Correlating Seeds With Time Series Data"
+  if [ ! "$(head -n 1 "$indir"/seeds.txt 2> /dev/null)" = ""  ] || [ ! "$(head -n 1 "$indir"/seeds_ms.txt 2> /dev/null)" = ""  ]; then
+      #### Seed Voxel Correlation (Execution) ############
+      echo "...Correlating Seeds With Time Series Data"
 
-    # Run script using Matlab or Octave
-    # Check for $motionscrubFlag, run appropriate file(s)
-    haveMatlab=$(which matlab)
-    if [[ "$haveMatlab" == "" ]]; then
-  		if [[ $motionscrubFlag == 0 ]]; then
-  		    octave --no-window-system "$indir"/$filename
-  		elif [[ $motionscrubFlag == 1 ]]; then
-  		    octave --no-window-system "$indir"/$filename2
-  		else
-  		    octave --no-window-system "$indir"/$filename
-  		    octave --no-window-system "$indir"/$filename2
-  		fi
-	  else
-  		if [[ $motionscrubFlag == 0 ]]; then
-  		    matlab -nodisplay -r "run "$indir"/$filename"
-  		elif [[ $motionscrubFlag == 1 ]]; then
-  		    matlab -nodisplay -r "run "$indir"/$filename2"
-  		else
-  		    matlab -nodisplay -r "run "$indir"/$filename"
-  		    matlab -nodisplay -r "run "$indir"/$filename2"
-  		fi
-    fi
-else
-	echo "no seeds to correlate."
-fi
+      # Run script using Matlab or Octave
+      # Check for $motionscrubFlag, run appropriate file(s)
+      haveMatlab=$(which matlab)
+      if [[ "$haveMatlab" == "" ]]; then
+    		if [[ $motionscrubFlag == 0 ]]; then
+    		    octave --no-window-system "$indir"/$filename
+    		elif [[ $motionscrubFlag == 1 ]]; then
+    		    octave --no-window-system "$indir"/$filename2
+    		else
+    		    octave --no-window-system "$indir"/$filename
+    		    octave --no-window-system "$indir"/$filename2
+    		fi
+  	  else
+    		if [[ $motionscrubFlag == 0 ]]; then
+    		    matlab -nodisplay -r "run "$indir"/$filename"
+    		elif [[ $motionscrubFlag == 1 ]]; then
+    		    matlab -nodisplay -r "run "$indir"/$filename2"
+    		else
+    		    matlab -nodisplay -r "run "$indir"/$filename"
+    		    matlab -nodisplay -r "run "$indir"/$filename2"
+    		fi
+      fi
+  else
+  	echo "no seeds to correlate."
+  fi
 #################################
 
 
 #### Zstat Results (to T1/MNI) ############
 
 
-echo "...Creating zstat Results Directory"
+  echo "...Creating zstat Results Directory"
 
 
-# Copy over anatomical files to results directory
-# T1 (highres)
-cp "$indir"/${nuisancefeat}/reg/highres.nii.gz ${seedcorrDir}
+  # Copy over anatomical files to results directory
+  # T1 (highres)
+  cp "$indir"/${nuisancefeat}/reg/highres.nii.gz ${seedcorrDir}
 
-# T1toMNI (highres2standard)
-cp "$indir"/${nuisancefeat}/reg/highres2standard.nii.gz ${seedcorrDir}
+  # T1toMNI (highres2standard)
+  cp "$indir"/${nuisancefeat}/reg/highres2standard.nii.gz ${seedcorrDir}
 
-# MNI (standard)
-cp "$indir"/${nuisancefeat}/reg/standard.nii.gz ${seedcorrDir}
+  # MNI (standard)
+  cp "$indir"/${nuisancefeat}/reg/standard.nii.gz ${seedcorrDir}
 
 
-# HTML setup
-echo "<hr><h2>Seed Time Series</h2>" >> "$indir"/analysisResults.html
+  # HTML setup
+  echo "<hr><h2>Seed Time Series</h2>" >> "$indir"/analysisResults.html
 
-for roi in $(cat "$indir"/seeds_orig.txt); do
-  echo "...Mapping Correlation For $roi To Subject T1, MNI"
-  # Adjust for motion scrubbing
-  if [[ $motionscrubFlag == 0 ]]; then
-    # No motionscrubbing
-    if [ -e ${roi}.png ]; then
-      rm ${roi}.png
-    fi
+  for roi in $(cat "$indir"/seeds_orig.txt); do
+    echo "...Mapping Correlation For $roi To Subject T1, MNI"
+    # Adjust for motion scrubbing
+    if [[ $motionscrubFlag == 0 ]]; then
+      # No motionscrubbing
+      if [ -e ${roi}.png ]; then
+        rm ${roi}.png
+      fi
 
-    # Check for FieldMap registration correction
-    if [[ $fieldMapFlag == 1 ]]; then
-      # Nonlinear warp from EPI to T1
-      clobber ${seedcorrDir}/${roi}_highres_zmap.nii.gz &&\
+      # Check for FieldMap registration correction
+      if [[ $fieldMapFlag == 1 ]]; then
+        # Nonlinear warp from EPI to T1
+        clobber ${seedcorrDir}/${roi}_highres_zmap.nii.gz &&\
+        applywarp --in="$indir"/${nuisancefeat}/stats/${roi}/cope1.nii \
+        --ref="$indir"/${nuisancefeat}/reg/highres.nii.gz \
+        --out=${seedcorrDir}/${roi}_highres_zmap.nii.gz \
+        --warp="$indir"/${nuisancefeat}/reg/example_func2highres_warp.nii.gz \
+        --datatype=float
+      else
+        # Affine Transform from EPI to T1
+        clobber ${seedcorrDir}/${roi}_highres_zmap.nii.gz &&\
+        flirt -in "$indir"/${nuisancefeat}/stats/${roi}/cope1.nii \
+        -ref "$indir"/${nuisancefeat}/reg/highres.nii.gz \
+        -out ${seedcorrDir}/${roi}_highres_zmap.nii.gz \
+        -applyxfm -init "$indir"/${nuisancefeat}/reg/example_func2highres.mat \
+        -datatype float
+      fi
+
+      # Mask out data with T1 mask (create temporary binary of skull-stripped T1)
+      fslmaths "$indir"/${nuisancefeat}/reg/highres.nii.gz -bin "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz -odt char
+      fslmaths ${seedcorrDir}/${roi}_highres_zmap.nii.gz -mas "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz ${seedcorrDir}/${roi}_highres_zmap_masked.nii.gz
+      rm "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz
+
+      # Nonlinear warp from EPI to MNI
+      clobber ${seedcorrDir}/${roi}_standard_zmap.nii.gz &&\
       applywarp --in="$indir"/${nuisancefeat}/stats/${roi}/cope1.nii \
-      --ref="$indir"/${nuisancefeat}/reg/highres.nii.gz \
-      --out=${seedcorrDir}/${roi}_highres_zmap.nii.gz \
-      --warp="$indir"/${nuisancefeat}/reg/example_func2highres_warp.nii.gz \
+      --ref="$indir"/${nuisancefeat}/reg/standard.nii.gz \
+      --out=${seedcorrDir}/${roi}_standard_zmap.nii.gz \
+      --warp="$indir"/${nuisancefeat}/reg/example_func2standard_warp.nii.gz \
       --datatype=float
-    else
-      # Affine Transform from EPI to T1
-      clobber ${seedcorrDir}/${roi}_highres_zmap.nii.gz &&\
-      flirt -in "$indir"/${nuisancefeat}/stats/${roi}/cope1.nii \
-      -ref "$indir"/${nuisancefeat}/reg/highres.nii.gz \
-      -out ${seedcorrDir}/${roi}_highres_zmap.nii.gz \
-      -applyxfm -init "$indir"/${nuisancefeat}/reg/example_func2highres.mat \
-      -datatype float
-    fi
 
-    # Mask out data with T1 mask (create temporary binary of skull-stripped T1)
-    fslmaths "$indir"/${nuisancefeat}/reg/highres.nii.gz -bin "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz -odt char
-    fslmaths ${seedcorrDir}/${roi}_highres_zmap.nii.gz -mas "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz ${seedcorrDir}/${roi}_highres_zmap_masked.nii.gz
-    rm "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz
+      # Mask out data with MNI mask
+      fslmaths ${seedcorrDir}/${roi}_standard_zmap.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_standard_zmap_masked.nii.gz
 
-    # Nonlinear warp from EPI to MNI
-    clobber ${seedcorrDir}/${roi}_standard_zmap.nii.gz &&\
-    applywarp --in="$indir"/${nuisancefeat}/stats/${roi}/cope1.nii \
-    --ref="$indir"/${nuisancefeat}/reg/standard.nii.gz \
-    --out=${seedcorrDir}/${roi}_standard_zmap.nii.gz \
-    --warp="$indir"/${nuisancefeat}/reg/example_func2standard_warp.nii.gz \
-    --datatype=float
-
-    # Mask out data with MNI mask
-    fslmaths ${seedcorrDir}/${roi}_standard_zmap.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_standard_zmap_masked.nii.gz
-
-    # Warp seed from MNI to T1
-    clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
-    applywarp --in=${seedcorrDir}/${roi}_standard.nii.gz \
-    --ref="$indir"/${nuisancefeat}/reg/highres.nii.gz \
-    --out=${seedcorrDir}/${roi}_highres.nii.gz \
-    --warp="$indir"/${nuisancefeat}/reg/standard2highres_warp.nii.gz \
-    --interp=nn
-
-    # Creating new plots with fsl_tsplot
-    # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
-    yMax=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
-    yMin=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
-
-    clobber "$indir"/${roi}.png &&\
-    fsl_tsplot -i "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$indir"/${roi}.png
-
-    echo "<br><img src=\""$indir"/${roi}.png\" alt=\"$roi seed\"><br>" >> "$indir"/analysisResults.html
-
-  elif [[ $motionscrubFlag == 1 ]]; then
-    # Only motionscrubbed data
-    if [ -e ${roi}_ms.png ]; then
-      rm ${roi}_ms.png
-    fi
-
-    # Check for FieldMap registration correction
-    if [[ $fieldMapFlag == 1 ]]; then
-      # Nonlinear warp from EPI to T1
-      clobber ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz &&\
-      applywarp --in="$indir"/${nuisancefeat}/stats/${roi}_ms/cope1.nii \
+      # Warp seed from MNI to T1
+      clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
+      applywarp --in=${seedcorrDir}/${roi}_standard.nii.gz \
       --ref="$indir"/${nuisancefeat}/reg/highres.nii.gz \
-      --out=${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz \
-      --warp="$indir"/${nuisancefeat}/reg/example_func2highres_warp.nii.gz \
-      --datatype=float
-    else
-      # Affine Transform from EPI to T1
-      clobber ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz &&\
-      flirt -in "$indir"/${nuisancefeat}/stats/${roi}_ms/cope1.nii \
-      -ref "$indir"/${nuisancefeat}/reg/highres.nii.gz \
-      -out ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz \
-      -applyxfm -init "$indir"/${nuisancefeat}/reg/example_func2highres.mat \
-      -datatype float
-    fi
-
-    # Mask out data with T1 mask (create temporary binary of skull-stripped T1)
-    fslmaths "$indir"/${nuisancefeat}/reg/highres.nii.gz -bin "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz -odt char
-    fslmaths ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz -mas "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz ${seedcorrDir}/${roi}_ms_highres_zmap_masked.nii.gz
-    rm "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz
-
-    # Nonlinear warp from EPI to MNI
-    clobber ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz &&\
-    applywarp --in="$indir"/${nuisancefeat}/stats/${roi}_ms/cope1.nii \
-    --ref="$indir"/${nuisancefeat}/reg/standard.nii.gz \
-    --out=${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz \
-    --warp="$indir"/${nuisancefeat}/reg/example_func2standard_warp.nii.gz \
-    --datatype=float
-
-    # Mask out data with MNI mask
-    fslmaths ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_ms_standard_zmap_masked.nii.gz
-
-    # Warp seed from MNI to T1
-    clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
-    applywarp --in=${seedcorrDir}/${roi}_standard.nii.gz \
-    --ref="$indir"/${nuisancefeat}/reg/highres.nii.gz \
-    --out=${seedcorrDir}/${roi}_highres.nii.gz \
-    --warp="$indir"/${nuisancefeat}/reg/standard2highres_warp.nii.gz \
-    --interp=nn
-
-
-    # Look for the presence of deleted volumes.  ONLY create "spike" (ms) images if found, otherwise default to non-motionscrubbed images
-    scrubDataCheck=$(cat "$indir"/$nuisancefeat/stats/deleted_vols.txt | head -1)
-
-    if [[ $scrubDataCheck != "" ]]; then
-      # Presence of scrubbed volumes
-
-      # Creating new plots with fsl_tsplot
-      # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
-      yMax=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ms_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
-      yMin=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ms_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
-
-      # Log the "scrubbed TRs"
-      xNum=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ms_ts.txt | wc -l)
-      count=1
-      while [ $count -le $xNum ]; do
-        tsPlotIn=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ms_ts.txt | head -${count} | tail -1)
-        delPlotCheck=$(cat "$indir"/${nuisancefeat}/stats/deleted_vols.txt | awk '{$1=$1}1' | grep -E '(^| )'${count}'( |$)')
-        if [ "$delPlotCheck" == "" ]; then
-          delPlot=$yMin
-        else
-          delPlot=$yMax
-        fi
-        echo $delPlot >> "$indir"/${nuisancefeat}/stats/${roi}_censored_TRplot.txt
-      let count=count+1
-      done
-
-      #Plot of "scrubbed" data
-      clobber "$indir"/${roi}_ms.png &&\
-      fsl_tsplot -i "$indir"/${nuisancefeat}/stats/${roi}_residvol_ms_ts.txt -t "$roi Time Series (Scrubbed)" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$indir"/${roi}_ms.png
-
-      echo "<br><img src=\""$indir"/${roi}.png\" alt=\"${roi} seed\"><img src=\""$indir"/${roi}_ms.png\" alt=\"${roi}_ms seed\"><br>" >> "$indir"/analysisResults.html
-
-    else
-      # Absence of scrubbed volumes
-
-      # Creating new plots with fsl_tsplot
-      # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
-      yMax=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ms_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
-      yMin=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ms_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
-
-      fsl_tsplot -i "$indir"/${nuisancefeat}/stats/${roi}_residvol_ms_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$indir"/${roi}.png
-
-      echo "<br><img src=\""$indir"/${roi}.png\" alt=\"$roi seed\"><br>" >> "$indir"/analysisResults.html
-    fi
-
-  else
-    # Non-motionscrubbed data
-    if [ -e ${roi}.png ]; then
-      rm ${roi}.png
-    fi
-    if [ -e ${roi}_ms.png ]; then
-      rm ${roi}_ms.png
-    fi
-
-    # Check for FieldMap registration correction
-    if [[ $fieldMapFlag == 1 ]]; then
-      # Nonlinear warp from EPI to T1
-      clobber ${seedcorrDir}/${roi}_highres_zmap.nii.gz &&\
-      applywarp --in="$indir"/${nuisancefeat}/stats/${roi}/cope1.nii \
-      --ref="$indir"/${nuisancefeat}/reg/highres.nii.gz \
-      --out=${seedcorrDir}/${roi}_highres_zmap.nii.gz \
-      --warp="$indir"/${nuisancefeat}/reg/example_func2highres_warp.nii.gz \
-      --datatype=float
-    else
-      # Affine Transform from EPI to T1
-      clobber ${seedcorrDir}/${roi}_highres_zmap.nii.gz &&\
-      flirt -in "$indir"/${nuisancefeat}/stats/${roi}/cope1.nii \
-      -ref "$indir"/${nuisancefeat}/reg/highres.nii.gz \
-      -out ${seedcorrDir}/${roi}_highres_zmap.nii.gz \
-      -applyxfm -init "$indir"/${nuisancefeat}/reg/example_func2highres.mat \
-      -datatype float
-    fi
-
-    # Mask out data with T1 mask (create temporary binary of skull-stripped T1)
-    fslmaths "$indir"/${nuisancefeat}/reg/highres.nii.gz -bin "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz -odt char
-    fslmaths ${seedcorrDir}/${roi}_highres_zmap.nii.gz -mas "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz ${seedcorrDir}/${roi}_highres_zmap_masked.nii.gz
-
-    # Nonlinear warp from EPI to MNI
-    clobber ${seedcorrDir}/${roi}_standard_zmap.nii.gz &&\
-    applywarp --in="$indir"/${nuisancefeat}/stats/${roi}/cope1.nii \
-    --ref="$indir"/${nuisancefeat}/reg/standard.nii.gz \
-    --out=${seedcorrDir}/${roi}_standard_zmap.nii.gz \
-    --warp="$indir"/${nuisancefeat}/reg/example_func2standard_warp.nii.gz \
-    --datatype=float
-
-    # Mask out data with MNI mask
-    fslmaths ${seedcorrDir}/${roi}_standard_zmap.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_standard_zmap_masked.nii.gz
-
-    # Warp seed from MNI to T1
-    clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
-    applywarp --in=${seedcorrDir}/${roi}_standard.nii.gz \
-    --ref="$indir"/${nuisancefeat}/reg/highres.nii.gz \
-    --out=${seedcorrDir}/${roi}_highres.nii.gz \
-    --warp="$indir"/${nuisancefeat}/reg/standard2highres_warp.nii.gz \
-    --interp=nn
-
-
-    # Motionscrubbed data
-    # Check for FieldMap registration correction
-    if [[ $fieldMapFlag == 1 ]]; then
-      # Nonlinear warp from EPI to T1
-      clobber ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz &&\
-      applywarp --in="$indir"/${nuisancefeat}/stats/${roi}_ms/cope1.nii \
-      --ref="$indir"/${nuisancefeat}/reg/highres.nii.gz \
-      --out=${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz \
-      --warp="$indir"/${nuisancefeat}/reg/example_func2highres_warp.nii.gz \
-      --datatype=float
-    else
-      # Affine Transform from EPI to T1
-      clobber ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz &&\
-      flirt -in "$indir"/${nuisancefeat}/stats/${roi}_ms/cope1.nii \
-      -ref "$indir"/${nuisancefeat}/reg/highres.nii.gz \
-      -out ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz \
-      -applyxfm -init "$indir"/${nuisancefeat}/reg/example_func2highres.mat \
-      -datatype float
-    fi
-
-    # Mask out data with T1 mask (remove temporary binary of skull-stripped T1)
-    fslmaths "$indir"/${nuisancefeat}/reg/highres.nii.gz -bin "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz -odt char
-    fslmaths ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz -mas "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz ${seedcorrDir}/${roi}_ms_highres_zmap_masked.nii.gz
-    rm "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz
-
-    # Nonlinear warp from EPI to MNI
-    clobber ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz &&\
-    applywarp --in="$indir"/${nuisancefeat}/stats/${roi}_ms/cope1.nii \
-    --ref="$indir"/${nuisancefeat}/reg/standard.nii.gz \
-    --out=${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz \
-    --warp="$indir"/${nuisancefeat}/reg/example_func2standard_warp.nii.gz \
-    --datatype=float
-
-    # Mask out data with MNI mask
-    fslmaths ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_ms_standard_zmap_masked.nii.gz
-
-
-    # Look for the presence of deleted volumes.  ONLY create "spike" (ms) images if found, otherwise default to non-motionscrubbed images
-    scrubDataCheck=$(cat "$indir"/$nuisancefeat/stats/deleted_vols.txt | head -1)
-
-    if [[ $scrubDataCheck != "" ]]; then
-      #Presence of scrubbed volumes
+      --out=${seedcorrDir}/${roi}_highres.nii.gz \
+      --warp="$indir"/${nuisancefeat}/reg/standard2highres_warp.nii.gz \
+      --interp=nn
 
       # Creating new plots with fsl_tsplot
       # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
       yMax=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
       yMin=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
 
-      # Log the "scrubbed TRs"
-      xNum=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt | wc -l)
-      count=1
-      while [ $count -le $xNum ]; do
-        tsPlotIn=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt | head -${count} | tail -1)
-        delPlotCheck=$(cat "$indir"/${nuisancefeat}/stats/deleted_vols.txt | awk '{$1=$1}1' | grep -E '(^| )'${count}'( |$)')
-        if [ "$delPlotCheck" == "" ]; then
-          delPlot=$yMin
-        else
-          delPlot=$yMax
-        fi
-        echo $delPlot >> "$indir"/${nuisancefeat}/stats/${roi}_censored_TRplot.txt
-      let count=count+1
-      done
-
-      # Plot of normal data showing scrubbed TRs
-      fsl_tsplot -i "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt,"$indir"/${nuisancefeat}/stats/${roi}_censored_TRplot.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' -a ",Scrubbed_TR" --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$indir"/${roi}.png
-
-      # Plot of "scrubbed" data
-      fsl_tsplot -i "$indir"/${nuisancefeat}/stats/${roi}_residvol_ms_ts.txt -t "$roi Time Series (Scrubbed)" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$indir"/${roi}_ms.png
-
-
-      echo "<br><img src=\""$indir"/${roi}.png\" alt=\"${roi} seed\"><img src=\""$indir"/${roi}_ms.png\" alt=\"${roi}_ms seed\"><br>" >> "$indir"/analysisResults.html
-
-    else
-      # No scrubbed TRs
-
-      # Creating new plots with fsl_tsplot
-      # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
-      yMax=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
-      yMin=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
-
+      clobber "$indir"/${roi}.png &&\
       fsl_tsplot -i "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$indir"/${roi}.png
 
       echo "<br><img src=\""$indir"/${roi}.png\" alt=\"$roi seed\"><br>" >> "$indir"/analysisResults.html
-    fi
-  fi
-done
 
+    elif [[ $motionscrubFlag == 1 ]]; then
+      # Only motionscrubbed data
+      if [ -e ${roi}_ms.png ]; then
+        rm ${roi}_ms.png
+      fi
+
+      # Check for FieldMap registration correction
+      if [[ $fieldMapFlag == 1 ]]; then
+        # Nonlinear warp from EPI to T1
+        clobber ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz &&\
+        applywarp --in="$indir"/${nuisancefeat}/stats/${roi}_ms/cope1.nii \
+        --ref="$indir"/${nuisancefeat}/reg/highres.nii.gz \
+        --out=${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz \
+        --warp="$indir"/${nuisancefeat}/reg/example_func2highres_warp.nii.gz \
+        --datatype=float
+      else
+        # Affine Transform from EPI to T1
+        clobber ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz &&\
+        flirt -in "$indir"/${nuisancefeat}/stats/${roi}_ms/cope1.nii \
+        -ref "$indir"/${nuisancefeat}/reg/highres.nii.gz \
+        -out ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz \
+        -applyxfm -init "$indir"/${nuisancefeat}/reg/example_func2highres.mat \
+        -datatype float
+      fi
+
+      # Mask out data with T1 mask (create temporary binary of skull-stripped T1)
+      fslmaths "$indir"/${nuisancefeat}/reg/highres.nii.gz -bin "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz -odt char
+      fslmaths ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz -mas "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz ${seedcorrDir}/${roi}_ms_highres_zmap_masked.nii.gz
+      rm "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz
+
+      # Nonlinear warp from EPI to MNI
+      clobber ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz &&\
+      applywarp --in="$indir"/${nuisancefeat}/stats/${roi}_ms/cope1.nii \
+      --ref="$indir"/${nuisancefeat}/reg/standard.nii.gz \
+      --out=${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz \
+      --warp="$indir"/${nuisancefeat}/reg/example_func2standard_warp.nii.gz \
+      --datatype=float
+
+      # Mask out data with MNI mask
+      fslmaths ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_ms_standard_zmap_masked.nii.gz
+
+      # Warp seed from MNI to T1
+      clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
+      applywarp --in=${seedcorrDir}/${roi}_standard.nii.gz \
+      --ref="$indir"/${nuisancefeat}/reg/highres.nii.gz \
+      --out=${seedcorrDir}/${roi}_highres.nii.gz \
+      --warp="$indir"/${nuisancefeat}/reg/standard2highres_warp.nii.gz \
+      --interp=nn
+
+
+      # Look for the presence of deleted volumes.  ONLY create "spike" (ms) images if found, otherwise default to non-motionscrubbed images
+      scrubDataCheck=$(cat "$indir"/$nuisancefeat/stats/deleted_vols.txt | head -1)
+
+      if [[ $scrubDataCheck != "" ]]; then
+        # Presence of scrubbed volumes
+
+        # Creating new plots with fsl_tsplot
+        # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
+        yMax=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ms_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
+        yMin=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ms_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
+
+        # Log the "scrubbed TRs"
+        xNum=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ms_ts.txt | wc -l)
+        count=1
+        while [ $count -le $xNum ]; do
+          tsPlotIn=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ms_ts.txt | head -${count} | tail -1)
+          delPlotCheck=$(cat "$indir"/${nuisancefeat}/stats/deleted_vols.txt | awk '{$1=$1}1' | grep -E '(^| )'${count}'( |$)')
+          if [ "$delPlotCheck" == "" ]; then
+            delPlot=$yMin
+          else
+            delPlot=$yMax
+          fi
+          echo $delPlot >> "$indir"/${nuisancefeat}/stats/${roi}_censored_TRplot.txt
+        let count=count+1
+        done
+
+        #Plot of "scrubbed" data
+        clobber "$indir"/${roi}_ms.png &&\
+        fsl_tsplot -i "$indir"/${nuisancefeat}/stats/${roi}_residvol_ms_ts.txt -t "$roi Time Series (Scrubbed)" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$indir"/${roi}_ms.png
+
+        echo "<br><img src=\""$indir"/${roi}.png\" alt=\"${roi} seed\"><img src=\""$indir"/${roi}_ms.png\" alt=\"${roi}_ms seed\"><br>" >> "$indir"/analysisResults.html
+
+      else
+        # Absence of scrubbed volumes
+
+        # Creating new plots with fsl_tsplot
+        # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
+        yMax=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ms_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
+        yMin=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ms_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
+
+        fsl_tsplot -i "$indir"/${nuisancefeat}/stats/${roi}_residvol_ms_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$indir"/${roi}.png
+
+        echo "<br><img src=\""$indir"/${roi}.png\" alt=\"$roi seed\"><br>" >> "$indir"/analysisResults.html
+      fi
+
+    else
+      # Non-motionscrubbed data
+      if [ -e ${roi}.png ]; then
+        rm ${roi}.png
+      fi
+      if [ -e ${roi}_ms.png ]; then
+        rm ${roi}_ms.png
+      fi
+
+      # Check for FieldMap registration correction
+      if [[ $fieldMapFlag == 1 ]]; then
+        # Nonlinear warp from EPI to T1
+        clobber ${seedcorrDir}/${roi}_highres_zmap.nii.gz &&\
+        applywarp --in="$indir"/${nuisancefeat}/stats/${roi}/cope1.nii \
+        --ref="$indir"/${nuisancefeat}/reg/highres.nii.gz \
+        --out=${seedcorrDir}/${roi}_highres_zmap.nii.gz \
+        --warp="$indir"/${nuisancefeat}/reg/example_func2highres_warp.nii.gz \
+        --datatype=float
+      else
+        # Affine Transform from EPI to T1
+        clobber ${seedcorrDir}/${roi}_highres_zmap.nii.gz &&\
+        flirt -in "$indir"/${nuisancefeat}/stats/${roi}/cope1.nii \
+        -ref "$indir"/${nuisancefeat}/reg/highres.nii.gz \
+        -out ${seedcorrDir}/${roi}_highres_zmap.nii.gz \
+        -applyxfm -init "$indir"/${nuisancefeat}/reg/example_func2highres.mat \
+        -datatype float
+      fi
+
+      # Mask out data with T1 mask (create temporary binary of skull-stripped T1)
+      fslmaths "$indir"/${nuisancefeat}/reg/highres.nii.gz -bin "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz -odt char
+      fslmaths ${seedcorrDir}/${roi}_highres_zmap.nii.gz -mas "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz ${seedcorrDir}/${roi}_highres_zmap_masked.nii.gz
+
+      # Nonlinear warp from EPI to MNI
+      clobber ${seedcorrDir}/${roi}_standard_zmap.nii.gz &&\
+      applywarp --in="$indir"/${nuisancefeat}/stats/${roi}/cope1.nii \
+      --ref="$indir"/${nuisancefeat}/reg/standard.nii.gz \
+      --out=${seedcorrDir}/${roi}_standard_zmap.nii.gz \
+      --warp="$indir"/${nuisancefeat}/reg/example_func2standard_warp.nii.gz \
+      --datatype=float
+
+      # Mask out data with MNI mask
+      fslmaths ${seedcorrDir}/${roi}_standard_zmap.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_standard_zmap_masked.nii.gz
+
+      # Warp seed from MNI to T1
+      clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
+      applywarp --in=${seedcorrDir}/${roi}_standard.nii.gz \
+      --ref="$indir"/${nuisancefeat}/reg/highres.nii.gz \
+      --out=${seedcorrDir}/${roi}_highres.nii.gz \
+      --warp="$indir"/${nuisancefeat}/reg/standard2highres_warp.nii.gz \
+      --interp=nn
+
+
+      # Motionscrubbed data
+      # Check for FieldMap registration correction
+      if [[ $fieldMapFlag == 1 ]]; then
+        # Nonlinear warp from EPI to T1
+        clobber ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz &&\
+        applywarp --in="$indir"/${nuisancefeat}/stats/${roi}_ms/cope1.nii \
+        --ref="$indir"/${nuisancefeat}/reg/highres.nii.gz \
+        --out=${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz \
+        --warp="$indir"/${nuisancefeat}/reg/example_func2highres_warp.nii.gz \
+        --datatype=float
+      else
+        # Affine Transform from EPI to T1
+        clobber ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz &&\
+        flirt -in "$indir"/${nuisancefeat}/stats/${roi}_ms/cope1.nii \
+        -ref "$indir"/${nuisancefeat}/reg/highres.nii.gz \
+        -out ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz \
+        -applyxfm -init "$indir"/${nuisancefeat}/reg/example_func2highres.mat \
+        -datatype float
+      fi
+
+      # Mask out data with T1 mask (remove temporary binary of skull-stripped T1)
+      fslmaths "$indir"/${nuisancefeat}/reg/highres.nii.gz -bin "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz -odt char
+      fslmaths ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz -mas "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz ${seedcorrDir}/${roi}_ms_highres_zmap_masked.nii.gz
+      rm "$indir"/${nuisancefeat}/reg/highres_mask.nii.gz
+
+      # Nonlinear warp from EPI to MNI
+      clobber ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz &&\
+      applywarp --in="$indir"/${nuisancefeat}/stats/${roi}_ms/cope1.nii \
+      --ref="$indir"/${nuisancefeat}/reg/standard.nii.gz \
+      --out=${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz \
+      --warp="$indir"/${nuisancefeat}/reg/example_func2standard_warp.nii.gz \
+      --datatype=float
+
+      # Mask out data with MNI mask
+      fslmaths ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_ms_standard_zmap_masked.nii.gz
+
+
+      # Look for the presence of deleted volumes.  ONLY create "spike" (ms) images if found, otherwise default to non-motionscrubbed images
+      scrubDataCheck=$(cat "$indir"/$nuisancefeat/stats/deleted_vols.txt | head -1)
+
+      if [[ $scrubDataCheck != "" ]]; then
+        #Presence of scrubbed volumes
+
+        # Creating new plots with fsl_tsplot
+        # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
+        yMax=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
+        yMin=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
+
+        # Log the "scrubbed TRs"
+        xNum=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt | wc -l)
+        count=1
+        while [ $count -le $xNum ]; do
+          tsPlotIn=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt | head -${count} | tail -1)
+          delPlotCheck=$(cat "$indir"/${nuisancefeat}/stats/deleted_vols.txt | awk '{$1=$1}1' | grep -E '(^| )'${count}'( |$)')
+          if [ "$delPlotCheck" == "" ]; then
+            delPlot=$yMin
+          else
+            delPlot=$yMax
+          fi
+          echo $delPlot >> "$indir"/${nuisancefeat}/stats/${roi}_censored_TRplot.txt
+        let count=count+1
+        done
+
+        # Plot of normal data showing scrubbed TRs
+        fsl_tsplot -i "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt,"$indir"/${nuisancefeat}/stats/${roi}_censored_TRplot.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' -a ",Scrubbed_TR" --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$indir"/${roi}.png
+
+        # Plot of "scrubbed" data
+        fsl_tsplot -i "$indir"/${nuisancefeat}/stats/${roi}_residvol_ms_ts.txt -t "$roi Time Series (Scrubbed)" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$indir"/${roi}_ms.png
+
+
+        echo "<br><img src=\""$indir"/${roi}.png\" alt=\"${roi} seed\"><img src=\""$indir"/${roi}_ms.png\" alt=\"${roi}_ms seed\"><br>" >> "$indir"/analysisResults.html
+
+      else
+        # No scrubbed TRs
+
+        # Creating new plots with fsl_tsplot
+        # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
+        yMax=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
+        yMin=$(cat "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
+
+        fsl_tsplot -i "$indir"/${nuisancefeat}/stats/${roi}_residvol_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$indir"/${roi}.png
+
+        echo "<br><img src=\""$indir"/${roi}.png\" alt=\"$roi seed\"><br>" >> "$indir"/analysisResults.html
+      fi
+    fi
+  done
+fi
 #################################
 
 
