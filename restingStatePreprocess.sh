@@ -29,8 +29,8 @@ function Usage {
   echo "   --tr TR time (seconds)"
   echo "   --te TE (milliseconds)"
   echo "   --s spatial smoothing kernel size"
-  echo "   --f fieldmap registration correction"
-  echo "   -a run ICA_AROMA"
+  echo "   -f fieldmap registration correction"
+  echo "   --aroma run ICA_AROMA"
   echo "   -c clobber/overwrite previous results"
   exit 1
 }
@@ -48,7 +48,7 @@ get_imarg1() {
 }
 
 get_arg1() {
-    if [ X`echo $1 | grep '='` = X ] ; then
+    if [ X"$(echo $1 | grep '=')" = X ] ; then
 	echo "Option $1 requires an argument" 1>&2
 	exit 1
     else
@@ -103,7 +103,8 @@ function medianScale()
 {
   local inFile=$1
   local maskFile=$2
-  local outDir=$(dirname $inFile)
+  local outDir
+  outDir=$(dirname $inFile)
 
   echo "scaling over median intensity"
   median_intensity=$(fslstats $inFile -k $maskFile -p 50)
@@ -170,7 +171,7 @@ function feat_regFix()
   cp $T1WarpDir/MNItoT1_warp.nii.gz $regDir/standard2highres_warp.nii.gz
 
   # Forgoing "updatefeatreg" and just recreating the appropriate pics with slicer/pngappend
-  cd $regDir
+  cd $regDir || exit
 
   # example_func2highres
   echo "......func2highres"
@@ -276,6 +277,8 @@ while [ $# -ge 1 ] ; do
 	--epi)
 	    epiData=`get_imarg1 $1`;
       export epiData;
+      indir=$(dirname $epiData);
+      export indir;
 	    shift;;
 	--t1brain)
 	    t1Data=`get_imarg1 $1`;
@@ -297,7 +300,7 @@ while [ $# -ge 1 ] ; do
       fieldMapFlag=1;
       export fieldMapFlag;
 	    shift;;
-  -a)
+  --aroma)
       aromaFlag=1;
       export aromaFlag;
       if [ "$(which ICA_AROMA.py)" == "" ]; then
@@ -308,8 +311,9 @@ while [ $# -ge 1 ] ; do
   -c)
       clob=true;
       export clob;
-      rm -rf "$(dirname ${epiData})"/${preprocfeat};
-      rm -rf "$(dirname ${epiData})"/ica_aroma;
+      echo "-c" >> $logDir/rsParams_log
+      rm -rf "${indir:?}"/${preprocfeat};
+      rm -rf "${indir:?}"/ica_aroma;
       shift;;
   esac
 done
@@ -349,8 +353,7 @@ if [[ $fieldMapFlag == "" ]]; then
   fieldMapFlag=0
 fi
 
-indir=$(dirname $epiData)
-export indir
+
 preprocDir=$indir/${preprocfeat}
 export preprocDir
 
@@ -366,9 +369,6 @@ echo "-s $smooth" >> $logDir/rsParams_log
 if [[ $fieldMapFlag == 1 ]]; then
   echo "-f" >> $logDir/rsParams_log
 fi
-if [[ $overwriteFlag == 1 ]]; then
-  echo "-c" >> $logDir/rsParams_log
-fi
 echo "$(date)" >> $logDir/rsParams_log
 echo "" >> $logDir/rsParams_log
 echo "" >> $logDir/rsParams_log
@@ -377,7 +377,7 @@ echo "" >> $logDir/rsParams_log
 
 echo "Running $0 ..."
 
-cd $indir
+cd $indir || exit
 
 
 # Set a few variables from data
@@ -437,7 +437,7 @@ if [ ${aromaFlag} == 1 ]; then
   run_aroma $preprocDir/nonfiltered_smooth_data_intnorm.nii.gz
 fi
 
-cd $indir
+cd $indir || exit
 
 
 # Log results to HTML file
