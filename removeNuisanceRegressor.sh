@@ -337,14 +337,13 @@ mkdir -p rois
 for roi in $(cat $nuisanceInFile)
 do
   roiName="$(get_filename "${roi}")"
-  echo $roi
-  echo $roiName
+
   #check if roi is in native space
   if [[ "$(fslinfo "${roi}" | grep ^dim1 | awk '{print $2}')" == 91 ]]; then
     echo "${roi} is in MNI space"
     clobber rois/"${roiName}"_native.nii.gz &&\
     MNItoEPIwarp=$(grep "MNItoEPIWarp=" "$logDir"/rsParams | tail -1 | awk -F"=" '{print $2}') &&\
-    applywarp --ref="$indir"/mcImgMean_stripped.nii.gz --in="${roi}" --out=rois/"${roiName}"_native.nii.gz --warp="$MNItoEPIwarp" --datatype=float
+    applywarp --ref="$rawEpiDir"/mcImgMean_stripped.nii.gz --in="${roi}" --out=rois/"${roiName}"_native.nii.gz --warp="$MNItoEPIwarp" --datatype=float
 
   elif [[ "$(fslinfo "${roi}" | grep ^dim1 | awk '{print $2}')" == "$(fslinfo ${epiData} | grep ^dim1 | awk '{print $2}')" ]]; then
     echo "${roi} is in native space"
@@ -401,32 +400,35 @@ done
 # #################################
 
 
-#
-# #### Plotting Regressor time courses ######
-#
+
+#### Plotting Regressor time courses ######
+
 # echo "...Plotting Regressor time series"
 #
-# for roi in "${nuisanceList[@]}"
+# for roi in $(cat $nuisanceInFile)
 # do
+#   roiName="$(get_filename "${roi}")"
 #   fsl_tsplot -i "$indir"/tsregressorslp/"${roi}"_normalized_ts.txt -t "${roi} Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o "$indir"/"${roi}"_norm.png
 #   echo "<br><br><img src=\"$indir/${roi}_norm.png\" alt=\"$roi nuisance regressor\"><br>" >> "$indir"/analysisResults.html
 # done
-#
-# #################################
+
+#################################
 
 ###### simultaneous bandpass + regression #####
 
 # paste regressor timeseries into one file
-# paste -d' ' < $(for i in $(cat $nuisanceInFile); do echo ${preprocfeat}/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' ') > "$rawEpiDir"/NuisanceRegressor_ts.txt
-IFS=" " read -r -a arr <<< "$(for i in $(cat $nuisanceInFile); do echo ${preprocfeat}/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' ')"
-paste "${arr[@]}" > "$rawEpiDir"/NuisanceRegressor_ts.txt
-
-if [[ "${compcorFlag}" -ne 1 ]]; then # append motion parameters to regressor list
-  paste -d' ' "$rawEpiDir"/NuisanceRegressor_ts.txt "$rawEpiDir"/mcImg.par > "$rawEpiDir"/NuisanceRegressor_ts.txt
+if [[ "${compcorFlag}" -eq 1 ]]; then
+  IFS=" " read -r -a arr <<< "$(for i in $(cat $nuisanceInFile); do echo ${preprocfeat}/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' ')"
+else # append motion parameters to regressor list
+  IFS=" " read -r -a arr <<< "$(for i in $(cat $nuisanceInFile); do echo ${preprocfeat}/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' '; echo "$rawEpiDir"/mcImg.par)"
 fi
+
+paste "${arr[@]}" > "$rawEpiDir"/NuisanceRegressor_ts.txt
 
 regressorsFile="$rawEpiDir"/NuisanceRegressor_ts.txt
 export regressorsFile
+
+fsl_tsplot -i "$regressorsFile" -t "Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o "${rawEpiDir}"/NuisanceRegressors_ts.png
 
 # simultaneous bandpass + regression
 clobber ${indir}/"$(basename "${epiData%%.nii*}")"_bp_res4d.nii.gz &&\
@@ -434,9 +436,6 @@ SimultBandpassNuisanceReg ${epiData} "$rawEpiDir"/mcImgMean_mask.nii.gz
 
 epiDataFiltReg=${indir}/"$(basename "${epiData%%.nii*}")"_bp_res4d.nii.gz
 export epiDataFiltReg
-
-
-
 
 
 ###### Post-regression data-scaling ########################################
