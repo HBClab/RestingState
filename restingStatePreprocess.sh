@@ -48,12 +48,12 @@ get_arg1() {
 	echo "Option $1 requires an argument" 1>&2
 	exit 1
     else
-	arg=`echo $1 | sed 's/.*=//'`
-	if [ X$arg = X ] ; then
+	arg="${1//=.*//}"
+	if [ X"$arg" = X ] ; then
 	    echo "Option $1 requires an argument" 1>&2
 	    exit 1
 	fi
-	echo $arg
+	echo "$arg"
     fi
 }
 
