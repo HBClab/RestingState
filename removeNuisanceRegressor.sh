@@ -128,29 +128,29 @@ function SimultBandpassNuisanceReg()
   fi
 
   #If neither lowpass or highpass is set, do an allpass filter (fbot=0 ftop=99999)
-   #If ONLY highpass is set, do a highpass filter (fbot=${highpassArg} ftop=99999)
-   #If ONLY lowpass is set, do a lowpass filter (fbot=0 ftop=${highpassArg})
-   #If both lowpass and highpass are set, do a bandpass filter (fbot=${highpassArg} ftop=${lowpassArg})
+   #If ONLY highpass is set, do a highpass filter (fbot=${hp} ftop=99999)
+   #If ONLY lowpass is set, do a lowpass filter (fbot=0 ftop=${hp})
+   #If both lowpass and highpass are set, do a bandpass filter (fbot=${hp} ftop=${lp})
   if [[ $lp == ""  &&  $hp == "" ]]; then
     ##allpass filter
     fbot=0
     ftop=99999
-    highpassArg=0
-    lowpassArg=99999
+    hp=0
+    lp=99999
     filtType=allpass
     echo "Performing an 'allpass' filter.  Removal of '0' and Nyquist only."
   elif [[ $lp == ""  &&  $hp != "" ]]; then
     ##highpass filter
     fbot=${hp}
     ftop=99999
-    lowpassArg=99999
+    lp=99999
     filtType=highpass
     echo "Performing a 'highpass' filter.  Frequencies below ${hp} will be filtered."
   elif [[ $lp != ""  &&  $hp == "" ]]; then
     ##lowpass filter
     fbot=0
     ftop=${lp}
-    highpassArg=0
+    hp=0
     filtType=lowpass
     echo "Performing a 'lowpass' filter.  Frequencies above ${lp} will be filtered."
   else
@@ -161,7 +161,7 @@ function SimultBandpassNuisanceReg()
     echo "Performing a 'bandpass' filter.  Frequencies between ${lp} & ${hp} will be filtered."
   fi
 
-  clobber ${inDir}/"$(basename "${inData%%.nii*}")"_bp.nii.gz &&\
+  clobber ${inDir}/"$(basename "${inData%%.nii*}")"_bp_res4d.nii.gz &&\
   rm -rf ${inDir}/*_mean.nii.gz 2> /dev/null &&\
   rm -rf ${inDir}/tmp_bp.nii.gz 2> /dev/null &&\
 	3dTproject -input ${inData} -prefix $inDir/tmp_bp.nii.gz -mask ${mask} -bandpass ${fbot} ${ftop} -ort ${regressorsFile} -verb &&\
@@ -214,12 +214,12 @@ while [ $# -ge 1 ] ; do
       declare -a nuisanceList=( "$(cat "${nuisanceInFile}")" );
       shift;;
     --lp)
-      lowpassArg=$(get_arg1 $1);
-      export lowpassArg;
+      lp=$(get_arg1 $1);
+      export lp;
       shift;;
     --hp)
-      highpassArg=$(get_arg1 $1);
-      export highpassArg;
+      hp=$(get_arg1 $1);
+      export hp;
       shift;;
     --tr)
       tr=$(get_arg1 $1);
@@ -240,9 +240,6 @@ while [ $# -ge 1 ] ; do
     -c)
       clob=true;
       export clob;
-      rm -- *_norm.png run_normseedregressors.m;
-      rm -rf nuisancereg.*;
-      rm -rf tsregressorslp;
       shift;;
     ?)
       echo "ERROR: Invalid option"
@@ -284,12 +281,12 @@ if [[ ${te} == "" ]]; then
   te=30
 fi
 
-if [[ "${lowpassArg}" == "" ]]; then
-  lowpassArg=0
+if [[ "${lp}" == "" ]]; then
+  lp=0
 fi
 
-if [[ "${highpassArg}" == "" ]]; then
-  highpassArg=0
+if [[ "${hp}" == "" ]]; then
+  hp=0
 fi
 
 
@@ -335,8 +332,8 @@ echo "------------------------------------"; \
 echo "-E $epiData"; \
 echo "-A $t1Data"; } >> "$logDir"/rsParams_log
   echo "-N $nuisanceInFile" >> "$logDir"/rsParams_log
-{ echo "-L $lowpassArg"; \
-echo "-H $highpassArg"; \
+{ echo "-L $lp"; \
+echo "-H $hp"; \
 echo "-t $tr"; \
 echo "-T $te"; } >> "$logDir"/rsParams_log
 if [[ $overwriteFlag == 1 ]]; then
@@ -379,7 +376,7 @@ do
     exit 1
   fi
   # check if needs binarize
-  if [[ "$(printf %.0f "$(fslstats rois/"${roiName}"_native.nii.gz -M)")" -ne 1 ]]; then
+  if [[ "$(printf %.0f $(fslstats rois/"${roiName}"_native.nii.gz -M))" -ne 1 ]]; then
     fslmaths rois/"${roiName}"_native.nii.gz -thr 0.5 -bin rois/"${roiName}"_native.nii.gz
   fi
 
@@ -395,51 +392,55 @@ do
 done
 
 
-#### Bandpass Motion Regressors ######
+# #### Bandpass Motion Regressors ######
+#
+# echo "...Bandpass filtering Motion Regressors"
+#
+#
+# if [ $lp != 0 ] || [ $hp != 0 ]; then
+#   # Filtering ONLY if low/highpass don't both = 0
+#   mclist='1 2 3 4 5 6'
+#   for mc in ${mclist}
+#   do
+#       cp "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D
+#       1dBandpass "$hp" "$lp" "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D
+#       cat "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt
+#   done
+# else
+#   # Passband filter
+#   mclist='1 2 3 4 5 6'
+#   for mc in ${mclist}
+#   do
+#       cp "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D
+#       1dBandpass 0 99999 "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D
+#       cat "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt
+#   done
+# fi
+#
+# #################################
 
-echo "...Bandpass filtering Motion Regressors"
 
-
-if [ $lowpassArg != 0 ] || [ $highpassArg != 0 ]; then
-  # Filtering ONLY if low/highpass don't both = 0
-  mclist='1 2 3 4 5 6'
-  for mc in ${mclist}
-  do
-      cp "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D
-      1dBandpass "$highpassArg" "$lowpassArg" "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D
-      cat "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt
-  done
-else
-  # Passband filter
-  mclist='1 2 3 4 5 6'
-  for mc in ${mclist}
-  do
-      cp "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D
-      1dBandpass 0 99999 "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D
-      cat "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt
-  done
-fi
-
-#################################
-
-
-
-#### Plotting Regressor time courses ######
-
-echo "...Plotting Regressor time series"
-
-for roi in "${nuisanceList[@]}"
-do
-  fsl_tsplot -i "$indir"/tsregressorslp/"${roi}"_normalized_ts.txt -t "${roi} Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o "$indir"/"${roi}"_norm.png
-  echo "<br><br><img src=\"$indir/${roi}_norm.png\" alt=\"$roi nuisance regressor\"><br>" >> "$indir"/analysisResults.html
-done
-
-#################################
+#
+# #### Plotting Regressor time courses ######
+#
+# echo "...Plotting Regressor time series"
+#
+# for roi in "${nuisanceList[@]}"
+# do
+#   fsl_tsplot -i "$indir"/tsregressorslp/"${roi}"_normalized_ts.txt -t "${roi} Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o "$indir"/"${roi}"_norm.png
+#   echo "<br><br><img src=\"$indir/${roi}_norm.png\" alt=\"$roi nuisance regressor\"><br>" >> "$indir"/analysisResults.html
+# done
+#
+# #################################
 
 ###### simultaneous bandpass + regression #####
 
 # paste regressor timeseries into one file
 paste -d' ' "$(for i in $(cat $nuisanceInFile); do echo ${preprocfeat}/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' ')" > "$(dirname ${preprocfeat})"/NuisanceRegressor_ts.txt
+
+if [[ "${compcorFlag}" -ne 1 ]]; then
+  paste -d' ' "$(dirname ${preprocfeat})"/NuisanceRegressor_ts.txt "$(dirname ${preprocfeat})"/mcImg.par > "$(dirname ${preprocfeat})"/NuisanceRegressor_ts.txt
+fi
 
 regressorsFile="$(dirname ${preprocfeat})"/NuisanceRegressor_ts.txt
 export regressorsFile
@@ -470,7 +471,7 @@ fslmaths mask -mul 1000 mask1000 -odt float
 echo "...Normalize Data"
 fslmaths ${epiDataFiltReg} -Tmean ${epiDataFiltReg/res4d/res4d_tmean} res4d_tmean
 fslmaths ${epiDataFiltReg} -Tstd ${epiDataFiltReg/res4d/res4d_std}res4d_std
-fslmaths ${epiDataFiltReg} -sub ${epiDataFiltReg/res4d/res4d_tmean} ${epiDataFiltReg/res4d/res4d_dmean} res4d_tmean res4d_dmean
+fslmaths ${epiDataFiltReg} -sub ${epiDataFiltReg/res4d/res4d_tmean} ${epiDataFiltReg/res4d/res4d_dmean}
 fslmaths ${epiDataFiltReg/res4d/res4d_dmean} -div ${epiDataFiltReg/res4d/res4d_std} ${epiDataFiltReg/res4d/res4d_normed}
 fslmaths ${epiDataFiltReg/res4d/res4d_normed} -add mask1000 ${epiDataFiltReg/res4d/res4d_normandscaled} -odt float
 
