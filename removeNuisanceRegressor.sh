@@ -10,18 +10,6 @@
 #       b. Motion Parameters (mclfirt/3dvolreg)
 ##################################################################################################################
 
-analysis=nuisancereg
-analysis2=nuisanceregFix
-nuisancefeat=nuisancereg.feat
-preprocfeat=preproc.feat
-melodicfeat=melodic.ica
-fsf=${analysis}.fsf
-fsf2=${analysis2}.fsf
-
-##Check of all ROIs (from ROIs directory), that can be used for nuisance regression
-scriptPath=$(perl -e 'use Cwd "abs_path";print abs_path(shift)' "$0")
-scriptDir=$(dirname "$scriptPath")
-
 SGE_ROOT='';export SGE_ROOT
 
 function Usage {
@@ -64,7 +52,7 @@ get_imarg1() {
 }
 
 get_arg1() {
-    if [ X`echo $1 | grep '='` = X ] ; then
+    if [ X"`echo $1 | grep '='`" = X ] ; then
 	echo "Option $1 requires an argument" 1>&2
 	exit 1
     else
@@ -313,13 +301,6 @@ indir=$(dirname "$epiData")
 preprocfeat=$(x=$indir; while [ "$x" != "/" ] ; do x=`dirname "$x"`; find "$x" -maxdepth 1 -type d -name preproc.feat; done)
 logDir=$(dirname ${preprocfeat})
 
-# Set flag depending on whether Melodic was run or not (to determine which directory to pull "reg" files from)
-# "Classic" processing = nonfiltered_smooth_data.nii.gz ('nonfiltered')
-# Melodic processing = denoised_func_data.nii.gz ('denoised')
-epiBase=$(basename "$epiData" | awk -F"_" '{print $1}')
-if [[ $epiBase == "denoised" ]]; then
-  melFlag=1
-fi
 
 # If new nuisance regressors were added, echo them out to the rsParams file (only if they don't already exist in the file)
 # Making a *strong* assumption that any nuisanceROI lists added after initial processing won't reuse the first ROI (e.g. pccrsp)
@@ -347,11 +328,9 @@ do
   echo "$i" >> "$indir"/nuisance_rois.txt
 done
 
-nuisanceroiList=$indir/nuisance_rois.txt
-nuisanceCount=$(awk 'END {print NR}' "$nuisanceroiList")
 
 # Echo out all input parameters into a log
-{ echo "$scriptPath"; \
+{
 echo "------------------------------------"; \
 echo "-E $epiData"; \
 echo "-A $t1Data"; } >> "$logDir"/rsParams_log
@@ -374,7 +353,6 @@ fi
 
 echo "Running $0 ..."
 
-roiList=("${nuisanceList[@]}")
 cd "${preprocfeat}" || exit
 mkdir -p rois
 
@@ -401,18 +379,18 @@ do
     exit 1
   fi
   # check if needs binarize
-  if [[ "$(printf %.0f $(fslstats rois/"${roiName}"_native.nii.gz -M))" -ne 1 ]]; then
+  if [[ "$(printf %.0f "$(fslstats rois/"${roiName}"_native.nii.gz -M)")" -ne 1 ]]; then
     fslmaths rois/"${roiName}"_native.nii.gz -thr 0.5 -bin rois/"${roiName}"_native.nii.gz
   fi
 
-  # extract regressor timeseries
+  # extract regressor timeseries from unfiltered epi
   if [[ "${compcorFlag}" -eq 1 ]]; then
     clobber rois/mean_"${roiName}"_ts.txt &&\
-    fslmeants -i "$epiDataFilt" -o rois/mean_"${roiName}"_ts.txt -m rois/"${roiName}"_native.nii.gz --eig --order=5
+    fslmeants -i "$epiData" -o rois/mean_"${roiName}"_ts.txt -m rois/"${roiName}"_native.nii.gz --eig --order=5
 
   else
     clobber rois/mean_"${roiName}"_ts.txt &&\
-    fslmeants -i "$epiDataFilt" -o rois/mean_"${roiName}"_ts.txt -m rois/"${roiName}"_native.nii.gz
+    fslmeants -i "$epiData" -o rois/mean_"${roiName}"_ts.txt -m rois/"${roiName}"_native.nii.gz
   fi
 done
 
