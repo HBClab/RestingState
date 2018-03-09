@@ -13,18 +13,17 @@
 SGE_ROOT='';export SGE_ROOT
 
 function Usage {
-  echo "Usage: removeNuisanceRegressor.sh --epi=restingStateImage --t1brain=T1Image --nuisanceMode=nuisanceMode --tr=tr --te=te --hp=highpass --lp=lowpass -c"
+  echo "Usage: removeNuisanceRegressor.sh --epi=restingStateImage --t1brain=T1Image --nuisanceList=nuisanceList.txt --tr=tr --te=te --hp=highpass --lp=lowpass -c"
   echo "            -OR-"
-  echo "Usage: removeNuisanceRegressor.sh -E restingStateImage -A T1Image -n nuisanceROI -t tr -T te -H highpass -L lowpass -M -c"
+  echo "Usage: removeNuisanceRegressor.sh --epi=restingStateImage --t1brain=T1Image --nuisanceList=nuisanceList.txt --tr=tr --te=te --hp=highpass --lp=lowpass --compcor -c"
   echo ""
   echo " where"
   echo "  -epi preprocessed Resting State file"
   echo "     *If using 'Classic' mode (no ICA Denoising), specify 'nonfiltered_func_data.nii.gz' from preproc.feat directory"
   echo "     *If using ICA_AROMA, use denoised_func_data_nonaggr.nii.gz from ica_aroma directory"
   echo "  --t1brain T1 file (skull-stripped)"
-  echo "     *T1 should be from output of dataPrep script, EPI shoule be from output of ICA_denoise script"
   echo "  --nuisanceList list containing paths to nuisance ROIs"
-  echo "      compcor = ICA-AROMA + WM/CSF regressors derived from FAST segmentation"
+  echo "      compcor = WM/CSF regressors derived from FAST segmentation"
   echo "      classic = global + WM roi + CSF roi"
   echo "  --lp lowpass filter frequency (Hz) (e.g. 0.08 Hz (2.5 sigma))"
   echo "  --hp highpass filter frequency (Hz) (e.g. 0.008 Hz (25.5 sigma / 120 s))"
@@ -32,9 +31,8 @@ function Usage {
   echo "     still be removed (allpass filter)"
   echo "  --tr TR time (seconds)"
   echo "  --te TE (milliseconds) (default to 30 ms)"
-  echo "  --aroma flag if using ICA_AROMA denoised data as input to nuisancereg"
   echo "  --compcor flag if using CompCor nuisancereg"
-  echo "  -c clobber/overwrite previous results"
+  echo "  --clobber clobber/overwrite previous results"
   echo ""
   exit 1
 }
@@ -224,11 +222,7 @@ while [ $# -ge 1 ] ; do
       compcorFlag=1;
       export compcorFlag;
       shift;;
-    --aroma)
-      aromaFlag=1;
-      export aromaFlag;
-      shift;;
-    -c)
+    --clobber)
       clob=true;
       export clob;
       shift;;
