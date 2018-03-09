@@ -1,4 +1,4 @@
-function firstlevelseeding_parallel(subPath,roiList,roiOutDir,funcvoldim,input,motion_scrub,doFisherZ)
+function firstlevelseeding_parallel(roiList,roiOutDir,funcvoldim,input,motion_scrub,doFisherZ)
 
 %script to calculate correlation coefficient between a set of seed
 %timecourses and a functional volume that has had nuisance signals
@@ -75,9 +75,9 @@ warning off all
 mypath=[roiOutDir];
 cd(mypath);
 
-if exist('cope1.nii.gz','file')
-  system('gunzip cope1.nii.gz')
-end
+%if exist('cope1.nii.gz','file')
+%  system('gunzip cope1.nii.gz')
+%end
 
 funcon=load_untouch_nii(input);
 func=funcon.img;

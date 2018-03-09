@@ -574,7 +574,7 @@ doFisherZ=1;
 motion_scrub=1;
 input='${epiData/.nii.gz/_ms.nii}';
 
-firstlevelseeding_parallel('$rawEpiDir',roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
+firstlevelseeding_parallel(roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
 quit
 EOF
   else
@@ -594,7 +594,7 @@ doFisherZ=1;
 motion_scrub=0;
 input='${epiData/.nii.gz/.nii}';
 
-firstlevelseeding_parallel('$rawEpiDir',roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
+firstlevelseeding_parallel(roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
 quit
 EOF
 
@@ -613,7 +613,7 @@ doFisherZ=1;
 motion_scrub=1;
 input='${epiData/.nii.gz/_ms.nii}';
 
-firstlevelseeding_parallel('$rawEpiDir',roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
+firstlevelseeding_parallel(roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
 quit
 EOF
   fi
