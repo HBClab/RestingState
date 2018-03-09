@@ -126,7 +126,7 @@ while [ $# -ge 1 ] ; do
   	    shift;;
     --roiList)
       roiInFile=$(get_arg1 $1);
-      declare -a roiList=( "$(cat "${nuisanceInFile}")" );
+      declare -a roiList=( "$(cat "${roiInFile}")" );
       shift;;
     --compcor)
       compcorFlag=1;
@@ -229,7 +229,7 @@ cd "$rawEpiDir" || exit
 # Map the ROIs
 for roi in "${roiList[@]}"; do
 	roiName=$(basename ${roi} .nii.gz)
-	roiMask=$(find "$rawEpiDir"/nuisancereg*.feat -maxdepth 2 -type f -name "${roiName}_mask.nii.gz" | head -n 1)
+	roiMask=$(find "$roiOutDir" -maxdepth 1 -type f -name "${roiName}_mask.nii.gz" | head -n 1)
 	# Copy over Seed ROI
   clobber ${seedcorrDir}/${roiName}_standard.nii.gz &&\
 	cp ${roi} ${seedcorrDir}/${roiName}_standard.nii.gz
@@ -318,7 +318,6 @@ for roi in ${roiList2}; do
 	echo $roi
 	roiName=$(basename ${roi} .nii.gz)
 	roiMask=$(find "$rawEpiDir" -maxdepth 3 -type f -name "${roiName}_mask.nii.gz" | head -n 1)
-	# roiMask="$rawEpiDir"/nuisancereg.feat/stats/${roiName}_mask.nii.gz
 	if [ ! -f "$rawEpiDir"/seedQC/${roi}_axial.png ] || [ ! -f "$rawEpiDir"/seedQC/${roi}_sagittal.png ] || [ ! -f "$rawEpiDir"/seedQC/${roi}_coronal.png ]; then
 		for splitdirection in x y z; do
 		    echo "......Preparing $roi ($splitdirection)"
@@ -566,7 +565,7 @@ doFisherZ=1;
 motion_scrub=0;
 input='res4d_normandscaled.nii';
 
-firstlevelseeding_parallel('"$rawEpiDir"',roiList,'$nuisancefeat',funcvoldim,input,motion_scrub,doFisherZ)
+firstlevelseeding_parallel('$rawEpiDir',roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
 quit
 EOF
   elif [[ $motionscrubFlag == 1 ]]; then
@@ -586,7 +585,7 @@ doFisherZ=1;
 motion_scrub=1;
 input='res4d_normandscaled_motionscrubbed.nii';
 
-firstlevelseeding_parallel('"$rawEpiDir"',roiList,'$nuisancefeat',funcvoldim,input,motion_scrub,doFisherZ)
+firstlevelseeding_parallel('$rawEpiDir',roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
 quit
 EOF
   else
@@ -606,7 +605,7 @@ doFisherZ=1;
 motion_scrub=0;
 input='res4d_normandscaled.nii';
 
-firstlevelseeding_parallel('"$rawEpiDir"',roiList,'$nuisancefeat',funcvoldim,input,motion_scrub,doFisherZ)
+firstlevelseeding_parallel('$rawEpiDir',roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
 quit
 EOF
 
@@ -625,7 +624,7 @@ doFisherZ=1;
 motion_scrub=1;
 input='res4d_normandscaled_motionscrubbed.nii';
 
-firstlevelseeding_parallel('"$rawEpiDir"',roiList,'$nuisancefeat',funcvoldim,input,motion_scrub,doFisherZ)
+firstlevelseeding_parallel('$rawEpiDir',roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
 quit
 EOF
   fi
@@ -672,13 +671,13 @@ EOF
 
   # Copy over anatomical files to results directory
   # T1 (highres)
-  cp "$rawEpiDir"/${nuisancefeat}/reg/highres.nii.gz ${seedcorrDir}
+  cp "$rawEpiDir"/${preprocfeat}/reg/highres.nii.gz ${seedcorrDir}
 
   # T1toMNI (highres2standard)
-  cp "$rawEpiDir"/${nuisancefeat}/reg/highres2standard.nii.gz ${seedcorrDir}
+  cp "$rawEpiDir"/${preprocfeat}/reg/highres2standard.nii.gz ${seedcorrDir}
 
   # MNI (standard)
-  cp "$rawEpiDir"/${nuisancefeat}/reg/standard.nii.gz ${seedcorrDir}
+  cp "$rawEpiDir"/${preprocfeat}/reg/standard.nii.gz ${seedcorrDir}
 
 
   # HTML setup
@@ -697,9 +696,9 @@ EOF
       # Nonlinear warp from EPI to MNI
       clobber ${seedcorrDir}/${roi}_standard_zmap.nii.gz &&\
       applywarp --in=${rawEpiDir}/${roi}/cope1.nii \
-      --ref="$rawEpiDir"/${nuisancefeat}/reg/standard.nii.gz \
+      --ref="$rawEpiDir"/${preprocfeat}/reg/standard.nii.gz \
       --out=${seedcorrDir}/${roi}_standard_zmap.nii.gz \
-      --warp="$rawEpiDir"/${nuisancefeat}/reg/example_func2standard_warp.nii.gz \
+      --warp="$rawEpiDir"/${preprocfeat}/reg/example_func2standard_warp.nii.gz \
       --datatype=float
 
       # Mask out data with MNI mask
@@ -708,9 +707,9 @@ EOF
       # Warp seed from MNI to T1
       clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
       applywarp --in=${seedcorrDir}/${roi}_standard.nii.gz \
-      --ref="$rawEpiDir"/${nuisancefeat}/reg/highres.nii.gz \
+      --ref="$rawEpiDir"/${preprocfeat}/reg/highres.nii.gz \
       --out=${seedcorrDir}/${roi}_highres.nii.gz \
-      --warp="$rawEpiDir"/${nuisancefeat}/reg/standard2highres_warp.nii.gz \
+      --warp="$rawEpiDir"/${preprocfeat}/reg/standard2highres_warp.nii.gz \
       --interp=nn
 
       # Creating new plots with fsl_tsplot
@@ -721,7 +720,7 @@ EOF
       clobber "$rawEpiDir"/${roi}.png &&\
       fsl_tsplot -i ${rawEpiDir}/${roi}_residvol_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$rawEpiDir"/${roi}.png
 
-      echo "<br><img src=\""$rawEpiDir"/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
+      echo "<br><img src=\"$rawEpiDir/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
 
     elif [[ $motionscrubFlag == 1 ]]; then
       # Only motionscrubbed data
@@ -733,9 +732,9 @@ EOF
       # Nonlinear warp from EPI to MNI
       clobber ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz &&\
       applywarp --in=${rawEpiDir}/${roi}_ms/cope1.nii \
-      --ref="$rawEpiDir"/${nuisancefeat}/reg/standard.nii.gz \
+      --ref="$rawEpiDir"/${preprocfeat}/reg/standard.nii.gz \
       --out=${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz \
-      --warp="$rawEpiDir"/${nuisancefeat}/reg/example_func2standard_warp.nii.gz \
+      --warp="$rawEpiDir"/${preprocfeat}/reg/example_func2standard_warp.nii.gz \
       --datatype=float
 
       # Mask out data with MNI mask
@@ -744,9 +743,9 @@ EOF
       # Warp seed from MNI to T1
       clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
       applywarp --in=${seedcorrDir}/${roi}_standard.nii.gz \
-      --ref="$rawEpiDir"/${nuisancefeat}/reg/highres.nii.gz \
+      --ref="$rawEpiDir"/${preprocfeat}/reg/highres.nii.gz \
       --out=${seedcorrDir}/${roi}_highres.nii.gz \
-      --warp="$rawEpiDir"/${nuisancefeat}/reg/standard2highres_warp.nii.gz \
+      --warp="$rawEpiDir"/${preprocfeat}/reg/standard2highres_warp.nii.gz \
       --interp=nn
 
 
@@ -780,7 +779,7 @@ EOF
         clobber "$rawEpiDir"/${roi}_ms.png &&\
         fsl_tsplot -i ${rawEpiDir}/${roi}_residvol_ms_ts.txt -t "$roi Time Series (Scrubbed)" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$rawEpiDir"/${roi}_ms.png
 
-        echo "<br><img src=\""$rawEpiDir"/${roi}.png\" alt=\"${roi} seed\"><img src=\""$rawEpiDir"/${roi}_ms.png\" alt=\"${roi}_ms seed\"><br>" >> "$rawEpiDir"/analysisResults.html
+        echo "<br><img src=\"$rawEpiDir/${roi}.png\" alt=\"${roi} seed\"><img src=\"$rawEpiDir/${roi}_ms.png\" alt=\"${roi}_ms seed\"><br>" >> "$rawEpiDir"/analysisResults.html
 
       else
         # Absence of scrubbed volumes
@@ -792,7 +791,7 @@ EOF
 
         fsl_tsplot -i ${rawEpiDir}/${roi}_residvol_ms_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$rawEpiDir"/${roi}.png
 
-        echo "<br><img src=\""$rawEpiDir"/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
+        echo "<br><img src=\"$rawEpiDir/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
       fi
 
     else
@@ -807,9 +806,9 @@ EOF
       # Nonlinear warp from EPI to MNI
       clobber ${seedcorrDir}/${roi}_standard_zmap.nii.gz &&\
       applywarp --in=${rawEpiDir}/${roi}/cope1.nii \
-      --ref="$rawEpiDir"/${nuisancefeat}/reg/standard.nii.gz \
+      --ref="$rawEpiDir"/${preprocfeat}/reg/standard.nii.gz \
       --out=${seedcorrDir}/${roi}_standard_zmap.nii.gz \
-      --warp="$rawEpiDir"/${nuisancefeat}/reg/example_func2standard_warp.nii.gz \
+      --warp="$rawEpiDir"/${preprocfeat}/reg/example_func2standard_warp.nii.gz \
       --datatype=float
 
       # Mask out data with MNI mask
@@ -818,9 +817,9 @@ EOF
       # Warp seed from MNI to T1
       clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
       applywarp --in=${seedcorrDir}/${roi}_standard.nii.gz \
-      --ref="$rawEpiDir"/${nuisancefeat}/reg/highres.nii.gz \
+      --ref="$rawEpiDir"/${preprocfeat}/reg/highres.nii.gz \
       --out=${seedcorrDir}/${roi}_highres.nii.gz \
-      --warp="$rawEpiDir"/${nuisancefeat}/reg/standard2highres_warp.nii.gz \
+      --warp="$rawEpiDir"/${preprocfeat}/reg/standard2highres_warp.nii.gz \
       --interp=nn
 
 
@@ -829,9 +828,9 @@ EOF
       # Nonlinear warp from EPI to MNI
       clobber ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz &&\
       applywarp --in=${rawEpiDir}/${roi}_ms/cope1.nii \
-      --ref="$rawEpiDir"/${nuisancefeat}/reg/standard.nii.gz \
+      --ref="$rawEpiDir"/${preprocfeat}/reg/standard.nii.gz \
       --out=${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz \
-      --warp="$rawEpiDir"/${nuisancefeat}/reg/example_func2standard_warp.nii.gz \
+      --warp="$rawEpiDir"/${preprocfeat}/reg/example_func2standard_warp.nii.gz \
       --datatype=float
 
       # Mask out data with MNI mask
@@ -871,7 +870,7 @@ EOF
         fsl_tsplot -i ${rawEpiDir}/${roi}_residvol_ms_ts.txt -t "$roi Time Series (Scrubbed)" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$rawEpiDir"/${roi}_ms.png
 
 
-        echo "<br><img src=\""$rawEpiDir"/${roi}.png\" alt=\"${roi} seed\"><img src=\""$rawEpiDir"/${roi}_ms.png\" alt=\"${roi}_ms seed\"><br>" >> "$rawEpiDir"/analysisResults.html
+        echo "<br><img src=\"$rawEpiDir/${roi}.png\" alt=\"${roi} seed\"><img src=\"$rawEpiDir/${roi}_ms.png\" alt=\"${roi}_ms seed\"><br>" >> "$rawEpiDir"/analysisResults.html
 
       else
         # No scrubbed TRs
@@ -883,7 +882,7 @@ EOF
 
         fsl_tsplot -i ${rawEpiDir}/${roi}_residvol_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$rawEpiDir"/${roi}.png
 
-        echo "<br><img src=\""$rawEpiDir"/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
+        echo "<br><img src=\"$rawEpiDir/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
       fi
     fi
   done
