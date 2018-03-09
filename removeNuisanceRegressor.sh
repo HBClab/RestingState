@@ -105,7 +105,7 @@ function clobber()
 	#clobber test.nii.gz &&\
 	#fslmaths input.nii.gz -mul 10 test.nii.gz
 }
-#default
+# default
 clob=false
 export -f clobber
 
@@ -118,12 +118,12 @@ function SimultBandpassNuisanceReg()
   local inDir
   inDir=$(dirname ${inData})
 
-  #If neither lowpass or highpass is set, do an allpass filter (fbot=0 ftop=99999)
-   #If ONLY highpass is set, do a highpass filter (fbot=${hp} ftop=99999)
-   #If ONLY lowpass is set, do a lowpass filter (fbot=0 ftop=${hp})
-   #If both lowpass and highpass are set, do a bandpass filter (fbot=${hp} ftop=${lp})
+   # If neither lowpass or highpass is set, do an allpass filter (fbot=0 ftop=99999)
+   # If ONLY highpass is set, do a highpass filter (fbot=${hp} ftop=99999)
+   # If ONLY lowpass is set, do a lowpass filter (fbot=0 ftop=${hp})
+   # If both lowpass and highpass are set, do a bandpass filter (fbot=${hp} ftop=${lp})
   if [[ $lp == ""  &&  $hp == "" ]]; then
-    ##allpass filter
+    # allpass filter
     fbot=0
     ftop=99999
     hp=0
@@ -131,21 +131,21 @@ function SimultBandpassNuisanceReg()
     filtType=allpass
     echo "Performing an 'allpass' filter.  Removal of '0' and Nyquist only."
   elif [[ $lp == ""  &&  $hp != "" ]]; then
-    ##highpass filter
+    # highpass filter
     fbot=${hp}
     ftop=99999
     lp=99999
     filtType=highpass
     echo "Performing a 'highpass' filter.  Frequencies below ${hp} will be filtered."
   elif [[ $lp != ""  &&  $hp == "" ]]; then
-    ##lowpass filter
+    # lowpass filter
     fbot=0
     ftop=${lp}
     hp=0
     filtType=lowpass
     echo "Performing a 'lowpass' filter.  Frequencies above ${lp} will be filtered."
   else
-    ##bandpass filter (low and high)
+    # bandpass filter (low and high)
     fbot=${hp}
     ftop=${lp}
     filtType=bandpass
