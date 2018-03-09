@@ -153,10 +153,13 @@ done
 
 # A few default parameters (if input not specified, these parameters are assumed)
 
-if [[ $motionscrubFlag == "" ]]; then
+if [[ -z $motionscrubFlag ]]; then
 motionscrubFlag=0
 fi
 
+if [[ -z $seedmapFlag ]]; then
+seedmapFlag=0
+fi
 
 # If new seeds are added, echo them out to the rsParams file (only if they don't already exist in the file)
 # Making a *strong* assumption that any ROI lists added after initial processing won't reuse the first ROI (e.g. pccrsp)
@@ -309,7 +312,7 @@ for roi in ${roiList2}; do
 	echo $roi
 	roiName=$(basename ${roi} .nii.gz)
 	roiMask=$(find "$rawEpiDir" -maxdepth 3 -type f -name "${roiName}_mask.nii.gz" | head -n 1)
-	if [ ! -f "$rawEpiDir"/seedQC/${roi}_axial.png ] || [ ! -f "$rawEpiDir"/seedQC/${roi}_sagittal.png ] || [ ! -f "$rawEpiDir"/seedQC/${roi}_coronal.png ]; then
+	if [ ! -f $seedQCdir/${roi}_axial.png ] || [ ! -f $seedQCdir/${roi}_sagittal.png ] || [ ! -f $seedQCdir/${roi}_coronal.png ]; then
 		for splitdirection in x y z; do
 		    echo "......Preparing $roi ($splitdirection)"
 
@@ -359,10 +362,8 @@ for roi in ${roiList2}; do
 		    fslsplit $overlayBase $seedQCdir/temp/overlay_split_${suffix} -${splitdirection}
 
 		    # Set variables for underlay and overlay images
-		    underlayImage=$(echo $seedQCdir/temp/* | grep "underlay_split_${suffix}" | grep $sliceCut)
-		    overlayImage=$(echo $seedQCdir/temp/* | grep "overlay_split_${suffix}" | grep $sliceCut)
-
-
+		    underlayImage=$(find "$seedQCdir" -name "underlay_split_${suffix}${sliceCut}.nii.gz")
+		    overlayImage=$(find "$seedQCdir" -name "overlay_split_${suffix}${sliceCut}.nii.gz")
 		    # Copy over underlay/overlay images, uncompress
 		    # Will need to check for presence of unzipped NIFTI file (from previous runs (otherwise "clobber" won't work))
 		    if [[ -e $seedQCdir/${roi}_underlay_${suffix}.nii ]]; then
@@ -373,7 +374,7 @@ for roi in ${roiList2}; do
 		      mv $seedQCdir/${roi}_underlay_${suffix}.nii $seedQCdir/oldSeeds
 		    fi
 
-		    cp $seedQCdir/temp/$underlayImage $seedQCdir/${roi}_underlay_${suffix}.nii.gz
+		    cp $underlayImage $seedQCdir/${roi}_underlay_${suffix}.nii.gz
 		    if [[ -e $seedQCdir/${roi}_overlay_${suffix}.nii ]]; then
 		      if [[ ! -e $seedQCdir/oldSeeds ]]; then
 		        mkdir $seedQCdir/oldSeeds
@@ -382,7 +383,7 @@ for roi in ${roiList2}; do
 		      mv $seedQCdir/${roi}_overlay_${suffix}.nii $seedQCdir/oldSeeds
 		    fi
 
-		    cp $seedQCdir/temp/$overlayImage $seedQCdir/${roi}_overlay_${suffix}.nii.gz
+		    cp $overlayImage $seedQCdir/${roi}_overlay_${suffix}.nii.gz
 
 		    # Need to reorient coronal and sagittal images in order for matlab to process correctly (axial is already OK)
 		    # Coronal images will also need the orientation swapped to update header AND image info
@@ -438,7 +439,7 @@ niftiScripts=['${scriptDir}','/Octave/nifti'];
 addpath(niftiScripts);statsScripts=['${scriptDir}','/Octave/statistics'];
 statsScripts=['${scriptDir}','/Octave/statistics'];
 addpath(statsScripts);
-fid=fopen('"$rawEpiDir"/seeds_forQC.txt');
+fid=fopen('$rawEpiDir/seeds_forQC.txt');
 roiList=textscan(fid,'%s');
 fclose(fid);
 seedDir='$seedQCdir';
