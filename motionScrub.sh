@@ -14,7 +14,7 @@ nuisancefeat=nuisancereg.feat
 filename=run_motionscrub.m
 
 
-function printCommandLine {
+function Usage {
   echo "Usage: motionScrub.sh -f restingStateImage"
   echo " where"
   echo "  -E resting state image"
@@ -23,34 +23,59 @@ function printCommandLine {
   exit 1
 }
 
+########## FSL's arg parsing functions ###################
+get_imarg1() {
+    arg=$(get_arg1 $1);
+    arg=$($FSLDIR/bin/remove_ext $arg);
+    echo $arg
+}
+
+get_arg1() {
+    if [ X"`echo $1 | grep '='`" = X ] ; then
+	echo "Option $1 requires an argument" 1>&2
+	exit 1
+    else
+	arg=`echo $1 | sed 's/.*=//'`
+	if [ X$arg = X ] ; then
+	    echo "Option $1 requires an argument" 1>&2
+	    exit 1
+	fi
+	echo $arg
+    fi
+}
+
+
 # Parse Command line arguments
-while getopts “hE:” OPTION
-do
-  case $OPTION in
-    h)
-      printCommandLine
-      ;;
-    E)
-      epiData=$OPTARG
-      ;;
-    ?)
-      echo "ERROR: Invalid option"
-      printCommandLine
-      ;;
+if [ $# -lt 1 ] ; then Usage; exit 0; fi
+while [ $# -ge 1 ] ; do
+    iarg=$(get_opt1 $1);
+    case "$iarg"
+	in
+    --epi)
+  	    epiData=`get_arg1 $1`;
+        export epiData;
+        indir=$(dirname $epiData);
+        export indir;
+        rawEpiDir=$(x=$indir; while [ "$x" != "/" ] ; do x=`dirname "$x"`; find "$x" -maxdepth 1 -type f -name mcImg.nii.gz; done 2>/dev/null);
+        export rawEpiDir
+        if [ "$epiData" == "" ]; then
+          echo "Error: The restingStateImage (-E) is a required option"
+          exit 1
+        fi
+  	    shift;;
+    -h)
+      Usage;
+      exit 0;;
+    *)
+      echo "Unrecognised option $1" 1>&2
+      exit 1
      esac
 done
 
 
-if [ "$epiData" == "" ]; then
-  echo "Error: The restingStateImage (-E) is a required option."
-  exit 1
-fi
-
-indir=`dirname $epiData`
-
 
 ##Echo out all input parameters into a log
-logDir=$indir
+logDir=$rawEpiDir
 echo "$scriptPath" >> $logDir/rsParams_log
 echo "------------------------------------" >> $logDir/rsParams_log
 echo "-E $epiData" >> $logDir/rsParams_log
@@ -65,7 +90,7 @@ echo "" >> $logDir/rsParams_log
 echo "Running $0 ..."
 
 
-cd $indir
+cd $rawEpiDir
 
 # Extract image dimensions from the NIFTI File
 numXdim=`fslinfo $epiData | grep ^dim1 | awk '{print $2}'`
@@ -94,7 +119,7 @@ EOF
 # Run script using Matlab or Octave
 haveMatlab=`which matlab`
 if [ "$haveMatlab" == "" ]; then
-  octave --no-window-system $indir/$filename 
+  octave --no-window-system $indir/$filename
 else
   matlab -nodisplay -r "run $indir/$filename"
 fi
@@ -106,7 +131,7 @@ fi
 #### Process Summary ############
 echo "...Summarizing Results"
 
-##Want to summarize motion-scrubbing output 
+##Want to summarize motion-scrubbing output
 echo "ID,total_volumes,deleted_volumes,prop_deleted,resid_vols" > ${indir}/motion_scrubbing_info.txt
 
 
@@ -140,6 +165,3 @@ fi
 echo "$0 Complete"
 echo ""
 echo ""
-
-
-
