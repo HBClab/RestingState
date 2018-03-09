@@ -13,9 +13,9 @@
 SGE_ROOT='';export SGE_ROOT
 
 function Usage {
-  echo "Usage: removeNuisanceRegressor.sh --epi=restingStateImage --t1brain=T1Image --nuisanceList=nuisanceList.txt --tr=tr --te=te --hp=highpass --lp=lowpass -c"
+  echo "Usage: removeNuisanceRegressor.sh --epi=restingStateImage --t1brain=T1Image --nuisanceList=nuisanceList.txt --hp=highpass --lp=lowpass --clobber"
   echo "            -OR-"
-  echo "Usage: removeNuisanceRegressor.sh --epi=restingStateImage --t1brain=T1Image --nuisanceList=nuisanceList.txt --tr=tr --te=te --hp=highpass --lp=lowpass --compcor -c"
+  echo "Usage: removeNuisanceRegressor.sh --epi=restingStateImage --t1brain=T1Image --nuisanceList=nuisanceList.txt --hp=highpass --lp=lowpass --compcor --clobber"
   echo ""
   echo " where"
   echo "  --epi preprocessed Resting State file"
@@ -29,8 +29,6 @@ function Usage {
   echo "  --hp highpass filter frequency (Hz) (e.g. 0.008 Hz (25.5 sigma / 120 s))"
   echo "    *If low/highpass filters are unset (or purposely set to both be '0'), the 0 and Nyquist frequencies will"
   echo "     still be removed (allpass filter)"
-  echo "  --tr TR time (seconds)"
-  echo "  --te TE (milliseconds) (default to 30 ms)"
   echo "  --compcor flag if using CompCor nuisancereg"
   echo "  --clobber clobber/overwrite previous results"
   echo ""
@@ -210,14 +208,6 @@ while [ $# -ge 1 ] ; do
       hp=$(get_arg1 $1);
       export hp;
       shift;;
-    --tr)
-      tr=$(get_arg1 $1);
-      export tr;
-      shift;;
-    --te)
-      te=$(get_arg1 $1);
-      export te;
-      shift;;
     --compcor)
       compcorFlag=1;
       export compcorFlag;
@@ -258,13 +248,6 @@ if [[ ${overwriteFlag} == "" ]]; then
   overwriteFlag=0
 fi
 
-if [[ ${tr} == "" ]]; then
-  tr=2
-fi
-
-if [[ ${te} == "" ]]; then
-  te=30
-fi
 
 # Source input (~func) directory
 indir=$(dirname "$epiData")
@@ -307,8 +290,6 @@ echo "-A $t1Data"; } >> "$logDir"/rsParams_log
   echo "-N $nuisanceInFile" >> "$logDir"/rsParams_log
 { echo "-L $lp"; \
 echo "-H $hp"; \
-echo "-t $tr"; \
-echo "-T $te"; } >> "$logDir"/rsParams_log
 if [[ $overwriteFlag == 1 ]]; then
   echo "-c" >> "$logDir"/rsParams_log
 fi
@@ -366,48 +347,6 @@ do
 done
 
 
-# #### Bandpass Motion Regressors ######
-#
-# echo "...Bandpass filtering Motion Regressors"
-#
-#
-# if [ $lp != 0 ] || [ $hp != 0 ]; then
-#   # Filtering ONLY if low/highpass don't both = 0
-#   mclist='1 2 3 4 5 6'
-#   for mc in ${mclist}
-#   do
-#       cp "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D
-#       1dBandpass "$hp" "$lp" "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D
-#       cat "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt
-#   done
-# else
-#   # Passband filter
-#   mclist='1 2 3 4 5 6'
-#   for mc in ${mclist}
-#   do
-#       cp "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D
-#       1dBandpass 0 99999 "${indir}"/tsregressorslp/mc"${mc}"_normalized.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D
-#       cat "${indir}"/tsregressorslp/mc"${mc}"_normalized_filt.1D > "${indir}"/tsregressorslp/mc"${mc}"_normalized.txt
-#   done
-# fi
-#
-# #################################
-
-
-
-#### Plotting Regressor time courses ######
-
-# echo "...Plotting Regressor time series"
-#
-# for roi in $(cat $nuisanceInFile)
-# do
-#   roiName="$(get_filename "${roi}")"
-#   fsl_tsplot -i "$indir"/tsregressorslp/"${roi}"_normalized_ts.txt -t "${roi} Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o "$indir"/"${roi}"_norm.png
-#   echo "<br><br><img src=\"$indir/${roi}_norm.png\" alt=\"$roi nuisance regressor\"><br>" >> "$indir"/analysisResults.html
-# done
-
-#################################
-
 ###### simultaneous bandpass + regression #####
 
 # paste regressor timeseries into one file
@@ -423,6 +362,7 @@ regressorsFile="$rawEpiDir"/NuisanceRegressor_ts.txt
 export regressorsFile
 
 fsl_tsplot -i "$regressorsFile" -t "Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o "${rawEpiDir}"/NuisanceRegressors_ts.png
+echo "<br><br><img src=\"${rawEpiDir}/NuisanceRegressors_ts.png\" alt=\"$roi nuisance regressor\"><br>" >> "$indir"/analysisResults.html
 
 # simultaneous bandpass + regression
 clobber ${indir}/"$(basename "${epiData%%.nii*}")"_bp_res4d.nii.gz &&\
