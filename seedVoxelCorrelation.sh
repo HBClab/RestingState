@@ -13,7 +13,6 @@
 scriptPath=$(perl -e 'use Cwd "abs_path";print abs_path(shift)' $0)
 scriptDir=$(dirname $scriptPath)
 
-VossLabMount="$(mount | grep vosslabhpc | awk '{print $3}')"
 
 
 function Usage {
@@ -227,10 +226,13 @@ for roi in "${roiList[@]}"; do
 
 		echo "......Mapping $roiName from MNI (standard) to subject EPI (func) space"
 		# Source MNI to EPI warp file
-		MNItoEPIWarp=${rawEpiDir}/EPItoT1optimized/MNItoEPI_warp.nii.gz
-
+		MNItoEPIWarp=$(find ${rawEpiDir}/EPItoT1optimized* -maxdepth 1 -name "MNItoEPI_warp.nii.gz")
+    if [ -z "${MNItoEPIWarp}" ]; then
+      echo "Error: MNItoEPIWarp not found"
+      exit 1
+    fi
 		# Apply the nonlinear warp from MNI to EPI
-		applywarp --ref=${epiData} --in=${roi} --out=${roiOutDir}/${roiName}_mask.nii.gz --warp=${MNItoEPIWarp} --mask=${rawEpiDir}/mask.nii.gz --datatype=float
+		applywarp --ref=${epiData} --in=${roi} --out=${roiOutDir}/${roiName}_mask.nii.gz --warp=${MNItoEPIWarp} --mask=${preprocfeat}/mask.nii.gz --datatype=float
 
 		# Threshold and binarize output
 		fslmaths ${roiOutDir}/${roiName}_mask.nii.gz -thr 0.5 ${roiOutDir}/${roiName}_mask.nii.gz
@@ -254,16 +256,16 @@ for roi in "${roiList[@]}"; do
 		# Will need the "normal" time-series, regardless of motion-scrubbing flag so, if condition = 1 or 2, write out regular time-series
 		if [[ $motionscrubFlag == 0 ]]; then
 				clobber ${roiOutDir}/${roiName}_residvol_ts.txt &&\
-				fslmeants -i ${rawEpiDir}/res4d_normandscaled -o ${roiOutDir}/${roiName}_residvol_ts.txt -m ${roiMask}
+				fslmeants -i ${epiData} -o ${roiOutDir}/${roiName}_residvol_ts.txt -m ${roiMask}
 		elif [[ $motionscrubFlag == 1 ]]; then
 				echo ${roiMask}
 				clobber ${roiOutDir}/${roiName}_residvol_ms_ts.txt &&\
-				fslmeants -i ${rawEpiDir}/res4d_normandscaled_motionscrubbed -o ${roiOutDir}/${roiName}_residvol_ms_ts.txt -m ${roiMask}
+				fslmeants -i ${epiData/.nii.gz/_ms.nii.gz} -o ${roiOutDir}/${roiName}_residvol_ms_ts.txt -m ${roiMask}
 		else
 				clobber ${roiOutDir}/${roiName}_residvol_ts.txt &&\
-				fslmeants -i ${rawEpiDir}/res4d_normandscaled -o ${roiOutDir}/${roiName}_residvol_ts.txt -m ${roiMask}
+				fslmeants -i ${epiData} -o ${roiOutDir}/${roiName}_residvol_ts.txt -m ${roiMask}
 				clobber ${roiOutDir}/${roiName}_residvol_ms_ts.txt &&\
-				fslmeants -i ${rawEpiDir}/res4d_normandscaled_motionscrubbed -o ${roiOutDir}/${roiName}_residvol_ms_ts.txt -m ${roiMask}
+				fslmeants -i ${epiData/.nii.gz/_ms.nii.gz} -o ${roiOutDir}/${roiName}_residvol_ms_ts.txt -m ${roiMask}
 		fi
 
 		# Output of fslmeants is a text file with space-delimited values.  There is only one "true" ts value (first column) and the blank space is interpreted as a "0" value in matlab.  Write to temp file then move (rewrite original)
