@@ -20,12 +20,12 @@ function Usage {
   echo "Usage: seedVoxelCorrelation.sh --epi=restingStateImage --roiList=roiList.txt --motionscrub"
   echo " where"
   echo "   --epi resting state image"
-  echo "        *Top-level RestingState.nii.gz image"
+  echo "        *this is the residual 4d image after nuisance regression"
   echo "   --motionscrub use motionscrubbed and non-motionscrubbed EPI (parallel output)"
   echo "   --roiList Data file with seed list, one seed per line"
   echo "        **Use ONLY one option, -r or -R, NOT both"
-  echo "   --compcor flag if CompCor reg was performed"
-  echo "   --seedmaps print seedmaps (default is off)"
+  echo "   --compcor Flag if CompCor reg was performed"
+  echo "   --seedmaps Flag to output seedmaps (default is off)"
   echo ""
   exit 1
 }
