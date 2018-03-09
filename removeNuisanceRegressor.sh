@@ -161,9 +161,9 @@ function SimultBandpassNuisanceReg()
 	3dTstat -mean -prefix $inDir/bp_mean.nii.gz $inDir/tmp_bp.nii.gz &&\
 	3dcalc -a $inDir/tmp_bp.nii.gz -b $inDir/orig_mean.nii.gz -c $inDir/bp_mean.nii.gz -expr "a+b-c" -prefix ${inDir}/"$(basename "${inData%%.nii*}")"_bp_res4d.nii.gz
 
-  echo "lowpassFilt=$ftop" >> $logDir/aromaParams
-  echo "highpassFilt=$fbot" >> $logDir/aromaParams
-  echo "_${filtType}" >> $logDir/aromaParams
+  echo "lowpassFilt=$ftop" >> $logDir/rsParams
+  echo "highpassFilt=$fbot" >> $logDir/rsParams
+  echo "_${filtType}" >> $logDir/rsParams
 }
 export -f SimultBandpassNuisanceReg
 
