@@ -17,18 +17,15 @@ VossLabMount="$(mount | grep vosslabhpc | awk '{print $3}')"
 
 
 function Usage {
-  echo "Usage: seedVoxelCorrelation.sh --epi=restingStateImage --roiList=roiList.txt --motionscrub --fmap"
+  echo "Usage: seedVoxelCorrelation.sh --epi=restingStateImage --roiList=roiList.txt --motionscrub"
   echo " where"
   echo "   --epi resting state image"
   echo "        *Top-level RestingState.nii.gz image"
   echo "   --motionscrub use motionscrubbed and non-motionscrubbed EPI (parallel output)"
   echo "   --roiList Data file with seed list, one seed per line"
   echo "        **Use ONLY one option, -r or -R, NOT both"
-  echo "   --compcor"
+  echo "   --compcor flag if CompCor reg was performed"
   echo "   --seedmaps print seedmaps (default is off)"
-  echo "   --fmap (fieldMap registration correction)"
-  echo "        *Only set this flag if FieldMap correction was used during qualityCheck"
-  echo "        **This affects only the EPI to T1 QC images"
   echo ""
   exit 1
 }
@@ -140,9 +137,6 @@ while [ $# -ge 1 ] ; do
       motionscrubFlag=1;
       export motionscrubFlag;
       shift;;
-    -f)
-      fieldMapFlag=1;
-      shift;;
     -c)
       clob=true;
       export clob;
@@ -163,9 +157,6 @@ if [[ $motionscrubFlag == "" ]]; then
 motionscrubFlag=0
 fi
 
-if [[ $fieldMapFlag == "" ]]; then
-fieldMapFlag=0
-fi
 
 # If new seeds are added, echo them out to the rsParams file (only if they don't already exist in the file)
 # Making a *strong* assumption that any ROI lists added after initial processing won't reuse the first ROI (e.g. pccrsp)
@@ -207,9 +198,6 @@ if [[ $roiInd == 1 ]]; then
   echo "$seeds" >> $logDir/rsParams_log
 else
   echo "-R $roiInFile" >> $logDir/rsParams_log
-fi
-if [[ $fieldMapFlag == 1 ]]; then
-  echo "-f" >> $logDir/rsParams_log
 fi
 echo "$(date)" >> $logDir/rsParams_log
 echo "" >> $logDir/rsParams_log
