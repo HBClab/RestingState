@@ -10,7 +10,6 @@
 
 scriptPath=`perl -e 'use Cwd "abs_path";print abs_path(shift)' $0`
 scriptDir=`dirname $scriptPath`
-nuisancefeat=nuisancereg.feat
 filename=run_motionscrub.m
 
 
@@ -24,6 +23,11 @@ function Usage {
 }
 
 ########## FSL's arg parsing functions ###################
+get_opt1() {
+    arg=$(echo $1 | sed 's/=.*//')
+    echo $arg
+}
+
 get_imarg1() {
     arg=$(get_arg1 $1);
     arg=$($FSLDIR/bin/remove_ext $arg);
@@ -56,7 +60,7 @@ while [ $# -ge 1 ] ; do
         export epiData;
         indir=$(dirname $epiData);
         export indir;
-        rawEpiDir=$(x=$indir; while [ "$x" != "/" ] ; do x=`dirname "$x"`; find "$x" -maxdepth 1 -type f -name mcImg.nii.gz; done 2>/dev/null);
+        rawEpiDir=$(dirname $(x=$indir; while [ "$x" != "/" ] ; do x=`dirname "$x"`; find "$x" -maxdepth 1 -type f -name "mcImg.nii.gz"; done 2>/dev/null));
         export rawEpiDir
         if [ "$epiData" == "" ]; then
           echo "Error: The restingStateImage (-E) is a required option"
@@ -71,7 +75,6 @@ while [ $# -ge 1 ] ; do
       exit 1
      esac
 done
-
 
 
 ##Echo out all input parameters into a log
@@ -110,7 +113,7 @@ addpath('${scriptDir}')
 niftiScripts=['${scriptDir}','/Octave/nifti'];
 addpath(niftiScripts)
 funcvoldim=[${numXdim} ${numYdim} ${numZdim} ${numtimepoint}];
-motionscrub('${indir}','${nuisancefeat}',funcvoldim)
+motionscrub('${rawEpiDir}','${epiData}',funcvoldim)
 quit
 EOF
 
@@ -119,44 +122,45 @@ EOF
 # Run script using Matlab or Octave
 haveMatlab=`which matlab`
 if [ "$haveMatlab" == "" ]; then
-  octave --no-window-system $indir/$filename
+  octave --no-window-system $rawEpiDir/$filename
 else
-  matlab -nodisplay -r "run $indir/$filename"
+  matlab -nodisplay -r "run $rawEpiDir/$filename"
 fi
 
 #################################
 
 
-
+cd ${rawEpiDir}/motionScrub || exit
 #### Process Summary ############
 echo "...Summarizing Results"
 
 ##Want to summarize motion-scrubbing output
-echo "ID,total_volumes,deleted_volumes,prop_deleted,resid_vols" > ${indir}/motion_scrubbing_info.txt
+echo "ID,total_volumes,deleted_volumes,prop_deleted,resid_vols" > motion_scrubbing_info.txt
 
-
+fsl_tsplot -i fd.txt -t "FD (mm)" -w 800 -h 300 -u 1 --start=1 -o fd.png
+fsl_tsplot -i dvars.txt -t "DVARS" -w 800 -h 300 -u 1 --start=1 -o dvars.png
 ##Echo out the pertinent info for the motion-scrubbed/processed subjects
 
-numvols=`fslinfo ${indir}/nuisancereg.feat/stats/res4d_normandscaled.nii | grep ^dim4 | awk '{print $2}'`
-delvols=`cat ${indir}/nuisancereg.feat/stats/deleted_vols.txt | wc | awk '{print $2}'`
+numvols=`fslinfo ${epiData} | grep ^dim4 | awk '{print $2}'`
+delvols=`cat ${indir}/deleted_vols.txt | wc | awk '{print $2}'`
 propdel=`echo ${numvols} ${delvols} | awk '{print ($2/$1)}'`
 residvols=`echo ${numvols} ${delvols} | awk '{print ($1-$2)}'`
-echo "${indir},${numvols},${delvols},${propdel},${residvols}" >> ${indir}/motion_scrubbing_info.txt
+echo "${indir},${numvols},${delvols},${propdel},${residvols}" >> motion_scrubbing_info.txt
 
 #Echo out motionscrub info to rsParams file
-echo "epiNormMS=${indir}/nuisancereg.feat/stats/res4d_normandscaled_motionscrubbed.nii" >> $indir/rsParams
+echo "epiNormMS=${epiData//.nii/_ms.nii}" >> $rawEpiDir/rsParams
 
 
 
-echo "<hr>" >> ${indir}/analysisResults.html
-echo "<h2>Motion Scrubbing</h2>" >> ${indir}/analysisResults.html
-echo "<b>Total Volumes</b>: $numvols<br>" >> ${indir}/analysisResults.html
-echo "<b>Deleted Volumes</b>: $delvols<br>" >> ${indir}/analysisResults.html
-echo "<b>Remaining Volumes</b>: $residvols<br>" >> ${indir}/analysisResults.html
+echo "<hr>" >> ${rawEpiDir}/analysisResults.html
+echo "<h2>Motion Scrubbing</h2>" >> ${rawEpiDir}/analysisResults.html
+echo "<b>Total Volumes</b>: $numvols<br>" >> ${rawEpiDir}/analysisResults.html
+echo "<b>Deleted Volumes</b>: $delvols<br>" >> ${rawEpiDir}/analysisResults.html
+echo "<b>Remaining Volumes</b>: $residvols<br>" >> ${rawEpiDir}/analysisResults.html
 
-scrubDataCheck=`cat $indir/$nuisancefeat/stats/deleted_vols.txt | head -1`
+scrubDataCheck=`cat $indir/deleted_vols.txt | head -1`
 if [[ $scrubDataCheck != "" ]]; then
-  echo "<b>Scrubbed TR</b>: `cat ${indir}/nuisancereg.feat/stats/deleted_vols.txt | awk '{$1=$1}1'`<br>" >> ${indir}/analysisResults.html
+  echo "<b>Scrubbed TR</b>: `cat ${indir}/deleted_vols.txt | awk '{$1=$1}1'`<br>" >> ${rawEpiDir}/analysisResults.html
 fi
 
 #################################
