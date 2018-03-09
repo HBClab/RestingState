@@ -492,9 +492,9 @@ if [ "${seedmapFlag}" -eq 1 ]; then
   # set directory for seed maps
   # strong assumption that only classic and compcor
   if [ ${compcorFlag} -eq 1 ]; then
-    seedcorrDir=${roiOutDir}/seedCorrelation_compcor
+    seedcorrDir=${rawEpiDir}/seedCorrelation_compcor
   else
-    seedcorrDir=${roiOutDir}/seedCorrelation
+    seedcorrDir=${rawEpiDir}/seedCorrelation
   fi
 
   mkdir -p ${seedcorrDir}
@@ -548,7 +548,7 @@ if [ "${seedmapFlag}" -eq 1 ]; then
 addpath('${scriptDir}')
 statsScripts=['${scriptDir}','/Octave/nifti'];
 addpath(statsScripts)
-fid=fopen('"$rawEpiDir"/seeds.txt');
+fid=fopen('$rawEpiDir/seeds.txt');
 roiList=textscan(fid,'%s');
 fclose(fid);
 
@@ -568,7 +568,7 @@ EOF
 addpath('${scriptDir}')
 statsScripts=['${scriptDir}','/Octave/nifti'];
 addpath(statsScripts)
-fid=fopen('"$rawEpiDir"/seeds_ms.txt');
+fid=fopen('$rawEpiDir/seeds_ms.txt');
 roiList=textscan(fid,'%s');
 fclose(fid);
 
@@ -588,7 +588,7 @@ EOF
 addpath('${scriptDir}')
 statsScripts=['${scriptDir}','/Octave/nifti'];
 addpath(statsScripts)
-fid=fopen('"$rawEpiDir"/seeds.txt');
+fid=fopen('$rawEpiDir/seeds.txt');
 roiList=textscan(fid,'%s');
 fclose(fid);
 
@@ -607,7 +607,7 @@ EOF
 addpath('${scriptDir}')
 statsScripts=['${scriptDir}','/Octave/nifti'];
 addpath(statsScripts)
-fid=fopen('"$rawEpiDir"/seeds_ms.txt');
+fid=fopen('$rawEpiDir/seeds_ms.txt');
 roiList=textscan(fid,'%s');
 fclose(fid);
 
