@@ -1,0 +1,1 @@
+/Users/tbweng/Documents/GitHub/RestingState/ROIs/Schaefer2018_LocalGlobal_MNI/MNI152_T1_1mm_brain.nii.gz
