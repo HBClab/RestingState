@@ -17,15 +17,16 @@ VossLabMount="$(mount | grep vosslabhpc | awk '{print $3}')"
 
 
 function Usage {
-  echo "Usage: seedVoxelCorrelation.sh --epi=restingStateImage --roiList=roiList.txt --motionscrub"
+  echo "Usage: seedVoxelCorrelation.sh --epi=restingStateImage --roiList=roiList.txt --motionscrub --clobber"
   echo " where"
   echo "   --epi resting state image"
-  echo "        *this is the residual 4d image after nuisance regression"
+  echo "        *this is the residual 4d image after nuisance regression and data scaling (*_bp_res4d_normandscaled.nii.gz)"
   echo "   --motionscrub use motionscrubbed and non-motionscrubbed EPI (parallel output)"
   echo "   --roiList Data file with seed list, one seed per line"
   echo "        **Use ONLY one option, -r or -R, NOT both"
   echo "   --compcor Flag if CompCor reg was performed"
   echo "   --seedmaps Flag to output seedmaps (default is off)"
+  echo "   --clobber overwrite previous results"
   echo ""
   exit 1
 }
@@ -108,7 +109,7 @@ export -f clobber
 
 # Parse Command line arguments
 
-if [ $# -lt 4 ] ; then Usage; exit 0; fi
+if [ $# -lt 2 ] ; then Usage; exit 0; fi
 while [ $# -ge 1 ] ; do
     iarg=$(get_opt1 $1);
     case "$iarg"
@@ -123,7 +124,7 @@ while [ $# -ge 1 ] ; do
   	    shift;;
     --roiList)
       roiInFile=$(get_arg1 $1);
-      declare -a roiList=( "$(cat "${roiInFile}")" );
+      IFS=$'\r\n' GLOBIGNORE='*' command eval  'roiList=($(cat ${roiInFile}))';
       shift;;
     --compcor)
       compcorFlag=1;
@@ -137,7 +138,7 @@ while [ $# -ge 1 ] ; do
       motionscrubFlag=1;
       export motionscrubFlag;
       shift;;
-    -c)
+    --clobber)
       clob=true;
       export clob;
       shift;;
@@ -161,7 +162,7 @@ fi
 # If new seeds are added, echo them out to the rsParams file (only if they don't already exist in the file)
 # Making a *strong* assumption that any ROI lists added after initial processing won't reuse the first ROI (e.g. pccrsp)
 indir=$(dirname $epiData)
-preprocfeat=$(x=$indir; while [ "$x" != "/" ] ; do x=`dirname "$x"`; find "$x" -maxdepth 1 -type d -name preproc.feat; done)
+preprocfeat=$(x=$indir; while [ "$x" != "/" ] ; do x=`dirname "$x"`; find "$x" -maxdepth 1 -type d -name preproc.feat; done 2>/dev/null)
 logDir=$(dirname ${preprocfeat})
 rawEpiDir=$(dirname "$preprocfeat")
 roiOutDir=${rawEpiDir}/rois
@@ -209,14 +210,15 @@ echo "Running $0 ..."
 echo "...Transforming ROIs to EPI space"
 
 cd "$rawEpiDir" || exit
-
+mkdir -p "$roiOutDir"
 # TW edit
 > "$rawEpiDir"/seeds.txt
 > "$rawEpiDir"/seeds_ms.txt
 
 # Map the ROIs
 for roi in "${roiList[@]}"; do
-	roiName=$(basename ${roi} .nii.gz)
+  echo "$roi";exit
+	roiName=$(basename "$roi" .nii.gz)
 	roiMask=$(find "$roiOutDir" -maxdepth 1 -type f -name "${roiName}_mask.nii.gz" | head -n 1)
 	# Copy over Seed ROI
   clobber ${seedcorrDir}/${roiName}_standard.nii.gz &&\
