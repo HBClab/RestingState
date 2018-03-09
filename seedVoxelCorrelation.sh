@@ -217,12 +217,11 @@ mkdir -p "$roiOutDir"
 
 # Map the ROIs
 for roi in "${roiList[@]}"; do
-  echo "$roi";exit
 	roiName=$(basename "$roi" .nii.gz)
 	roiMask=$(find "$roiOutDir" -maxdepth 1 -type f -name "${roiName}_mask.nii.gz" | head -n 1)
 	# Copy over Seed ROI
-  clobber ${seedcorrDir}/${roiName}_standard.nii.gz &&\
-	cp ${roi} ${seedcorrDir}/${roiName}_standard.nii.gz
+  clobber ${roiOutDir}/${roiName}_standard.nii.gz &&\
+	cp ${roi} ${roiOutDir}/${roiName}_standard.nii.gz
 
 	if [ "$(echo ${roiMask})" = "" ]; then #TW edit
 
@@ -231,12 +230,12 @@ for roi in "${roiList[@]}"; do
 		MNItoEPIWarp=${rawEpiDir}/EPItoT1optimized/MNItoEPI_warp.nii.gz
 
 		# Apply the nonlinear warp from MNI to EPI
-		applywarp --ref=${epiData} --in=${roi} --out=${rawEpiDir}/${roiName}_mask.nii.gz --warp=${MNItoEPIWarp} --mask=${rawEpiDir}/mask.nii.gz --datatype=float
+		applywarp --ref=${epiData} --in=${roi} --out=${roiOutDir}/${roiName}_mask.nii.gz --warp=${MNItoEPIWarp} --mask=${rawEpiDir}/mask.nii.gz --datatype=float
 
 		# Threshold and binarize output
-		fslmaths ${rawEpiDir}/${roiName}_mask.nii.gz -thr 0.5 ${rawEpiDir}/${roiName}_mask.nii.gz
-		fslmaths ${rawEpiDir}/${roiName}_mask.nii.gz -bin ${rawEpiDir}/${roiName}_mask.nii.gz
-		roiMask=${rawEpiDir}/${roiName}_mask.nii.gz
+		fslmaths ${roiOutDir}/${roiName}_mask.nii.gz -thr 0.5 ${roiOutDir}/${roiName}_mask.nii.gz
+		fslmaths ${roiOutDir}/${roiName}_mask.nii.gz -bin ${roiOutDir}/${roiName}_mask.nii.gz
+		roiMask=${roiOutDir}/${roiName}_mask.nii.gz
 	else # TW edit
 	echo "$roiName has already been mapped from MNI to EPI" # TW edit
 	echo "roimask: ${roiMask}"
@@ -248,37 +247,37 @@ for roi in "${roiList[@]}"; do
 	seedVol=$(fslstats ${roiMask} -V | awk '{print $2}')
 	if [[ $seedVol == 0.000000 ]]; then
 		echo $roiName >> ${rawEpiDir}/seedsTooSmall.txt
-		rm ${rawEpiDir}/${roiName}_mask.nii.gz
+		rm ${roiOutDir}/${roiName}_mask.nii.gz
 	else
 		# Account for $motionscrubFlag
 		# Extract the time-series per ROI
 		# Will need the "normal" time-series, regardless of motion-scrubbing flag so, if condition = 1 or 2, write out regular time-series
 		if [[ $motionscrubFlag == 0 ]]; then
-				clobber ${rawEpiDir}/${roiName}_residvol_ts.txt &&\
-				fslmeants -i ${rawEpiDir}/res4d_normandscaled -o ${rawEpiDir}/${roiName}_residvol_ts.txt -m ${roiMask}
+				clobber ${roiOutDir}/${roiName}_residvol_ts.txt &&\
+				fslmeants -i ${rawEpiDir}/res4d_normandscaled -o ${roiOutDir}/${roiName}_residvol_ts.txt -m ${roiMask}
 		elif [[ $motionscrubFlag == 1 ]]; then
 				echo ${roiMask}
-				clobber ${rawEpiDir}/${roiName}_residvol_ms_ts.txt &&\
-				fslmeants -i ${rawEpiDir}/res4d_normandscaled_motionscrubbed -o ${rawEpiDir}/${roiName}_residvol_ms_ts.txt -m ${roiMask}
+				clobber ${roiOutDir}/${roiName}_residvol_ms_ts.txt &&\
+				fslmeants -i ${rawEpiDir}/res4d_normandscaled_motionscrubbed -o ${roiOutDir}/${roiName}_residvol_ms_ts.txt -m ${roiMask}
 		else
-				clobber ${rawEpiDir}/${roiName}_residvol_ts.txt &&\
-				fslmeants -i ${rawEpiDir}/res4d_normandscaled -o ${rawEpiDir}/${roiName}_residvol_ts.txt -m ${roiMask}
-				clobber ${rawEpiDir}/${roiName}_residvol_ms_ts.txt &&\
-				fslmeants -i ${rawEpiDir}/res4d_normandscaled_motionscrubbed -o ${rawEpiDir}/${roiName}_residvol_ms_ts.txt -m ${roiMask}
+				clobber ${roiOutDir}/${roiName}_residvol_ts.txt &&\
+				fslmeants -i ${rawEpiDir}/res4d_normandscaled -o ${roiOutDir}/${roiName}_residvol_ts.txt -m ${roiMask}
+				clobber ${roiOutDir}/${roiName}_residvol_ms_ts.txt &&\
+				fslmeants -i ${rawEpiDir}/res4d_normandscaled_motionscrubbed -o ${roiOutDir}/${roiName}_residvol_ms_ts.txt -m ${roiMask}
 		fi
 
 		# Output of fslmeants is a text file with space-delimited values.  There is only one "true" ts value (first column) and the blank space is interpreted as a "0" value in matlab.  Write to temp file then move (rewrite original)
 		if [[ $motionscrubFlag == 0 ]]; then
-			cat ${rawEpiDir}/${roiName}_residvol_ts.txt | awk '{print $1}' > ${rawEpiDir}/temp_${roiName}_residvol_ts.txt
-			mv ${rawEpiDir}/temp_${roiName}_residvol_ts.txt ${rawEpiDir}/${roiName}_residvol_ts.txt
+			cat ${roiOutDir}/${roiName}_residvol_ts.txt | awk '{print $1}' > ${roiOutDir}/temp_${roiName}_residvol_ts.txt
+			mv ${roiOutDir}/temp_${roiName}_residvol_ts.txt ${roiOutDir}/${roiName}_residvol_ts.txt
 		elif [[ $motionscrubFlag == 1 ]]; then
-			cat ${rawEpiDir}/${roiName}_residvol_ms_ts.txt | awk '{print $1}' > ${rawEpiDir}/temp_${roiName}_residvol_ms_ts.txt
-			mv ${rawEpiDir}/temp_${roiName}_residvol_ms_ts.txt ${rawEpiDir}/${roiName}_residvol_ms_ts.txt
+			cat ${roiOutDir}/${roiName}_residvol_ms_ts.txt | awk '{print $1}' > ${roiOutDir}/temp_${roiName}_residvol_ms_ts.txt
+			mv ${roiOutDir}/temp_${roiName}_residvol_ms_ts.txt ${roiOutDir}/${roiName}_residvol_ms_ts.txt
 		else
-			cat ${rawEpiDir}/${roiName}_residvol_ts.txt | awk '{print $1}' > ${rawEpiDir}/temp_${roiName}_residvol_ts.txt
-			cat ${rawEpiDir}/${roiName}_residvol_ms_ts.txt | awk '{print $1}' > ${rawEpiDir}/temp_${roiName}_residvol_ms_ts.txt
-			mv ${rawEpiDir}/temp_${roiName}_residvol_ts.txt ${rawEpiDir}/${roiName}_residvol_ts.txt
-			mv ${rawEpiDir}/temp_${roiName}_residvol_ms_ts.txt ${rawEpiDir}/${roiName}_residvol_ms_ts.txt
+			cat ${roiOutDir}/${roiName}_residvol_ts.txt | awk '{print $1}' > ${roiOutDir}/temp_${roiName}_residvol_ts.txt
+			cat ${roiOutDir}/${roiName}_residvol_ms_ts.txt | awk '{print $1}' > ${roiOutDir}/temp_${roiName}_residvol_ms_ts.txt
+			mv ${roiOutDir}/temp_${roiName}_residvol_ts.txt ${roiOutDir}/${roiName}_residvol_ts.txt
+			mv ${roiOutDir}/temp_${roiName}_residvol_ms_ts.txt ${roiOutDir}/${roiName}_residvol_ms_ts.txt
 		fi
 		echo "$roiName" >> "$rawEpiDir"/seeds.txt
 	fi
