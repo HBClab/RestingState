@@ -5,7 +5,7 @@
 #     1. Push Seed masks from MNI to EPI space
 #     2. Calculate Time-series for each Seed of interest
 #     3. Time-Series Correlation/Zmap Creation
-#     4. Seed zmap QC (push to highres (T1) and standard (MNI)
+#     4. Seed zmap QC (push to standard (MNI)
 ##################################################################################################################
 
 
@@ -693,29 +693,6 @@ EOF
         rm ${roi}.png
       fi
 
-      # Check for FieldMap registration correction
-      if [[ $fieldMapFlag == 1 ]]; then
-        # Nonlinear warp from EPI to T1
-        clobber ${seedcorrDir}/${roi}_highres_zmap.nii.gz &&\
-        applywarp --in=${rawEpiDir}/${roi}/cope1.nii \
-        --ref="$rawEpiDir"/${nuisancefeat}/reg/highres.nii.gz \
-        --out=${seedcorrDir}/${roi}_highres_zmap.nii.gz \
-        --warp="$rawEpiDir"/${nuisancefeat}/reg/example_func2highres_warp.nii.gz \
-        --datatype=float
-      else
-        # Affine Transform from EPI to T1
-        clobber ${seedcorrDir}/${roi}_highres_zmap.nii.gz &&\
-        flirt -in ${rawEpiDir}/${roi}/cope1.nii \
-        -ref "$rawEpiDir"/${nuisancefeat}/reg/highres.nii.gz \
-        -out ${seedcorrDir}/${roi}_highres_zmap.nii.gz \
-        -applyxfm -init "$rawEpiDir"/${nuisancefeat}/reg/example_func2highres.mat \
-        -datatype float
-      fi
-
-      # Mask out data with T1 mask (create temporary binary of skull-stripped T1)
-      fslmaths "$rawEpiDir"/${nuisancefeat}/reg/highres.nii.gz -bin "$rawEpiDir"/${nuisancefeat}/reg/highres_mask.nii.gz -odt char
-      fslmaths ${seedcorrDir}/${roi}_highres_zmap.nii.gz -mas "$rawEpiDir"/${nuisancefeat}/reg/highres_mask.nii.gz ${seedcorrDir}/${roi}_highres_zmap_masked.nii.gz
-      rm "$rawEpiDir"/${nuisancefeat}/reg/highres_mask.nii.gz
 
       # Nonlinear warp from EPI to MNI
       clobber ${seedcorrDir}/${roi}_standard_zmap.nii.gz &&\
@@ -752,29 +729,6 @@ EOF
         rm ${roi}_ms.png
       fi
 
-      # Check for FieldMap registration correction
-      if [[ $fieldMapFlag == 1 ]]; then
-        # Nonlinear warp from EPI to T1
-        clobber ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz &&\
-        applywarp --in=${rawEpiDir}/${roi}_ms/cope1.nii \
-        --ref="$rawEpiDir"/${nuisancefeat}/reg/highres.nii.gz \
-        --out=${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz \
-        --warp="$rawEpiDir"/${nuisancefeat}/reg/example_func2highres_warp.nii.gz \
-        --datatype=float
-      else
-        # Affine Transform from EPI to T1
-        clobber ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz &&\
-        flirt -in ${rawEpiDir}/${roi}_ms/cope1.nii \
-        -ref "$rawEpiDir"/${nuisancefeat}/reg/highres.nii.gz \
-        -out ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz \
-        -applyxfm -init "$rawEpiDir"/${nuisancefeat}/reg/example_func2highres.mat \
-        -datatype float
-      fi
-
-      # Mask out data with T1 mask (create temporary binary of skull-stripped T1)
-      fslmaths "$rawEpiDir"/${nuisancefeat}/reg/highres.nii.gz -bin "$rawEpiDir"/${nuisancefeat}/reg/highres_mask.nii.gz -odt char
-      fslmaths ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz -mas "$rawEpiDir"/${nuisancefeat}/reg/highres_mask.nii.gz ${seedcorrDir}/${roi}_ms_highres_zmap_masked.nii.gz
-      rm "$rawEpiDir"/${nuisancefeat}/reg/highres_mask.nii.gz
 
       # Nonlinear warp from EPI to MNI
       clobber ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz &&\
@@ -850,29 +804,6 @@ EOF
         rm ${roi}_ms.png
       fi
 
-      # Check for FieldMap registration correction
-      if [[ $fieldMapFlag == 1 ]]; then
-        # Nonlinear warp from EPI to T1
-        clobber ${seedcorrDir}/${roi}_highres_zmap.nii.gz &&\
-        applywarp --in=${rawEpiDir}/${roi}/cope1.nii \
-        --ref="$rawEpiDir"/${nuisancefeat}/reg/highres.nii.gz \
-        --out=${seedcorrDir}/${roi}_highres_zmap.nii.gz \
-        --warp="$rawEpiDir"/${nuisancefeat}/reg/example_func2highres_warp.nii.gz \
-        --datatype=float
-      else
-        # Affine Transform from EPI to T1
-        clobber ${seedcorrDir}/${roi}_highres_zmap.nii.gz &&\
-        flirt -in ${rawEpiDir}/${roi}/cope1.nii \
-        -ref "$rawEpiDir"/${nuisancefeat}/reg/highres.nii.gz \
-        -out ${seedcorrDir}/${roi}_highres_zmap.nii.gz \
-        -applyxfm -init "$rawEpiDir"/${nuisancefeat}/reg/example_func2highres.mat \
-        -datatype float
-      fi
-
-      # Mask out data with T1 mask (create temporary binary of skull-stripped T1)
-      fslmaths "$rawEpiDir"/${nuisancefeat}/reg/highres.nii.gz -bin "$rawEpiDir"/${nuisancefeat}/reg/highres_mask.nii.gz -odt char
-      fslmaths ${seedcorrDir}/${roi}_highres_zmap.nii.gz -mas "$rawEpiDir"/${nuisancefeat}/reg/highres_mask.nii.gz ${seedcorrDir}/${roi}_highres_zmap_masked.nii.gz
-
       # Nonlinear warp from EPI to MNI
       clobber ${seedcorrDir}/${roi}_standard_zmap.nii.gz &&\
       applywarp --in=${rawEpiDir}/${roi}/cope1.nii \
@@ -894,29 +825,6 @@ EOF
 
 
       # Motionscrubbed data
-      # Check for FieldMap registration correction
-      if [[ $fieldMapFlag == 1 ]]; then
-        # Nonlinear warp from EPI to T1
-        clobber ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz &&\
-        applywarp --in=${rawEpiDir}/${roi}_ms/cope1.nii \
-        --ref="$rawEpiDir"/${nuisancefeat}/reg/highres.nii.gz \
-        --out=${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz \
-        --warp="$rawEpiDir"/${nuisancefeat}/reg/example_func2highres_warp.nii.gz \
-        --datatype=float
-      else
-        # Affine Transform from EPI to T1
-        clobber ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz &&\
-        flirt -in ${rawEpiDir}/${roi}_ms/cope1.nii \
-        -ref "$rawEpiDir"/${nuisancefeat}/reg/highres.nii.gz \
-        -out ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz \
-        -applyxfm -init "$rawEpiDir"/${nuisancefeat}/reg/example_func2highres.mat \
-        -datatype float
-      fi
-
-      # Mask out data with T1 mask (remove temporary binary of skull-stripped T1)
-      fslmaths "$rawEpiDir"/${nuisancefeat}/reg/highres.nii.gz -bin "$rawEpiDir"/${nuisancefeat}/reg/highres_mask.nii.gz -odt char
-      fslmaths ${seedcorrDir}/${roi}_ms_highres_zmap.nii.gz -mas "$rawEpiDir"/${nuisancefeat}/reg/highres_mask.nii.gz ${seedcorrDir}/${roi}_ms_highres_zmap_masked.nii.gz
-      rm "$rawEpiDir"/${nuisancefeat}/reg/highres_mask.nii.gz
 
       # Nonlinear warp from EPI to MNI
       clobber ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz &&\
