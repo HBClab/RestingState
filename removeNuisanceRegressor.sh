@@ -18,7 +18,7 @@ function Usage {
   echo "Usage: removeNuisanceRegressor.sh --epi=restingStateImage --t1brain=T1Image --nuisanceList=nuisanceList.txt --tr=tr --te=te --hp=highpass --lp=lowpass --compcor -c"
   echo ""
   echo " where"
-  echo "  -epi preprocessed Resting State file"
+  echo "  --epi preprocessed Resting State file"
   echo "     *If using 'Classic' mode (no ICA Denoising), specify 'nonfiltered_func_data.nii.gz' from preproc.feat directory"
   echo "     *If using ICA_AROMA, use denoised_func_data_nonaggr.nii.gz from ica_aroma directory"
   echo "  --t1brain T1 file (skull-stripped)"
