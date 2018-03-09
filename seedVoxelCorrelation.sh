@@ -535,15 +535,12 @@ if [ "${seedmapFlag}" -eq 1 ]; then
 
   if [[ $motionscrubFlag == 0 ]]; then
 
-  # If $motionscrubFlag == 0 (no motionscrub), res4dnormandscaled never gets unzipped
-  if [ -e ${rawEpiDir}/res4d_normandscaled.nii.gz ] && [ ${rawEpiDir}/res4d_normandscaled.nii ]; then
-  	rm ${rawEpiDir}/res4d_normandscaled.nii
-  	gunzip -f ${rawEpiDir}/res4d_normandscaled.nii.gz
-  fi
+    # If $motionscrubFlag == 0 (no motionscrub), res4dnormandscaled never gets unzipped
+  	clobber "${epiData/.nii.gz/.nii}" &&\
+  	gunzip -f ${epiData}
 
-
-  echo "...Creating Octave script"
-  cat > $filename << EOF
+    echo "...Creating Octave script"
+    cat > $filename << EOF
 % It is matlab script
 addpath('${scriptDir}')
 statsScripts=['${scriptDir}','/Octave/nifti'];
@@ -555,15 +552,15 @@ fclose(fid);
 funcvoldim=[$numXdim $numYdim ${numZdim}];
 doFisherZ=1;
 motion_scrub=0;
-input='res4d_normandscaled.nii';
+input='${epiData/.nii.gz/.nii}';
 
-firstlevelseeding_parallel('$rawEpiDir',roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
+firstlevelseeding_parallel(roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
 quit
 EOF
   elif [[ $motionscrubFlag == 1 ]]; then
 
-  echo "...Creating Octave script (motionscrubbed data)"
-  cat > $filename2 << EOF
+    echo "...Creating Octave script (motionscrubbed data)"
+    cat > $filename2 << EOF
 % It is matlab script
 addpath('${scriptDir}')
 statsScripts=['${scriptDir}','/Octave/nifti'];
@@ -575,15 +572,15 @@ fclose(fid);
 funcvoldim=[$numXdim $numYdim ${numZdim}];
 doFisherZ=1;
 motion_scrub=1;
-input='res4d_normandscaled_motionscrubbed.nii';
+input='${epiData/.nii.gz/_ms.nii}';
 
 firstlevelseeding_parallel('$rawEpiDir',roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
 quit
 EOF
   else
 
-  echo "...Creating Octave script"
-  cat > $filename << EOF
+    echo "...Creating Octave script"
+    cat > $filename << EOF
 % It is matlab script
 addpath('${scriptDir}')
 statsScripts=['${scriptDir}','/Octave/nifti'];
@@ -595,7 +592,7 @@ fclose(fid);
 funcvoldim=[$numXdim $numYdim ${numZdim}];
 doFisherZ=1;
 motion_scrub=0;
-input='res4d_normandscaled.nii';
+input='${epiData/.nii.gz/.nii}';
 
 firstlevelseeding_parallel('$rawEpiDir',roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
 quit
@@ -614,7 +611,7 @@ fclose(fid);
 funcvoldim=[$numXdim $numYdim ${numZdim}];
 doFisherZ=1;
 motion_scrub=1;
-input='res4d_normandscaled_motionscrubbed.nii';
+input='${epiData/.nii.gz/_ms.nii}';
 
 firstlevelseeding_parallel('$rawEpiDir',roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
 quit
