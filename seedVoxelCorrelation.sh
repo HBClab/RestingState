@@ -17,7 +17,7 @@ VossLabMount="$(mount | grep vosslabhpc | awk '{print $3}')"
 
 
 function Usage {
-  echo "Usage: seedVoxelCorrelation.sh -E restingStateImage -r roi -m motionscrubFlag -n -f"
+  echo "Usage: seedVoxelCorrelation.sh --epi=restingStateImage --roiList=roiList.txt --motionscrub --fmap"
   echo " where"
   echo "   --epi resting state image"
   echo "        *Top-level RestingState.nii.gz image"
@@ -26,7 +26,7 @@ function Usage {
   echo "        **Use ONLY one option, -r or -R, NOT both"
   echo "   --compcor"
   echo "   --seedmaps print seedmaps (default is off)"
-  echo "   -f (fieldMap registration correction)"
+  echo "   --fmap (fieldMap registration correction)"
   echo "        *Only set this flag if FieldMap correction was used during qualityCheck"
   echo "        **This affects only the EPI to T1 QC images"
   echo ""
