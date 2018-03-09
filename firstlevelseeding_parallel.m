@@ -1,4 +1,4 @@
-function firstlevelseeding_parallel(subPath,roiList,featdir,funcvoldim,input,motion_scrub,doFisherZ)
+function firstlevelseeding_parallel(roiList,roiOutDir,funcvoldim,input,motion_scrub,doFisherZ)
 
 %script to calculate correlation coefficient between a set of seed
 %timecourses and a functional volume that has had nuisance signals
@@ -52,7 +52,7 @@ imagedimsz=funcvoldim(3);
 
 numclusters = parcluster('local'); %find the number of workers available on your machine/server
 
-if roiN <= 4    
+if roiN <= 4
     dcpoolsize = roiN; %for cases when there's only 1 or 2 ROIs
 elseif numclusters.NumWorkers > 4
     dcpoolsize = numclusters.NumWorkers-2; %if you have more than 4 workers available, set pool size to N-2, limits tying up server
@@ -72,12 +72,12 @@ catch err
 end
 
 warning off all
-mypath=[subPath,'/',featdir,'/stats'];
+mypath=[roiOutDir];
 cd(mypath);
 
-if exist('cope1.nii.gz','file')
-  system('gunzip cope1.nii.gz')
-end
+%if exist('cope1.nii.gz','file')
+%  system('gunzip cope1.nii.gz')
+%end
 
 funcon=load_untouch_nii(input);
 func=funcon.img;
@@ -97,7 +97,7 @@ totalslices=imagedimsx*roiN;
 
 
 parfor r=1:roiN
-  
+
   fcmap=zeros(imagedimsx,imagedimsy,imagedimsz);
 
   if (motion_scrub==1)
@@ -105,12 +105,12 @@ parfor r=1:roiN
   else
     seedts=load([char(roiList{1,1}(r)),'_','residvol_ts.txt']);
   end
-  % Loop over three dims - x y z 
+  % Loop over three dims - x y z
   for a=1:imagedimsx;
-    
+
     %fprintf(1, '%3d%% \n',int8(index/totalslices*100.0));
     %index = index +1
-    
+
     for b=1:imagedimsy;
       for c=1:imagedimsz;
         %calc correlation bewteen seed timeseries and timeseries of that voxel; tmp=2x2 symmetric corr table
@@ -130,7 +130,7 @@ parfor r=1:roiN
         end
 
         %fill voxel with correlation coefficient
-        fcmap(a,b,c)=pixr; 
+        fcmap(a,b,c)=pixr;
       end
     end
   end
@@ -164,12 +164,5 @@ parfor r=1:roiN
     system(['rm',' ', [char(roiList{1,1}(r)) '_cope1.nii']]);
     fprintf(1,'%s Done \n',[char(roiList{1,1}(r))]);
   end
- 
+
 end
-
-
-
-
-
-
-
