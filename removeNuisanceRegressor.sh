@@ -5,9 +5,9 @@
 #     1. Filtering
 #       a. High or Lowpass filtering via AFNI's 3dBandpass
 #       b. If High/Lowpass set to 0, the 0 and Nyquist Frequencies will still be removed
-#     2. Removal or Nuisance signal (FEAT)
-#       a. ROI based (e.g. wmroi, global, latvent)
-#       b. Motion Parameters (mclfirt/3dvolreg)
+#     2. Removal of Nuisance signal (3dTproject)
+#       a. classic: global roi + WM roi + CSF roi + 6 motion params
+#       b. CompCor: WM/CSF regressors derived from FAST segmentation
 ##################################################################################################################
 
 SGE_ROOT='';export SGE_ROOT
@@ -24,7 +24,7 @@ function Usage {
   echo "  --t1brain T1 file (skull-stripped)"
   echo "  --nuisanceList list containing paths to nuisance ROIs"
   echo "      compcor = WM/CSF regressors derived from FAST segmentation"
-  echo "      classic = global + WM roi + CSF roi"
+  echo "      classic = global + WM roi + CSF roi + 6 motion params"
   echo "  --lp lowpass filter frequency (Hz) (e.g. 0.08 Hz (2.5 sigma))"
   echo "  --hp highpass filter frequency (Hz) (e.g. 0.008 Hz (25.5 sigma / 120 s))"
   echo "    *If low/highpass filters are unset (or purposely set to both be '0'), the 0 and Nyquist frequencies will"
@@ -148,14 +148,14 @@ function SimultBandpassNuisanceReg()
     echo "Performing a 'bandpass' filter.  Frequencies between ${lp} & ${hp} will be filtered."
   fi
 
-  clobber ${inDir}/"$(basename "${inData%%.nii*}")"_bp_res4d.nii.gz &&\
-  rm -rf ${inDir}/*_mean.nii.gz 2> /dev/null &&\
-  rm -rf ${inDir}/tmp_bp* 2> /dev/null &&\
-	3dTproject -input ${inData} -prefix $inDir/tmp_bp.nii.gz -mask ${mask} -bandpass ${fbot} ${ftop} -ort ${regressorsFile} -verb &&\
+  clobber ${outDir}/"$(basename "${inData%%.nii*}")"_bp_res4d.nii.gz &&\
+  rm -rf ${outDir}/*_mean.nii.gz 2> /dev/null &&\
+  rm -rf ${outDir}/tmp_bp* 2> /dev/null &&\
+	3dTproject -input ${inData} -prefix $outDir/tmp_bp.nii.gz -mask ${mask} -bandpass ${fbot} ${ftop} -ort ${regressorsFile} -verb &&\
   # add mean back in
-	3dTstat -mean -prefix $inDir/orig_mean.nii.gz ${inData} &&\
-	3dTstat -mean -prefix $inDir/bp_mean.nii.gz $inDir/tmp_bp.nii.gz &&\
-	3dcalc -a $inDir/tmp_bp.nii.gz -b $inDir/orig_mean.nii.gz -c $inDir/bp_mean.nii.gz -expr "a+b-c" -prefix ${inDir}/"$(basename "${inData%%.nii*}")"_bp_res4d.nii.gz
+	3dTstat -mean -prefix $outDir/orig_mean.nii.gz ${inData} &&\
+	3dTstat -mean -prefix $outDir/bp_mean.nii.gz $outDir/tmp_bp.nii.gz &&\
+	3dcalc -a $outDir/tmp_bp.nii.gz -b $outDir/orig_mean.nii.gz -c $outDir/bp_mean.nii.gz -expr "a+b-c" -prefix ${outDir}/"$(basename "${inData%%.nii*}")"_bp_res4d.nii.gz
 
   echo "lowpassFilt=$ftop" >> $logDir/rsParams
   echo "highpassFilt=$fbot" >> $logDir/rsParams
@@ -192,12 +192,16 @@ while [ $# -ge 1 ] ; do
   	    t1Data=`get_imarg1 $1`;
         export t1Data;
         if [ "$t1Data" == "" ]; then
-          echo "Error: The T1 image (-A) is a required option"
+          echo "Error: The T1 image is a required option"
           exit 1
         fi
   	    shift;;
     --nuisanceList)
       nuisanceInFile=$(get_arg1 $1);
+      if [ ! -e "$nuisanceInFile" ]; then
+        echo "Error: The nuisanceList file is a required option"
+        exit 1
+      fi
       declare -a nuisanceList=( "$(cat "${nuisanceInFile}")" );
       shift;;
     --lp)
@@ -248,12 +252,18 @@ if [[ ${overwriteFlag} == "" ]]; then
   overwriteFlag=0
 fi
 
-
 # Source input (~func) directory
 indir=$(dirname "$epiData")
-preprocfeat=$(x=$indir; while [ "$x" != "/" ] ; do x=`dirname "$x"`; find "$x" -maxdepth 1 -type d -name preproc.feat; done)
+preprocfeat=$(x=$indir; while [ "$x" != "/" ] ; do x=`dirname "$x"`; find "$x" -maxdepth 1 -type d -name preproc.feat 2>/dev/null; done)
 logDir=$(dirname ${preprocfeat})
 rawEpiDir=$(dirname "$preprocfeat")
+
+if [ "${compcorFlag}" -eq 1 ]; then
+  outDir=${rawEpiDir}/nuisanceRegression/compcor
+else
+  outDir=${rawEpiDir}/nuisanceRegression/classic
+fi
+mkdir -p ${outDir}/rois
 
 # If new nuisance regressors were added, echo them out to the rsParams file (only if they don't already exist in the file)
 # Making a *strong* assumption that any nuisanceROI lists added after initial processing won't reuse the first ROI (e.g. pccrsp)
@@ -272,13 +282,13 @@ fi
 
 # Echo out nuisance ROIs to a text file in input directory.
 
-if [ -e "$rawEpiDir"/nuisance_rois.txt ]; then
-  rm "$rawEpiDir"/nuisance_rois.txt
+if [ -e "$outDir"/nuisance_rois.txt ]; then
+  rm "$outDir"/nuisance_rois.txt
 fi
 
 for i in "${nuisanceList[@]}"
 do
-  echo "$i" >> "$rawEpiDir"/nuisance_rois.txt
+  echo "$i" >> "$outDir"/nuisance_rois.txt
 done
 
 
@@ -287,9 +297,9 @@ done
 echo "------------------------------------"; \
 echo "-E $epiData"; \
 echo "-A $t1Data"; } >> "$logDir"/rsParams_log
-  echo "-N $nuisanceInFile" >> "$logDir"/rsParams_log
+echo "-N $nuisanceInFile" >> "$logDir"/rsParams_log
 { echo "-L $lp"; \
-echo "-H $hp"; \
+echo "-H $hp"; } >> "$logDir"/rsParams_log
 if [[ $overwriteFlag == 1 ]]; then
   echo "-c" >> "$logDir"/rsParams_log
 fi
@@ -304,9 +314,6 @@ fi
 
 echo "Running $0 ..."
 
-cd "${preprocfeat}" || exit
-mkdir -p rois
-
 #################################
 #### Nuisance ROI mapping ############
 for roi in $(cat $nuisanceInFile)
@@ -316,33 +323,33 @@ do
   #check if roi is in native space
   if [[ "$(fslinfo "${roi}" | grep ^dim1 | awk '{print $2}')" == 91 ]]; then
     echo "${roi} is in MNI space"
-    clobber rois/"${roiName}"_native.nii.gz &&\
+    clobber "$outDir"/rois/"${roiName}"_native.nii.gz &&\
     MNItoEPIwarp=$(grep "MNItoEPIWarp=" "$logDir"/rsParams | tail -1 | awk -F"=" '{print $2}') &&\
-    applywarp --ref="$rawEpiDir"/mcImgMean_stripped.nii.gz --in="${roi}" --out=rois/"${roiName}"_native.nii.gz --warp="$MNItoEPIwarp" --datatype=float
+    applywarp --ref="$rawEpiDir"/mcImgMean_stripped.nii.gz --in="${roi}" --out="$outDir"/roi/"${roiName}"_native.nii.gz --warp="$MNItoEPIwarp" --datatype=float
 
   elif [[ "$(fslinfo "${roi}" | grep ^dim1 | awk '{print $2}')" == "$(fslinfo ${epiData} | grep ^dim1 | awk '{print $2}')" ]]; then
     echo "${roi} is in native space"
-    clobber rois/"${roiName}"_native.nii.gz &&\
-    cp "${roi}" rois/"${roiName}"_native.nii.gz
+    clobber "$outDir"/rois/"${roiName}"_native.nii.gz &&\
+    cp "${roi}" "$outDir"/rois/"${roiName}"_native.nii.gz
 
   else
     echo "dimensions of $roi not in MNI or EPI space"
     exit 1
   fi
   # check if needs binarize
-  if [[ "$(printf %.0f $(fslstats rois/"${roiName}"_native.nii.gz -M))" -ne 1 ]]; then
-    fslmaths rois/"${roiName}"_native.nii.gz -thr 0.5 -bin rois/"${roiName}"_native.nii.gz
+  if [[ "$(printf %.0f $(fslstats "$outDir"/rois/"${roiName}"_native.nii.gz -M))" -ne 1 ]]; then
+    fslmaths "$outDir"/rois/"${roiName}"_native.nii.gz -thr 0.5 -bin "$outDir"/rois/"${roiName}"_native.nii.gz
   fi
 
   # extract regressor timeseries from unfiltered epi
   if [[ "${compcorFlag}" -eq 1 ]]; then
-    clobber rois/mean_"${roiName}"_ts.txt &&\
+    clobber "$outDir"/rois/mean_"${roiName}"_ts.txt &&\
     echo "extracting timeseries for $roiName" &&\
-    fslmeants -i "$epiData" -o rois/mean_"${roiName}"_ts.txt -m rois/"${roiName}"_native.nii.gz --eig --order=5
+    fslmeants -i "$epiData" -o "$outDir"/rois/mean_"${roiName}"_ts.txt -m "$outDir"/rois/"${roiName}"_native.nii.gz --eig --order=5
 
   else
-    clobber rois/mean_"${roiName}"_ts.txt &&\
-    fslmeants -i "$epiData" -o rois/mean_"${roiName}"_ts.txt -m rois/"${roiName}"_native.nii.gz
+    clobber "$outDir"/rois/mean_"${roiName}"_ts.txt &&\
+    fslmeants -i "$epiData" -o "$outDir"/rois/mean_"${roiName}"_ts.txt -m "$outDir"/rois/"${roiName}"_native.nii.gz
   fi
 done
 
@@ -351,24 +358,24 @@ done
 
 # paste regressor timeseries into one file
 if [[ "${compcorFlag}" -eq 1 ]]; then
-  IFS=" " read -r -a arr <<< "$(for i in $(cat $nuisanceInFile); do echo ${preprocfeat}/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' ')"
+  IFS=" " read -r -a arr <<< "$(for i in $(cat $nuisanceInFile); do echo "$outDir"/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' ')"
 else # append motion parameters to regressor list
-  IFS=" " read -r -a arr <<< "$(for i in $(cat $nuisanceInFile); do echo ${preprocfeat}/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' '; echo "$rawEpiDir"/mcImg.par)"
+  IFS=" " read -r -a arr <<< "$(for i in $(cat $nuisanceInFile); do echo "$outDir"/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' '; echo "$rawEpiDir"/mcImg.par)"
 fi
 
-paste "${arr[@]}" > "$rawEpiDir"/NuisanceRegressor_ts.txt
+paste "${arr[@]}" > "$outDir"/NuisanceRegressor_ts.txt
 
-regressorsFile="$rawEpiDir"/NuisanceRegressor_ts.txt
+regressorsFile="$outDir"/NuisanceRegressor_ts.txt
 export regressorsFile
 
-fsl_tsplot -i "$regressorsFile" -t "Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o "${rawEpiDir}"/NuisanceRegressors_ts.png
-echo "<br><br><img src=\"${rawEpiDir}/NuisanceRegressors_ts.png\" alt=\"$roi nuisance regressor\"><br>" >> "$indir"/analysisResults.html
+fsl_tsplot -i "$regressorsFile" -t "Time Series" -u 1 --start=1 -x 'Time Points (TR)' -w 800 -h 300 -o "${outDir}"/NuisanceRegressors_ts.png
+echo "<br><br><img src=\"${outDir}/NuisanceRegressors_ts.png\" alt=\"$roi nuisance regressor\"><br>" >> "$indir"/analysisResults.html
 
 # simultaneous bandpass + regression
-clobber ${indir}/"$(basename "${epiData%%.nii*}")"_bp_res4d.nii.gz &&\
+clobber ${outDir}/"$(basename "${epiData%%.nii*}")"_bp_res4d.nii.gz &&\
 SimultBandpassNuisanceReg ${epiData} "$rawEpiDir"/mcImgMean_mask.nii.gz
 
-epiDataFiltReg=${indir}/"$(basename "${epiData%%.nii*}")"_bp_res4d.nii.gz
+epiDataFiltReg=${outDir}/"$(basename "${epiData%%.nii*}")"_bp_res4d.nii.gz
 export epiDataFiltReg
 
 
@@ -380,7 +387,7 @@ cp ${epiDataFiltReg} ${epiDataFiltReg/res4d/res4d_orig}
 
 # For some reason, this mask isn't very good.  Use the good mask top-level
 echo "...Copy Brain mask"
-cp "$(dirname ${preprocfeat})"/mcImgMean_mask.nii.gz mask.nii.gz
+cp "${rawEpiDir}"/mcImgMean_mask.nii.gz mask.nii.gz
 fslmaths mask -mul 1000 mask1000 -odt float
 
 # normalize res4d here
