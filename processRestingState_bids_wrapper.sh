@@ -179,68 +179,76 @@ else
       fmap_mag_stripped="$(find ${subDir}/${sesID}/fmap -type f -name "*magnitude_stripped.nii.gz")"
     fi
 
-    ${scriptdir}/qualityCheck.sh -E "$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
-      -A ${T1_RPI_brain} \
-      -a ${T1_RPI} \
-      -f \
-      -b ${fmap_prepped} \
-      -v ${fmap_mag} \
-      -x ${fmap_mag_stripped} \
-      -D ${dwellTime} \
-      -d -y -c
+    ${scriptdir}/qualityCheck.sh --epi="$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
+      --t1brain=${T1_RPI_brain} \
+      --t1=${T1_RPI} \
+      --fmap=${fmap_prepped} \
+      --fmapmag=${fmap_mag} \
+      --fmapmagbrain=${fmap_mag_stripped} \
+      --dwelltime=${dwellTime} \
+      --pedir=-y \
+      --regmode=6dof
 
-    ${scriptdir}/restingStatePreprocess.sh -E ${rsOut}/mcImg_stripped.nii.gz \
-      -A ${T1_RPI_brain} \
-      -t 2 \
-      -T 30 \
-      -s 6 \
-      -f -c
+    ${scriptdir}/restingStatePreprocess.sh --epi= ${rsOut}/mcImg_stripped.nii.gz \
+      --t1brain=${T1_RPI_brain} \
+      --tr=2 \
+      --te=30 \
+      --smooth=6 \
+      --aroma \
+      --usefmap
+    elif [ "${fieldMapFlag}" != 1 ]; then
+      printf "Process without fieldmap."
+      ${scriptdir}/qualityCheck.sh \
+        --epi="$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
+        --t1brain=${T1_RPI_brain} \
+        --t1=${T1_RPI} \
+        --dwelltime=${dwellTime} \
+        --pedir=-y \
+        --regmode=6dof
 
-    ${scriptdir}/removeNuisanceRegressor.sh -E $rsOut/preproc.feat/nonfiltered_smooth_data.nii.gz \
-      -A ${T1_RPI_brain} \
-      -n wmroi -n latvent -n global \
-      -L .08 \
-      -H .008 \
-      -t 2 \
-      -T 30 -c
+      ${scriptdir}/restingStatePreprocess.sh \
+        --epi=${rsOut}/mcImg_stripped.nii.gz \
+        --t1brain=${T1_RPI_brain} \
+        --tr=2 \
+        --te=30 \
+        --smooth=6 \
+        --aroma
+    fi
 
-    ${scriptdir}/motionScrub.sh -E $rsOut/RestingState.nii.gz
+    if [ "${compcorFlag}" -eq 1 ]; then
+      epiDataFilt="${rsOut}"/ica_aroma/denoised_func_data_nonaggr.nii.gz
+      epiDataFiltReg="${rsOut}"/nuisanceRegression/denoised_func_data_nonaggr_bp_res4d_normandscaled.nii
+      compcorArg="--compcor"
+      SNR/CSF_pve_to_RS_thresh.nii.gz SNR/WM_pve_to_RS_thresh_ero.nii.gz
+      {
+      echo "$rsOut/SNR/CSF_pve_to_RS_thresh.nii.gz"; \
+      echo "$rsOut/SNR/WM_pve_to_RS_thresh_ero.nii.gz"; } > "$rsOut"/nuisanceList.txt
+    else
+      epiDataFilt="$rsOut"/preproc.feat/nonfiltered_smooth_data.nii.gz
+      epiDataFiltReg="${rsOut}"/nuisanceRegression/nonfiltered_smooth_data_bp_res4d_normandscaled.nii
+      compcorArg=""
+      {
+      echo "${scriptdir}/ROIs/latvent.nii.gz"; \
+      echo "${scriptdir}/ROIs/global.nii.gz"; \
+      echo "${scriptdir}/ROIs/wmroi.nii.gz"; } > "$rsOut"/nuisanceList.txt
+    fi
 
-    ${scriptdir}/seedVoxelCorrelation.sh -E $rsOut/RestingState.nii.gz \
-      -m 2 \
-      -R ${roilist} \
-      -f
-  elif [ "${fieldMapFlag}" != 1 ]; then
-    printf "Process without fieldmap."
-    ${scriptdir}/qualityCheck.sh -E "$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
-      -A ${T1_RPI_brain} \
-      -a ${T1_RPI} \
-      -D ${dwellTime} \
-      -d -y -c
+    ${scriptdir}/removeNuisanceRegressor.sh \
+      --epi=$epiDataFilt \
+      --t1brain=${T1_RPI_brain} \
+      --nuisancelist="$rsOut"/nuisanceList.txt \
+      --lp=.08 \
+      --hp=.008 \
+      "${compcorArg}"
 
-    ${scriptdir}/restingStatePreprocess.sh -E ${rsOut}/mcImg_stripped.nii.gz \
-      -A ${T1_RPI_brain} \
-      -t 2 \
-      -T 30 \
-      -s 6 \
-      -c
+    ${scriptdir}/motionScrub.sh --epi=${epiDataFiltReg}
 
-    ${scriptdir}/removeNuisanceRegressor.sh -E $rsOut/preproc.feat/nonfiltered_smooth_data.nii.gz \
-      -A ${T1_RPI_brain} \
-      -n wmroi -n latvent -n global \
-      -L .08 \
-      -H .008 \
-      -t 2 \
-      -T 30 -c
-
-    ${scriptdir}/motionScrub.sh -E $rsOut/RestingState.nii.gz
-
-    ${scriptdir}/seedVoxelCorrelation.sh -E $rsOut/RestingState.nii.gz \
-      -m 2 \
-      -R ${roilist}
+    ${scriptdir}/seedVoxelCorrelation.sh \
+      --epi=${epiDataFiltReg\\.nii\.nii.gz} \
+      --motionscrub \
+      --roilist=${roilist} \
+      "${compcorArg}"
   fi
-  printf "\n%s\nBeginning reproc nuisance regression (ica_aroma + compcor)...\n" "$(date)"
-  ${scriptdir}/reproc_2016.sh -i ${rsOut} -R ${roilist} -A "${MBA_dir}"
 
   # prevents permissions denied error when others run new seeds
   parallel chmod 774 ::: "$(find ${rsOut} -type f \( -name "highres2standard.nii.gz" -o -name "seeds*.txt" -o -name "rsParams*" -o -name "run*.m" -o -name "highres.nii.gz" -o -name "standard.nii.gz" -o -name "analysisResults.html" \))"
