@@ -510,17 +510,17 @@ if [ "${seedmapFlag}" -eq 1 ]; then
 
   # check if seeding results exist, re-populate seeds.txt with non existing seeds
   for roi in $(cat "$rawEpiDir"/seeds_orig.txt); do
-  	if [[ $motionscrubFlag == 1 ]] && [ ! -f ${rawEpiDir}/${roi}_ms/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_ms_standard_zmap.nii.gz ]; then
+  	if [[ $motionscrubFlag == 1 ]] && [ ! -f ${roiOutDir}/${roi}_ms/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_ms_standard_zmap.nii.gz ]; then
   		echo $roi >> "$rawEpiDir"/seeds_ms.txt
   	fi
-  	if [[ $motionscrubFlag == 0 ]] && [ ! -f ${rawEpiDir}/${roi}/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_standard_zmap.nii.gz ]; then
+  	if [[ $motionscrubFlag == 0 ]] && [ ! -f ${roiOutDir}/${roi}/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_standard_zmap.nii.gz ]; then
   		echo $roi >> "$rawEpiDir"/seeds.txt
   	fi
   	if [[ $motionscrubFlag == 2 ]]; then
-  		if [ ! -f ${rawEpiDir}/${roi}/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_standard_zmap.nii.gz ]; then
+  		if [ ! -f ${roiOutDir}/${roi}/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_standard_zmap.nii.gz ]; then
   			echo $roi >> "$rawEpiDir"/seeds.txt
   		fi
-  		if [ ! -f ${rawEpiDir}/${roi}_ms/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_ms_standard_zmap.nii.gz ]; then
+  		if [ ! -f ${roiOutDir}/${roi}_ms/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_ms_standard_zmap.nii.gz ]; then
   			echo $roi >> "$rawEpiDir"/seeds_ms.txt
   		fi
   	fi
@@ -638,12 +638,12 @@ EOF
     		fi
   	  else
     		if [[ $motionscrubFlag == 0 ]]; then
-    		    matlab -nodisplay -r "run "$rawEpiDir"/$filename"
+    		    matlab -nodisplay -r "run $rawEpiDir/$filename"
     		elif [[ $motionscrubFlag == 1 ]]; then
-    		    matlab -nodisplay -r "run "$rawEpiDir"/$filename2"
+    		    matlab -nodisplay -r "run $rawEpiDir/$filename2"
     		else
-    		    matlab -nodisplay -r "run "$rawEpiDir"/$filename"
-    		    matlab -nodisplay -r "run "$rawEpiDir"/$filename2"
+    		    matlab -nodisplay -r "run $rawEpiDir/$filename"
+    		    matlab -nodisplay -r "run $rawEpiDir/$filename2"
     		fi
       fi
   else
@@ -660,13 +660,13 @@ EOF
 
   # Copy over anatomical files to results directory
   # T1 (highres)
-  cp "$rawEpiDir"/${preprocfeat}/reg/highres.nii.gz ${seedcorrDir}
+  cp ${preprocfeat}/reg/highres.nii.gz ${seedcorrDir}
 
   # T1toMNI (highres2standard)
-  cp "$rawEpiDir"/${preprocfeat}/reg/highres2standard.nii.gz ${seedcorrDir}
+  cp ${preprocfeat}/reg/highres2standard.nii.gz ${seedcorrDir}
 
   # MNI (standard)
-  cp "$rawEpiDir"/${preprocfeat}/reg/standard.nii.gz ${seedcorrDir}
+  cp ${preprocfeat}/reg/standard.nii.gz ${seedcorrDir}
 
 
   # HTML setup
@@ -684,10 +684,10 @@ EOF
 
       # Nonlinear warp from EPI to MNI
       clobber ${seedcorrDir}/${roi}_standard_zmap.nii.gz &&\
-      applywarp --in=${rawEpiDir}/${roi}/cope1.nii \
-      --ref="$rawEpiDir"/${preprocfeat}/reg/standard.nii.gz \
+      applywarp --in=${roiOutDir}/${roi}/cope1.nii \
+      --ref=${preprocfeat}/reg/standard.nii.gz \
       --out=${seedcorrDir}/${roi}_standard_zmap.nii.gz \
-      --warp="$rawEpiDir"/${preprocfeat}/reg/example_func2standard_warp.nii.gz \
+      --warp=${preprocfeat}/reg/example_func2standard_warp.nii.gz \
       --datatype=float
 
       # Mask out data with MNI mask
@@ -695,21 +695,21 @@ EOF
 
       # Warp seed from MNI to T1
       clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
-      applywarp --in=${seedcorrDir}/${roi}_standard.nii.gz \
-      --ref="$rawEpiDir"/${preprocfeat}/reg/highres.nii.gz \
+      applywarp --in=${roiOutDir}/${roi}_standard.nii.gz \
+      --ref=${preprocfeat}/reg/highres.nii.gz \
       --out=${seedcorrDir}/${roi}_highres.nii.gz \
-      --warp="$rawEpiDir"/${preprocfeat}/reg/standard2highres_warp.nii.gz \
+      --warp=${preprocfeat}/reg/standard2highres_warp.nii.gz \
       --interp=nn
 
       # Creating new plots with fsl_tsplot
       # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
-      yMax=$(cat ${rawEpiDir}/${roi}_residvol_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
-      yMin=$(cat ${rawEpiDir}/${roi}_residvol_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
+      yMax=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
+      yMin=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
 
-      clobber "$rawEpiDir"/${roi}.png &&\
-      fsl_tsplot -i ${rawEpiDir}/${roi}_residvol_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$rawEpiDir"/${roi}.png
+      clobber "$roiOutDir"/${roi}.png &&\
+      fsl_tsplot -i ${roiOutDir}/${roi}_residvol_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$roiOutDir"/${roi}.png
 
-      echo "<br><img src=\"$rawEpiDir/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
+      echo "<br><img src=\"$roiOutDir/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
 
     elif [[ $motionscrubFlag == 1 ]]; then
       # Only motionscrubbed data
@@ -719,11 +719,11 @@ EOF
 
 
       # Nonlinear warp from EPI to MNI
-      clobber ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz &&\
-      applywarp --in=${rawEpiDir}/${roi}_ms/cope1.nii \
-      --ref="$rawEpiDir"/${preprocfeat}/reg/standard.nii.gz \
+      clobber ${roiOutDir}/${roi}_ms_standard_zmap.nii.gz &&\
+      applywarp --in=${roiOutDir}/${roi}_ms/cope1.nii \
+      --ref=${preprocfeat}/reg/standard.nii.gz \
       --out=${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz \
-      --warp="$rawEpiDir"/${preprocfeat}/reg/example_func2standard_warp.nii.gz \
+      --warp=${preprocfeat}/reg/example_func2standard_warp.nii.gz \
       --datatype=float
 
       # Mask out data with MNI mask
@@ -731,10 +731,10 @@ EOF
 
       # Warp seed from MNI to T1
       clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
-      applywarp --in=${seedcorrDir}/${roi}_standard.nii.gz \
-      --ref="$rawEpiDir"/${preprocfeat}/reg/highres.nii.gz \
+      applywarp --in=${roiOutDir}/${roi}_standard.nii.gz \
+      --ref=${preprocfeat}/reg/highres.nii.gz \
       --out=${seedcorrDir}/${roi}_highres.nii.gz \
-      --warp="$rawEpiDir"/${preprocfeat}/reg/standard2highres_warp.nii.gz \
+      --warp=${preprocfeat}/reg/standard2highres_warp.nii.gz \
       --interp=nn
 
 
@@ -746,41 +746,41 @@ EOF
 
         # Creating new plots with fsl_tsplot
         # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
-        yMax=$(cat ${rawEpiDir}/${roi}_residvol_ms_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
-        yMin=$(cat ${rawEpiDir}/${roi}_residvol_ms_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
+        yMax=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
+        yMin=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
 
         # Log the "scrubbed TRs"
-        xNum=$(cat ${rawEpiDir}/${roi}_residvol_ms_ts.txt | wc -l)
+        xNum=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | wc -l)
         count=1
         while [ $count -le $xNum ]; do
-          tsPlotIn=$(cat ${rawEpiDir}/${roi}_residvol_ms_ts.txt | head -${count} | tail -1)
+          tsPlotIn=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | head -${count} | tail -1)
           delPlotCheck=$(cat ${rawEpiDir}/deleted_vols.txt | awk '{$1=$1}1' | grep -E '(^| )'${count}'( |$)')
           if [ "$delPlotCheck" == "" ]; then
             delPlot=$yMin
           else
             delPlot=$yMax
           fi
-          echo $delPlot >> ${rawEpiDir}/${roi}_censored_TRplot.txt
+          echo $delPlot >> ${roiOutDir}/${roi}_censored_TRplot.txt
         let count=count+1
         done
 
         #Plot of "scrubbed" data
-        clobber "$rawEpiDir"/${roi}_ms.png &&\
-        fsl_tsplot -i ${rawEpiDir}/${roi}_residvol_ms_ts.txt -t "$roi Time Series (Scrubbed)" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$rawEpiDir"/${roi}_ms.png
+        clobber "$roiOutDir"/${roi}_ms.png &&\
+        fsl_tsplot -i ${roiOutDir}/${roi}_residvol_ms_ts.txt -t "$roi Time Series (Scrubbed)" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$roiOutDir"/${roi}_ms.png
 
-        echo "<br><img src=\"$rawEpiDir/${roi}.png\" alt=\"${roi} seed\"><img src=\"$rawEpiDir/${roi}_ms.png\" alt=\"${roi}_ms seed\"><br>" >> "$rawEpiDir"/analysisResults.html
+        echo "<br><img src=\"$roiOutDir/${roi}.png\" alt=\"${roi} seed\"><img src=\"$roiOutDir/${roi}_ms.png\" alt=\"${roi}_ms seed\"><br>" >> "$rawEpiDir"/analysisResults.html
 
       else
         # Absence of scrubbed volumes
 
         # Creating new plots with fsl_tsplot
         # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
-        yMax=$(cat ${rawEpiDir}/${roi}_residvol_ms_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
-        yMin=$(cat ${rawEpiDir}/${roi}_residvol_ms_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
+        yMax=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
+        yMin=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
 
-        fsl_tsplot -i ${rawEpiDir}/${roi}_residvol_ms_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$rawEpiDir"/${roi}.png
+        fsl_tsplot -i ${roiOutDir}/${roi}_residvol_ms_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$roiOutDir"/${roi}.png
 
-        echo "<br><img src=\"$rawEpiDir/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
+        echo "<br><img src=\"$roiOutDir/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
       fi
 
     else
@@ -794,10 +794,10 @@ EOF
 
       # Nonlinear warp from EPI to MNI
       clobber ${seedcorrDir}/${roi}_standard_zmap.nii.gz &&\
-      applywarp --in=${rawEpiDir}/${roi}/cope1.nii \
-      --ref="$rawEpiDir"/${preprocfeat}/reg/standard.nii.gz \
+      applywarp --in=${roiOutDir}/${roi}/cope1.nii \
+      --ref=${preprocfeat}/reg/standard.nii.gz \
       --out=${seedcorrDir}/${roi}_standard_zmap.nii.gz \
-      --warp="$rawEpiDir"/${preprocfeat}/reg/example_func2standard_warp.nii.gz \
+      --warp=${preprocfeat}/reg/example_func2standard_warp.nii.gz \
       --datatype=float
 
       # Mask out data with MNI mask
@@ -805,10 +805,10 @@ EOF
 
       # Warp seed from MNI to T1
       clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
-      applywarp --in=${seedcorrDir}/${roi}_standard.nii.gz \
-      --ref="$rawEpiDir"/${preprocfeat}/reg/highres.nii.gz \
+      applywarp --in=${roiOutDir}/${roi}_standard.nii.gz \
+      --ref=${preprocfeat}/reg/highres.nii.gz \
       --out=${seedcorrDir}/${roi}_highres.nii.gz \
-      --warp="$rawEpiDir"/${preprocfeat}/reg/standard2highres_warp.nii.gz \
+      --warp=${preprocfeat}/reg/standard2highres_warp.nii.gz \
       --interp=nn
 
 
@@ -816,10 +816,10 @@ EOF
 
       # Nonlinear warp from EPI to MNI
       clobber ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz &&\
-      applywarp --in=${rawEpiDir}/${roi}_ms/cope1.nii \
-      --ref="$rawEpiDir"/${preprocfeat}/reg/standard.nii.gz \
+      applywarp --in=${roiOutDir}/${roi}_ms/cope1.nii \
+      --ref=${preprocfeat}/reg/standard.nii.gz \
       --out=${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz \
-      --warp="$rawEpiDir"/${preprocfeat}/reg/example_func2standard_warp.nii.gz \
+      --warp=${preprocfeat}/reg/example_func2standard_warp.nii.gz \
       --datatype=float
 
       # Mask out data with MNI mask
@@ -834,44 +834,44 @@ EOF
 
         # Creating new plots with fsl_tsplot
         # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
-        yMax=$(cat ${rawEpiDir}/${roi}_residvol_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
-        yMin=$(cat ${rawEpiDir}/${roi}_residvol_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
+        yMax=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
+        yMin=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
 
         # Log the "scrubbed TRs"
-        xNum=$(cat ${rawEpiDir}/${roi}_residvol_ts.txt | wc -l)
+        xNum=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | wc -l)
         count=1
         while [ $count -le $xNum ]; do
-          tsPlotIn=$(cat ${rawEpiDir}/${roi}_residvol_ts.txt | head -${count} | tail -1)
+          tsPlotIn=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | head -${count} | tail -1)
           delPlotCheck=$(cat ${rawEpiDir}/deleted_vols.txt | awk '{$1=$1}1' | grep -E '(^| )'${count}'( |$)')
           if [ "$delPlotCheck" == "" ]; then
             delPlot=$yMin
           else
             delPlot=$yMax
           fi
-          echo $delPlot >> ${rawEpiDir}/${roi}_censored_TRplot.txt
+          echo $delPlot >> ${roiOutDir}/${roi}_censored_TRplot.txt
         let count=count+1
         done
 
         # Plot of normal data showing scrubbed TRs
-        fsl_tsplot -i ${rawEpiDir}/${roi}_residvol_ts.txt,${rawEpiDir}/${roi}_censored_TRplot.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' -a ",Scrubbed_TR" --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$rawEpiDir"/${roi}.png
+        fsl_tsplot -i ${roiOutDir}/${roi}_residvol_ts.txt,${roiOutDir}/${roi}_censored_TRplot.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' -a ",Scrubbed_TR" --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$roiOutDir"/${roi}.png
 
         # Plot of "scrubbed" data
-        fsl_tsplot -i ${rawEpiDir}/${roi}_residvol_ms_ts.txt -t "$roi Time Series (Scrubbed)" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$rawEpiDir"/${roi}_ms.png
+        fsl_tsplot -i ${roiOutDir}/${roi}_residvol_ms_ts.txt -t "$roi Time Series (Scrubbed)" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$roiOutDir"/${roi}_ms.png
 
 
-        echo "<br><img src=\"$rawEpiDir/${roi}.png\" alt=\"${roi} seed\"><img src=\"$rawEpiDir/${roi}_ms.png\" alt=\"${roi}_ms seed\"><br>" >> "$rawEpiDir"/analysisResults.html
+        echo "<br><img src=\"$roiOutDir/${roi}.png\" alt=\"${roi} seed\"><img src=\"$roiOutDir/${roi}_ms.png\" alt=\"${roi}_ms seed\"><br>" >> "$rawEpiDir"/analysisResults.html
 
       else
         # No scrubbed TRs
 
         # Creating new plots with fsl_tsplot
         # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
-        yMax=$(cat ${rawEpiDir}/${roi}_residvol_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
-        yMin=$(cat ${rawEpiDir}/${roi}_residvol_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
+        yMax=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
+        yMin=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
 
-        fsl_tsplot -i ${rawEpiDir}/${roi}_residvol_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$rawEpiDir"/${roi}.png
+        fsl_tsplot -i ${roiOutDir}/${roi}_residvol_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$roiOutDir"/${roi}.png
 
-        echo "<br><img src=\"$rawEpiDir/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
+        echo "<br><img src=\"$roiOutDir/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
       fi
     fi
   done
@@ -880,7 +880,7 @@ fi
 
 
 echo "$0 Complete"
-echo "Please make sure that the ROI folders were created in the ${rawEpiDir}/ folder."
+echo "Please make sure that the ROI folders were created in the ${roiOutDir}/ folder."
 echo "If resultant warped seeds (to MNI) were too small, they were NOT processed.  Check ${rawEpiDir}/seedsTooSmall for exclusions."
 echo "If motionscrubbing was set to 1 or 2, make sure that motionscrubbed data was created."
 echo "OCTAVE/Matlab wouldn't give an error even if this step was not successfully done."
