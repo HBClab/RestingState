@@ -3,31 +3,54 @@
 # assumes BIDS directory structure
 # TODOS:
 # need a different way to determine scannerID. e.g., dicom header?
-function printCommandLine {
+function Usage {
   echo ""
-  echo "Usage: processRestingState_wrapper.sh -i infile -R roilist "
-  echo "-i path/to/BIDS/sub-GEA161/ses-activepre/func/sub-GEA161_ses-activepre_task-rest_bold.nii.gz"
-  echo "-R file with list of rois. must include path to roi file."
+  echo "Usage: processRestingState_wrapper.sh --epi=rawEpiFile --roiList=roilist"
+  echo "--epi path/to/BIDS/sub-GEA161/ses-activepre/func/sub-GEA161_ses-activepre_task-rest_bold.nii.gz"
+  echo "--roiList file with list of rois. must include path to roi file."
   exit 1
+}
+
+########## FSL's arg parsing functions ###################
+get_opt1() {
+    arg=$(echo $1 | sed 's/=.*//')
+    echo $arg
+}
+
+get_imarg1() {
+    arg=$(get_arg1 $1);
+    arg=$($FSLDIR/bin/remove_ext $arg);
+    echo $arg
+}
+
+get_arg1() {
+    if [ X"`echo $1 | grep '='`" = X ] ; then
+	echo "Option $1 requires an argument" 1>&2
+	exit 1
+    else
+	arg=`echo $1 | sed 's/.*=//'`
+	if [ X$arg = X ] ; then
+	    echo "Option $1 requires an argument" 1>&2
+	    exit 1
+	fi
+	echo $arg
+    fi
 }
 
 function softwareCheck()
 {
-  fsl_check=$(which fsl)
-  afni_check=$(which afni)
-  freesurfer_check=$(which freesurfer)
 
-  if [ "${afni_check}" == "" ]; then
+  if [ "$(which afni)" == "" ]; then
       echo "afni is either not downloaded or not defined in your path, exiting script"
       exit 1
   fi
 
-  if [ "${fsl_check}" == "" ]; then
+  if [ "$(which fsl)" == "" ]; then
       echo "fsl is either not downloaded or not defined in your path, exiting script"
       exit 1
   fi
 
-  if [ "${freesurfer_check}" == "" ]; then
+  if [ "$(which freesurfer)" == "" ]; then
       echo "freesurfer is either not downloaded or not defined in your path, exiting script"
       exit 1
   fi
@@ -71,36 +94,44 @@ function clobber()
 clob=false
 export -f clobber
 
-while getopts "i:R:fh" OPTION
-do
-  case $OPTION in
-    i)
-      inFile=$OPTARG  # e.g., -i path/to/BIDS/sub-GEA161/ses-activepre/func/sub-GEA161_ses-activepre_task-rest_bold.nii.gz
+if [ $# -lt 2 ] ; then Usage; exit 0; fi
+while [ $# -ge 1 ] ; do
+  iarg=$(get_opt1 $1);
+  case "$iarg"
+in
+  --epi)
+      inFile=`get_arg1 $1`;
+      export inFile;
+      if [ "$inFile" == "" ]; then
+        echo "Error: The restingStateImage (-E) is a required option"
+        exit 1
+      fi
+      shift;;
+  --roiList)
+      roilist=$(get_arg1 $1);
+      shift;;
+  --compcor)
+      compcorFlag=1;
+      aromaArg="--aroma";
+      export compcorFlag;
+      shift;;
+  --usefmap)
+      fieldMapFlag=1;
+      shift;;
+  --clobber)
+      clob=true;
+      shift;;
+  -h)
+      Usage;
       ;;
-    R)
-      roilist=$OPTARG
-      ;;
-    f)
-      fieldMapFlag=1
-      echo "forcing fieldmap correction."
-      ;;
-    h)
-      printCommandLine
-      ;;
-    ?)
+  *)
       echo "ERROR: Invalid option"
-      printCommandLine
+      Usage;
       ;;
-      esac
- done
+    esac
+done
 
 scriptdir="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
-
-if [ "${inFile}" == "" ]; then
-  echo "ERROR: -i is required flag"
-  printCommandLine
-  exit 1
-fi
 
 # if no user-defined roilist, default to first .nii.gz file found in ROIs dir
 if [[ "${roilist}" == "" ]]; then
@@ -113,8 +144,8 @@ subID="$(echo ${inFile} | grep -o "sub-[a-z0-9A-Z]*" | head -n 1 | sed -e "s|sub
 sesID="$(echo ${inFile} | grep -o "ses-[a-z0-9A-Z]*" | head -n 1 | sed -e "s|ses-||")" # gets sesID from inFile
 subDir="${bidsDir}/sub-${subID}" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161
 scanner="$(echo ${subID} | cut -c -2)" # extract scannerID from subID, works when scannerID is embedded in subID. TODO: need a different way to determine scannerID. e.g., dicom header?
-rsOut="${bidsDir}/derivatives/rsOut_legacy/sub-${subID}/${sesID}"
-
+# rsOut="${bidsDir}/derivatives/rsOut_legacy/sub-${subID}/${sesID}"
+rsOut="${bidsDir}/derivatives/test/sub-${subID}/ses-${sesID}"
 # load variables needed for processing
 
 MBA_dir="$(dirname "$(find ${bidsDir}/derivatives/MBA/sub-${subID} -type f -print -quit)")" # find dir containing MBA output
@@ -125,22 +156,22 @@ if [[ ! -d "${MBA_dir}" ]]; then
   echo "ERROR: MBA directory not found in derivatives. Exiting."
   exit 1
 else
-  T1_RPI="$(find ${subDir}/ses-*/anat -type f -name "sub-${subID}_ses*_T1w.nii.gz")"
-  T1_RPI_brain="$(find ${subDir}/ses-*/anat -type f -name "sub-${subID}_ses*_T1w_brain.nii.gz")"
+  T1_RPI="$(find ${subDir}/ses-*/anat -type f -name "sub-${subID}_ses*_T1w.nii.gz" -print -quit)"
+  T1_RPI_brain="$(find ${MBA_dir} -type f -name "sub-${subID}_ses*_T1w_brain.nii.gz")"
   T1_brain_mask="$(find ${MBA_dir} -type f -name "sub-${subID}_ses*_T1w_mask_60_smooth.nii.gz")"
 
 fi
 
 
 if [ "${scanner}" == "GE" ]; then
-  fmap_prepped="$(find ${subDir}/${sesID}/fmap -type f -name "*fieldmap.nii.gz")"
-  fmap_mag="$(find ${subDir}/${sesID}/fmap -type f -name "*magnitude.nii.gz")"
-  fmap_mag_stripped="$(find ${subDir}/${sesID}/fmap -type f -name "*magnitude_stripped.nii.gz")"
-  dwellTime="$(cat "$(find ${subDir}/${sesID}/func -type f -name "*rest_bold_info.txt")" | grep "dwellTime=" | awk -F"=" '{print $2}' | tail -1)"
+  fmap_prepped="$(find ${subDir}/ses-${sesID}/fmap -type f -name "*fieldmap.nii.gz")"
+  fmap_mag="$(find ${subDir}/ses-${sesID}/fmap -type f -name "*magnitude.nii.gz")"
+  fmap_mag_stripped="$(find ${subDir}/ses-${sesID}/fmap -type f -name "*magnitude_stripped.nii.gz")"
+  dwellTime="$(cat "$(find ${subDir}/ses-${sesID}/func -type f -name "*rest_bold_info.txt")" | grep "dwellTime=" | awk -F"=" '{print $2}' | tail -1)"
 elif [ "${scanner}" == "SE" ]; then
-  fmap_prepped="$(find ${subDir}/${sesID}/fmap -maxdepth 1 -type f -name "*fieldmap_prepped.nii.gz")"
-  fmap_mag="$(find ${subDir}/${sesID}/fmap -maxdepth 1 -type f -name "*magnitude1.nii.gz")"
-  fmap_mag_stripped="$(find ${subDir}/${sesID}/fmap/mag1/ -type f -name "*_stripped.nii.gz")"
+  fmap_prepped="$(find ${subDir}/ses-${sesID}/fmap -maxdepth 1 -type f -name "*fieldmap_prepped.nii.gz")"
+  fmap_mag="$(find ${subDir}/ses-${sesID}/fmap -maxdepth 1 -type f -name "*magnitude1.nii.gz")"
+  fmap_mag_stripped="$(find ${subDir}/ses-${sesID}/fmap/mag1/ -type f -name "*_stripped.nii.gz")"
   dwellTime=0.00056
 fi
 
@@ -152,7 +183,7 @@ else
 
   softwareCheck # check dependencies
 
-  printf "\n%s\nBeginning preprocesssing (classic mode)...\n" "$(date)"
+  printf "\n%s\nBeginning preprocesssing ...\n" "$(date)"
 
   mkdir -p ${rsOut}
 
@@ -166,7 +197,7 @@ else
 
 
   # copy raw rest image from BIDS to derivatives/rsOut_legacy/subID/sesID/
-  cp ${inFile} ${rsOut}
+  rsync -a ${inFile} ${rsOut}/
 
   if [ ! -z "${fmap_prepped}" ] && [ "${fieldMapFlag}" == 1 ]; then # process with fmap
     echo "fieldMapCorrection=1" >> ${rsOut}/rsParams
@@ -174,11 +205,12 @@ else
     if [ "${fmap_mag_stripped}" == "" ]; then
       printf "\n%s\nSkull stripping fmap magnitude image..." "$(date)" &&\
       bet ${fmap_mag} "$(echo ${fmap_mag} | sed -e 's/magnitude/magnitude_stripped/')" -m -n -f 0.3 -B &&\
-      fslmaths "$(find ${subDir}/${sesID}/fmap -type f -name "*magnitude_stripped_mask.nii.gz")" -ero -bin "$(echo ${fmap_mag} | sed -e 's/magnitude/magnitude_stripped_mask_eroded/')" -odt char &&\
+      fslmaths "$(find ${subDir}/ses-${sesID}/fmap -type f -name "*magnitude_stripped_mask.nii.gz")" -ero -bin "$(echo ${fmap_mag} | sed -e 's/magnitude/magnitude_stripped_mask_eroded/')" -odt char &&\
       fslmaths ${fmap_mag} -mas "$(echo ${fmap_mag} | sed -e 's/magnitude/magnitude_stripped_mask_eroded/')" "$(echo ${fmap_mag} | sed -e 's/magnitude/magnitude_stripped/')" &&\
-      fmap_mag_stripped="$(find ${subDir}/${sesID}/fmap -type f -name "*magnitude_stripped.nii.gz")"
+      fmap_mag_stripped="$(find ${subDir}/ses-${sesID}/fmap -type f -name "*magnitude_stripped.nii.gz")"
     fi
 
+    clobber ${rsOut}/mcImg_stripped.nii.gz &&\
     ${scriptdir}/qualityCheck.sh --epi="$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
       --t1brain=${T1_RPI_brain} \
       --t1=${T1_RPI} \
@@ -189,66 +221,66 @@ else
       --pedir=-y \
       --regmode=6dof
 
-    ${scriptdir}/restingStatePreprocess.sh --epi= ${rsOut}/mcImg_stripped.nii.gz \
+    clobber ${rsOut}/preproc.feat/nonfiltered_smooth_data.nii.gz &&\
+    ${scriptdir}/restingStatePreprocess.sh --epi=${rsOut}/mcImg_stripped.nii.gz \
       --t1brain=${T1_RPI_brain} \
       --tr=2 \
       --te=30 \
       --smooth=6 \
-      --aroma \
-      --usefmap
-    elif [ "${fieldMapFlag}" != 1 ]; then
-      printf "Process without fieldmap."
-      ${scriptdir}/qualityCheck.sh \
-        --epi="$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
-        --t1brain=${T1_RPI_brain} \
-        --t1=${T1_RPI} \
-        --dwelltime=${dwellTime} \
-        --pedir=-y \
-        --regmode=6dof
+      --usefmap \
+      "${aromaArg}"
 
-      ${scriptdir}/restingStatePreprocess.sh \
-        --epi=${rsOut}/mcImg_stripped.nii.gz \
-        --t1brain=${T1_RPI_brain} \
-        --tr=2 \
-        --te=30 \
-        --smooth=6 \
-        --aroma
-    fi
-
-    if [ "${compcorFlag}" -eq 1 ]; then
-      epiDataFilt="${rsOut}"/ica_aroma/denoised_func_data_nonaggr.nii.gz
-      epiDataFiltReg="${rsOut}"/nuisanceRegression/denoised_func_data_nonaggr_bp_res4d_normandscaled.nii
-      compcorArg="--compcor"
-      SNR/CSF_pve_to_RS_thresh.nii.gz SNR/WM_pve_to_RS_thresh_ero.nii.gz
-      {
-      echo "$rsOut/SNR/CSF_pve_to_RS_thresh.nii.gz"; \
-      echo "$rsOut/SNR/WM_pve_to_RS_thresh_ero.nii.gz"; } > "$rsOut"/nuisanceList.txt
-    else
-      epiDataFilt="$rsOut"/preproc.feat/nonfiltered_smooth_data.nii.gz
-      epiDataFiltReg="${rsOut}"/nuisanceRegression/nonfiltered_smooth_data_bp_res4d_normandscaled.nii
-      compcorArg=""
-      {
-      echo "${scriptdir}/ROIs/latvent.nii.gz"; \
-      echo "${scriptdir}/ROIs/global.nii.gz"; \
-      echo "${scriptdir}/ROIs/wmroi.nii.gz"; } > "$rsOut"/nuisanceList.txt
-    fi
-
-    ${scriptdir}/removeNuisanceRegressor.sh \
-      --epi=$epiDataFilt \
+  elif [ "${fieldMapFlag}" != 1 ]; then
+    printf "Process without fieldmap."
+    ${scriptdir}/qualityCheck.sh \
+      --epi="$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
       --t1brain=${T1_RPI_brain} \
-      --nuisancelist="$rsOut"/nuisanceList.txt \
-      --lp=.08 \
-      --hp=.008 \
-      "${compcorArg}"
+      --t1=${T1_RPI} \
+      --dwelltime=${dwellTime} \
+      --pedir=-y \
+      --regmode=6dof
 
-    ${scriptdir}/motionScrub.sh --epi=${epiDataFiltReg}
-
-    ${scriptdir}/seedVoxelCorrelation.sh \
-      --epi=${epiDataFiltReg\\.nii\.nii.gz} \
-      --motionscrub \
-      --roilist=${roilist} \
-      "${compcorArg}"
+    ${scriptdir}/restingStatePreprocess.sh \
+      --epi=${rsOut}/mcImg_stripped.nii.gz \
+      --t1brain=${T1_RPI_brain} \
+      --tr=2 \
+      --te=30 \
+      --smooth=6 \
+      "${aromaArg}"
   fi
+
+  if [ "${compcorFlag}" -eq 1 ]; then
+    epiDataFilt="${rsOut}"/ica_aroma/denoised_func_data_nonaggr.nii.gz
+    epiDataFiltReg="${rsOut}"/nuisanceRegression/denoised_func_data_nonaggr_bp_res4d_normandscaled.nii
+    compcorArg="--compcor"
+    {
+    echo "$rsOut/SNR/CSF_pve_to_RS_thresh.nii.gz"; \
+    echo "$rsOut/SNR/WM_pve_to_RS_thresh_ero.nii.gz"; } > "$rsOut"/nuisanceList.txt
+  else
+    epiDataFilt="$rsOut"/preproc.feat/nonfiltered_smooth_data.nii.gz
+    epiDataFiltReg="${rsOut}"/nuisanceRegression/nonfiltered_smooth_data_bp_res4d_normandscaled.nii
+    compcorArg=""
+    {
+    echo "${scriptdir}/ROIs/latvent.nii.gz"; \
+    echo "${scriptdir}/ROIs/global.nii.gz"; \
+    echo "${scriptdir}/ROIs/wmroi.nii.gz"; } > "$rsOut"/nuisanceList.txt
+  fi
+
+  ${scriptdir}/removeNuisanceRegressor.sh \
+    --epi=$epiDataFilt \
+    --t1brain=${T1_RPI_brain} \
+    --nuisanceList="$rsOut"/nuisanceList.txt \
+    --lp=.08 \
+    --hp=.008 \
+    "${compcorArg}"
+    
+  ${scriptdir}/motionScrub.sh --epi=${epiDataFiltReg}
+
+  ${scriptdir}/seedVoxelCorrelation.sh \
+    --epi=${epiDataFiltReg\\.nii\.nii.gz} \
+    --motionscrub \
+    --roilist=${roilist} \
+    "${compcorArg}"
 
   # prevents permissions denied error when others run new seeds
   parallel chmod 774 ::: "$(find ${rsOut} -type f \( -name "highres2standard.nii.gz" -o -name "seeds*.txt" -o -name "rsParams*" -o -name "run*.m" -o -name "highres.nii.gz" -o -name "standard.nii.gz" -o -name "analysisResults.html" \))"

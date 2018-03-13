@@ -67,13 +67,14 @@ function motionCorrection {
   ########## Motion Correction ###################
   # Going to run with AFNI's 3dvolreg over FSL's mcflirt.  Output pics will have same names to be drop-in replacments
   echo "...Applying motion correction."
+  cd "$indir" || exit
 
   # Determine halfway point of dataset to use as a target for registration
   halfPoint=$(fslhd $epiData | grep "^dim4" | awk '{print int($2/2)}')
 
   # Run 3dvolreg, save matrices and parameters
   # Saving "raw" AFNI output for possible use later (motionscrubbing?)
-  clobber $indir/mcImg.nii.gz &&\
+  clobber "$indir"/mcImg.nii.gz &&\
   3dvolreg -verbose -tshift 0 -Fourier -zpad 4 -prefix mcImg.nii.gz -base $halfPoint -dfile mcImg_raw.par -1Dmatrix_save mcImg.mat $epiData
 
   # Create a mean volume
@@ -344,9 +345,9 @@ function EPItoT1reg() {
     mkdir -p ${epiWarpDir}
   fi
 
-  mv $indir/FM_UD* ${epiWarpDir}
-  mv $indir/fmap* ${epiWarpDir}
-  mv $indir/grot.nii.gz ${epiWarpDir}
+  mv $(dirname $fieldMap)/FM_UD* ${epiWarpDir}
+  mv $(dirname $fieldMap)/fmap* ${epiWarpDir}
+  mv $(dirname $fieldMap)/grot.nii.gz ${epiWarpDir}
 
   cp $t1Dir/T1_MNI_brain_wmseg.nii.gz ${epiWarpDir}/EPItoT1_wmseg.nii.gz
   # epi_reg will not link to this file well, have epi_reg create it from T1_brain
@@ -554,29 +555,29 @@ while [ $# -ge 1 ] ; do
     case "$iarg"
 	in
 	--epi)
-	    epiData=`get_imarg1 $1`;
+	    epiData=`get_arg1 $1`;
       export epiData;
 	    shift;;
 	--t1)
-	    t1SkullData=`get_imarg1 $1`;
+	    t1SkullData=`get_arg1 $1`;
       export t1SkullData;
 	    shift;;
   --t1brain)
-	    t1Data=`get_imarg1 $1`;
+	    t1Data=`get_arg1 $1`;
       export t1Data;
 	    shift;;
 	--fmap)
-	    fieldMap=`get_imarg1 $1`;
+	    fieldMap=`get_arg1 $1`;
       export fieldMap;
 	    fieldMapFlag=1;
       export fieldMapFlag;
 	    shift;;
 	--fmapmag)
-	    fieldMapMagSkull=`get_imarg1 $1`;
+	    fieldMapMagSkull=`get_arg1 $1`;
       export fieldMapMagSkull;
 	    shift;;
 	--fmapmagbrain)
-	    fieldMapMag=`get_imarg1 $1`;
+	    fieldMapMag=`get_arg1 $1`;
       export fieldMapMag;
 	    shift;;
   --dwelltime)
@@ -587,7 +588,7 @@ while [ $# -ge 1 ] ; do
       peDir=`get_arg1 $1`;
       export peDir;
       shift;;
-  --regMode)
+  --regmode)
       regMode=`get_arg1 $1`;
       export regMode
       echo Registration mode = $regMode;
