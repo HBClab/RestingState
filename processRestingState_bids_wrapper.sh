@@ -145,7 +145,7 @@ sesID="$(echo ${inFile} | grep -o "ses-[a-z0-9A-Z]*" | head -n 1 | sed -e "s|ses
 subDir="${bidsDir}/sub-${subID}" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161
 scanner="$(echo ${subID} | cut -c -2)" # extract scannerID from subID, works when scannerID is embedded in subID. TODO: need a different way to determine scannerID. e.g., dicom header?
 # rsOut="${bidsDir}/derivatives/rsOut_legacy/sub-${subID}/${sesID}"
-rsOut="${bidsDir}/derivatives/test/sub-${subID}/ses-${sesID}"
+rsOut="${bidsDir}/derivatives/rsOut/sub-${subID}/ses-${sesID}"
 # load variables needed for processing
 
 MBA_dir="$(dirname "$(find ${bidsDir}/derivatives/MBA/sub-${subID} -type f -print -quit)")" # find dir containing MBA output
@@ -251,14 +251,14 @@ else
 
   if [ "${compcorFlag}" -eq 1 ]; then
     epiDataFilt="${rsOut}"/ica_aroma/denoised_func_data_nonaggr.nii.gz
-    epiDataFiltReg="${rsOut}"/nuisanceRegression/denoised_func_data_nonaggr_bp_res4d_normandscaled.nii
+    epiDataFiltReg="${rsOut}"/nuisanceRegression/compcor/denoised_func_data_nonaggr_bp_res4d_normandscaled.nii.gz
     compcorArg="--compcor"
     {
     echo "$rsOut/SNR/CSF_pve_to_RS_thresh.nii.gz"; \
     echo "$rsOut/SNR/WM_pve_to_RS_thresh_ero.nii.gz"; } > "$rsOut"/nuisanceList.txt
   else
     epiDataFilt="$rsOut"/preproc.feat/nonfiltered_smooth_data.nii.gz
-    epiDataFiltReg="${rsOut}"/nuisanceRegression/nonfiltered_smooth_data_bp_res4d_normandscaled.nii
+    epiDataFiltReg="${rsOut}"/nuisanceRegression/classic/nonfiltered_smooth_data_bp_res4d_normandscaled.nii.gz
     compcorArg=""
     {
     echo "${scriptdir}/ROIs/latvent.nii.gz"; \
@@ -266,6 +266,7 @@ else
     echo "${scriptdir}/ROIs/wmroi.nii.gz"; } > "$rsOut"/nuisanceList.txt
   fi
 
+  clobber ${epiDataFiltReg} &&\
   ${scriptdir}/removeNuisanceRegressor.sh \
     --epi=$epiDataFilt \
     --t1brain=${T1_RPI_brain} \
@@ -273,13 +274,14 @@ else
     --lp=.08 \
     --hp=.008 \
     "${compcorArg}"
-    
-  ${scriptdir}/motionScrub.sh --epi=${epiDataFiltReg}
+
+  clobber ${rsOut}/motionScrub/$(basename ${epiDataFiltReg/.nii/_ms.nii}) &&\
+  ${scriptdir}/motionScrub.sh --epi=${epiDataFiltReg//.nii.gz/.nii}
 
   ${scriptdir}/seedVoxelCorrelation.sh \
-    --epi=${epiDataFiltReg\\.nii\.nii.gz} \
+    --epi=${epiDataFiltReg} \
     --motionscrub \
-    --roilist=${roilist} \
+    --roiList=${roilist} \
     "${compcorArg}"
 
   # prevents permissions denied error when others run new seeds

@@ -167,11 +167,19 @@ indir=$(dirname $epiData)
 preprocfeat=$(x=$indir; while [ "$x" != "/" ] ; do x=`dirname "$x"`; find "$x" -maxdepth 1 -type d -name preproc.feat; done 2>/dev/null)
 logDir=$(dirname ${preprocfeat})
 rawEpiDir=$(dirname "$preprocfeat")
-roiOutDir=${rawEpiDir}/rois
+
+if [ "${compcorFlag}" -eq 1 ]; then
+  outDir=${rawEpiDir}/seedCorrelation/compcor
+else
+  outDir=${rawEpiDir}/seedCorrelation/classic
+fi
+roiOutDir=${outDir}/rois
+mkdir -p "$roiOutDir"
 
 seedTestBase=$(cat "$rawEpiDir"/rsParams | grep "seeds=" | awk -F"=" '{print $2}' | awk -F"-r " '{for (i=2; i<=NF; i++) print $i}')
 seedTest=$(echo $seedTestBase | awk '{print $1}')
 roiTest=$(echo "${roiList[@]}" | awk '{print $1}')
+cd $outDir || exit
 
 for i in "${roiList[@]}"
 do
@@ -212,10 +220,8 @@ echo "Running $0 ..."
 echo "...Transforming ROIs to EPI space"
 
 cd "$rawEpiDir" || exit
-mkdir -p "$roiOutDir"
-# TW edit
-> "$rawEpiDir"/seeds.txt
-> "$rawEpiDir"/seeds_ms.txt
+> "$roiOutDir"/seeds.txt
+> "$roiOutDir"/seeds_ms.txt
 
 # Map the ROIs
 for roi in "${roiList[@]}"; do
@@ -225,7 +231,7 @@ for roi in "${roiList[@]}"; do
   clobber ${roiOutDir}/${roiName}_standard.nii.gz &&\
 	cp ${roi} ${roiOutDir}/${roiName}_standard.nii.gz
 
-	if [ "$(echo ${roiMask})" = "" ]; then #TW edit
+	if [ "$(echo ${roiMask})" = "" ]; then
 
 		echo "......Mapping $roiName from MNI (standard) to subject EPI (func) space"
 		# Source MNI to EPI warp file
@@ -241,17 +247,17 @@ for roi in "${roiList[@]}"; do
 		fslmaths ${roiOutDir}/${roiName}_mask.nii.gz -thr 0.5 ${roiOutDir}/${roiName}_mask.nii.gz
 		fslmaths ${roiOutDir}/${roiName}_mask.nii.gz -bin ${roiOutDir}/${roiName}_mask.nii.gz
 		roiMask=${roiOutDir}/${roiName}_mask.nii.gz
-	else # TW edit
-	echo "$roiName has already been mapped from MNI to EPI" # TW edit
-	echo "roimask: ${roiMask}"
+	else
+  	echo "$roiName has already been mapped from MNI to EPI"
+  	echo "roimask: ${roiMask}"
 
-	fi # TW edit
+	fi
 
 	# Check to see that resultant, warped file has any volume (if seed is too small, warped output may have a zero volume)
 
 	seedVol=$(fslstats ${roiMask} -V | awk '{print $2}')
 	if [[ $seedVol == 0.000000 ]]; then
-		echo $roiName >> ${rawEpiDir}/seedsTooSmall.txt
+		echo $roiName >> ${roiOutDir}/seedsTooSmall.txt
 		rm ${roiOutDir}/${roiName}_mask.nii.gz
 	else
 		# Account for $motionscrubFlag
@@ -261,14 +267,10 @@ for roi in "${roiList[@]}"; do
 				clobber ${roiOutDir}/${roiName}_residvol_ts.txt &&\
 				fslmeants -i ${epiData} -o ${roiOutDir}/${roiName}_residvol_ts.txt -m ${roiMask}
 		elif [[ $motionscrubFlag == 1 ]]; then
-				echo ${roiMask}
-				clobber ${roiOutDir}/${roiName}_residvol_ms_ts.txt &&\
-				fslmeants -i ${epiData/.nii.gz/_ms.nii.gz} -o ${roiOutDir}/${roiName}_residvol_ms_ts.txt -m ${roiMask}
-		else
 				clobber ${roiOutDir}/${roiName}_residvol_ts.txt &&\
 				fslmeants -i ${epiData} -o ${roiOutDir}/${roiName}_residvol_ts.txt -m ${roiMask}
 				clobber ${roiOutDir}/${roiName}_residvol_ms_ts.txt &&\
-				fslmeants -i ${epiData/.nii.gz/_ms.nii.gz} -o ${roiOutDir}/${roiName}_residvol_ms_ts.txt -m ${roiMask}
+				fslmeants -i ${rawEpiDir}/motionScrub/"$(basename ${epiData/.nii/_ms.nii})" -o ${roiOutDir}/${roiName}_residvol_ms_ts.txt -m ${roiMask}
 		fi
 
 		# Output of fslmeants is a text file with space-delimited values.  There is only one "true" ts value (first column) and the blank space is interpreted as a "0" value in matlab.  Write to temp file then move (rewrite original)
@@ -284,13 +286,13 @@ for roi in "${roiList[@]}"; do
 			mv ${roiOutDir}/temp_${roiName}_residvol_ts.txt ${roiOutDir}/${roiName}_residvol_ts.txt
 			mv ${roiOutDir}/temp_${roiName}_residvol_ms_ts.txt ${roiOutDir}/${roiName}_residvol_ms_ts.txt
 		fi
-		echo "$roiName" >> "$rawEpiDir"/seeds.txt
+		echo "$roiName" >> "$roiOutDir"/seeds.txt
 	fi
 done
 
 
 
-roiList2=$(cat "$rawEpiDir"/seeds.txt)
+roiList2=$(cat "$roiOutDir"/seeds.txt)
 
 #################################
 
@@ -302,7 +304,7 @@ echo "...QC Image Setup"
 # Create QC images of seed/ROI overlaid on RestingState EPI.  Place in top level directory and report in HTML file
 # Create underlay/overlay NIFTI files for QC check
 # Create a temp directory
-seedQCdir=${rawEpiDir}/seedQC
+seedQCdir=${roiOutDir}/seedQC
 if [ ! -e $seedQCdir/temp ]; then
   mkdir -p $seedQCdir/temp
 fi
@@ -311,7 +313,7 @@ fi
 for roi in ${roiList2}; do
 	echo $roi
 	roiName=$(basename ${roi} .nii.gz)
-	roiMask=$(find "$rawEpiDir" -maxdepth 3 -type f -name "${roiName}_mask.nii.gz" | head -n 1)
+	roiMask=$(find "$outDir" -maxdepth 3 -type f -name "${roiName}_mask.nii.gz" | head -n 1)
 	if [ ! -f $seedQCdir/${roi}_axial.png ] || [ ! -f $seedQCdir/${roi}_sagittal.png ] || [ ! -f $seedQCdir/${roi}_coronal.png ]; then
 		for splitdirection in x y z; do
 		    echo "......Preparing $roi ($splitdirection)"
@@ -409,26 +411,26 @@ done
 
 
 # Create an output directory for QC seed images
-seedQCOutdir="$rawEpiDir"/seedQC
+seedQCOutdir="$roiOutDir"/seedQC
 if [ ! -e $seedQCOutdir ]; then
   mkdir $seedQCOutdir
 fi
 
-> "$rawEpiDir"/seeds_forQC.txt
+> "$roiOutDir"/seeds_forQC.txt
 
-for i in $(cat "$rawEpiDir"/seeds.txt); do
+for i in $(cat "$roiOutDir"/seeds.txt); do
 	if [ ! -f $seedQCOutdir/${i}_axial.png ] || [ ! -f $seedQCOutdir/${i}_coronal.png ] || [ ! -f $seedQCOutdir/${i}_sagittal.png ]; then
-		echo "${i}" >> "$rawEpiDir"/seeds_forQC.txt
+		echo "${i}" >> "$roiOutDir"/seeds_forQC.txt
 	else
 		echo "$i QC already exists"
 	fi
 done
 
-if [ -s "$rawEpiDir"/seeds_forQC.txt ] && [ ! "$(head -n 1 "$rawEpiDir"/seeds_forQC.txt 2> /dev/null)" = "" ]; then
+if [ -s "$roiOutDir"/seeds_forQC.txt ] && [ ! "$(head -n 1 "$roiOutDir"/seeds_forQC.txt 2> /dev/null)" = "" ]; then
 
 	# Create overlaps of seed_mask registered to EPI space using Octave
 	echo "...Creating QC Images of ROI/Seed Registration To Functional Space"
-	filenameQC=run_seedregistrationcheck.m;
+	filenameQC="$roiOutDir"/run_seedregistrationcheck.m;
 cat > $filenameQC << EOF
 
 % It is matlab script
@@ -439,7 +441,7 @@ niftiScripts=['${scriptDir}','/Octave/nifti'];
 addpath(niftiScripts);statsScripts=['${scriptDir}','/Octave/statistics'];
 statsScripts=['${scriptDir}','/Octave/statistics'];
 addpath(statsScripts);
-fid=fopen('$rawEpiDir/seeds_forQC.txt');
+fid=fopen('$roiOutDir/seeds_forQC.txt');
 roiList=textscan(fid,'%s');
 fclose(fid);
 seedDir='$seedQCdir';
@@ -452,9 +454,9 @@ EOF
 	# Run script using Matlab or Octave
 	haveMatlab=$(which matlab)
 	if [ "$haveMatlab" == "" ]; then
-	  octave --no-window-system "$rawEpiDir"/$filenameQC
+	  octave --no-window-system $filenameQC
 	else
-	  matlab -nodisplay -r "run "$rawEpiDir"/$filenameQC"
+	  matlab -nodisplay -r "run $filenameQC"
 	fi
 else
 	echo "no seeds to QC"
@@ -487,41 +489,33 @@ done
 
 #### Seed Voxel Correlation (Setup) ############
 if [ "${seedmapFlag}" -eq 1 ]; then
-
   echo "...Seed Voxel Correlation Setup"
-  # set directory for seed maps
-  # strong assumption that only classic and compcor
-  if [ ${compcorFlag} -eq 1 ]; then
-    seedcorrDir=${rawEpiDir}/seedCorrelation_compcor
-  else
-    seedcorrDir=${rawEpiDir}/seedCorrelation
-  fi
-
+  seedcorrDir=${outDir}/seedmaps
   mkdir -p ${seedcorrDir}
-
+  cd ${seedcorrDir} || exit
   # Dimensions of EPI data
   numXdim=$(fslinfo $epiData | grep ^dim1 | awk '{print $2}')
   numYdim=$(fslinfo $epiData | grep ^dim2 | awk '{print $2}')
   numZdim=$(fslinfo $epiData | grep ^dim3 | awk '{print $2}')
 
-  cp "$rawEpiDir"/seeds.txt "$rawEpiDir"/seeds_orig.txt
-  > "$rawEpiDir"/seeds_ms.txt
-  > "$rawEpiDir"/seeds.txt
+  cp "$roiOutDir"/seeds.txt "$roiOutDir"/seeds_orig.txt
+  > "$roiOutDir"/seeds_ms.txt
+  > "$roiOutDir"/seeds.txt
 
   # check if seeding results exist, re-populate seeds.txt with non existing seeds
-  for roi in $(cat "$rawEpiDir"/seeds_orig.txt); do
+  for roi in $(cat "$roiOutDir"/seeds_orig.txt); do
   	if [[ $motionscrubFlag == 1 ]] && [ ! -f ${roiOutDir}/${roi}_ms/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_ms_standard_zmap.nii.gz ]; then
-  		echo $roi >> "$rawEpiDir"/seeds_ms.txt
+  		echo $roi >> "$roiOutDir"/seeds_ms.txt
   	fi
   	if [[ $motionscrubFlag == 0 ]] && [ ! -f ${roiOutDir}/${roi}/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_standard_zmap.nii.gz ]; then
-  		echo $roi >> "$rawEpiDir"/seeds.txt
+  		echo $roi >> "$roiOutDir"/seeds.txt
   	fi
   	if [[ $motionscrubFlag == 2 ]]; then
   		if [ ! -f ${roiOutDir}/${roi}/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_standard_zmap.nii.gz ]; then
-  			echo $roi >> "$rawEpiDir"/seeds.txt
+  			echo $roi >> "$roiOutDir"/seeds.txt
   		fi
   		if [ ! -f ${roiOutDir}/${roi}_ms/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_ms_standard_zmap.nii.gz ]; then
-  			echo $roi >> "$rawEpiDir"/seeds_ms.txt
+  			echo $roi >> "$roiOutDir"/seeds_ms.txt
   		fi
   	fi
   done
@@ -545,7 +539,7 @@ if [ "${seedmapFlag}" -eq 1 ]; then
 addpath('${scriptDir}')
 statsScripts=['${scriptDir}','/Octave/nifti'];
 addpath(statsScripts)
-fid=fopen('$rawEpiDir/seeds.txt');
+fid=fopen('$roiOutDir/seeds.txt');
 roiList=textscan(fid,'%s');
 fclose(fid);
 
@@ -565,7 +559,7 @@ EOF
 addpath('${scriptDir}')
 statsScripts=['${scriptDir}','/Octave/nifti'];
 addpath(statsScripts)
-fid=fopen('$rawEpiDir/seeds_ms.txt');
+fid=fopen('$roiOutDir/seeds_ms.txt');
 roiList=textscan(fid,'%s');
 fclose(fid);
 
@@ -585,7 +579,7 @@ EOF
 addpath('${scriptDir}')
 statsScripts=['${scriptDir}','/Octave/nifti'];
 addpath(statsScripts)
-fid=fopen('$rawEpiDir/seeds.txt');
+fid=fopen('$roiOutDir/seeds.txt');
 roiList=textscan(fid,'%s');
 fclose(fid);
 
@@ -604,7 +598,7 @@ EOF
 addpath('${scriptDir}')
 statsScripts=['${scriptDir}','/Octave/nifti'];
 addpath(statsScripts)
-fid=fopen('$rawEpiDir/seeds_ms.txt');
+fid=fopen('$roiOutDir/seeds_ms.txt');
 roiList=textscan(fid,'%s');
 fclose(fid);
 
@@ -620,7 +614,7 @@ EOF
 
 #################################
 
-  if [ ! "$(head -n 1 "$rawEpiDir"/seeds.txt 2> /dev/null)" = ""  ] || [ ! "$(head -n 1 "$rawEpiDir"/seeds_ms.txt 2> /dev/null)" = ""  ]; then
+  if [ ! "$(head -n 1 "$roiOutDir"/seeds.txt 2> /dev/null)" = ""  ] || [ ! "$(head -n 1 "$roiOutDir"/seeds_ms.txt 2> /dev/null)" = ""  ]; then
       #### Seed Voxel Correlation (Execution) ############
       echo "...Correlating Seeds With Time Series Data"
 
@@ -629,21 +623,21 @@ EOF
       haveMatlab=$(which matlab)
       if [[ "$haveMatlab" == "" ]]; then
     		if [[ $motionscrubFlag == 0 ]]; then
-    		    octave --no-window-system "$rawEpiDir"/$filename
+    		    octave --no-window-system "$seedcorrDir"/$filename
     		elif [[ $motionscrubFlag == 1 ]]; then
-    		    octave --no-window-system "$rawEpiDir"/$filename2
+    		    octave --no-window-system "$seedcorrDir"/$filename2
     		else
-    		    octave --no-window-system "$rawEpiDir"/$filename
-    		    octave --no-window-system "$rawEpiDir"/$filename2
+    		    octave --no-window-system "$seedcorrDir"/$filename
+    		    octave --no-window-system "$seedcorrDir"/$filename2
     		fi
   	  else
     		if [[ $motionscrubFlag == 0 ]]; then
-    		    matlab -nodisplay -r "run $rawEpiDir/$filename"
+    		    matlab -nodisplay -r "run $seedcorrDir/$filename"
     		elif [[ $motionscrubFlag == 1 ]]; then
-    		    matlab -nodisplay -r "run $rawEpiDir/$filename2"
+    		    matlab -nodisplay -r "run $seedcorrDir/$filename2"
     		else
-    		    matlab -nodisplay -r "run $rawEpiDir/$filename"
-    		    matlab -nodisplay -r "run $rawEpiDir/$filename2"
+    		    matlab -nodisplay -r "run $seedcorrDir/$filename"
+    		    matlab -nodisplay -r "run $seedcorrDir/$filename2"
     		fi
       fi
   else
@@ -672,7 +666,7 @@ EOF
   # HTML setup
   echo "<hr><h2>Seed Time Series</h2>" >> "$rawEpiDir"/analysisResults.html
 
-  for roi in $(cat "$rawEpiDir"/seeds_orig.txt); do
+  for roi in $(cat "$roiOutDir"/seeds_orig.txt); do
     echo "...Mapping Correlation For $roi To Subject T1, MNI"
     # Adjust for motion scrubbing
     if [[ $motionscrubFlag == 0 ]]; then
@@ -739,7 +733,7 @@ EOF
 
 
       # Look for the presence of deleted volumes.  ONLY create "spike" (ms) images if found, otherwise default to non-motionscrubbed images
-      scrubDataCheck=$(cat ${rawEpiDir}/deleted_vols.txt | head -1)
+      scrubDataCheck=$(cat ${rawEpiDir}/motionScrub/deleted_vols.txt | head -1)
 
       if [[ $scrubDataCheck != "" ]]; then
         # Presence of scrubbed volumes
@@ -754,7 +748,7 @@ EOF
         count=1
         while [ $count -le $xNum ]; do
           tsPlotIn=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | head -${count} | tail -1)
-          delPlotCheck=$(cat ${rawEpiDir}/deleted_vols.txt | awk '{$1=$1}1' | grep -E '(^| )'${count}'( |$)')
+          delPlotCheck=$(cat ${rawEpiDir}/motionScrub/deleted_vols.txt | awk '{$1=$1}1' | grep -E '(^| )'${count}'( |$)')
           if [ "$delPlotCheck" == "" ]; then
             delPlot=$yMin
           else
@@ -827,7 +821,7 @@ EOF
 
 
       # Look for the presence of deleted volumes.  ONLY create "spike" (ms) images if found, otherwise default to non-motionscrubbed images
-      scrubDataCheck=$(cat ${rawEpiDir}/deleted_vols.txt | head -1)
+      scrubDataCheck=$(cat ${rawEpiDir}/motionScrub/deleted_vols.txt | head -1)
 
       if [[ $scrubDataCheck != "" ]]; then
         #Presence of scrubbed volumes
@@ -842,7 +836,7 @@ EOF
         count=1
         while [ $count -le $xNum ]; do
           tsPlotIn=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | head -${count} | tail -1)
-          delPlotCheck=$(cat ${rawEpiDir}/deleted_vols.txt | awk '{$1=$1}1' | grep -E '(^| )'${count}'( |$)')
+          delPlotCheck=$(cat ${rawEpiDir}/motionScrub/deleted_vols.txt | awk '{$1=$1}1' | grep -E '(^| )'${count}'( |$)')
           if [ "$delPlotCheck" == "" ]; then
             delPlot=$yMin
           else

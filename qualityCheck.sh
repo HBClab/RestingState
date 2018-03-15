@@ -345,9 +345,9 @@ function EPItoT1reg() {
     mkdir -p ${epiWarpDir}
   fi
 
-  mv $(dirname $fieldMap)/FM_UD* ${epiWarpDir}
-  mv $(dirname $fieldMap)/fmap* ${epiWarpDir}
-  mv $(dirname $fieldMap)/grot.nii.gz ${epiWarpDir}
+  cp $(dirname $fieldMap)/FM_UD* ${epiWarpDir}/
+  cp $(dirname $fieldMap)/fmap* ${epiWarpDir}/
+  cp $(dirname $fieldMap)/grot.nii.gz ${epiWarpDir}/
 
   cp $t1Dir/T1_MNI_brain_wmseg.nii.gz ${epiWarpDir}/EPItoT1_wmseg.nii.gz
   # epi_reg will not link to this file well, have epi_reg create it from T1_brain
