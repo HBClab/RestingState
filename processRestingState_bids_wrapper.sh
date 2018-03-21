@@ -144,7 +144,6 @@ subID="$(echo ${inFile} | grep -o "sub-[a-z0-9A-Z]*" | head -n 1 | sed -e "s|sub
 sesID="$(echo ${inFile} | grep -o "ses-[a-z0-9A-Z]*" | head -n 1 | sed -e "s|ses-||")" # gets sesID from inFile
 subDir="${bidsDir}/sub-${subID}" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161
 scanner="$(echo ${subID} | cut -c -2)" # extract scannerID from subID, works when scannerID is embedded in subID. TODO: need a different way to determine scannerID. e.g., dicom header?
-# rsOut="${bidsDir}/derivatives/rsOut_legacy/sub-${subID}/${sesID}"
 rsOut="${bidsDir}/derivatives/rsOut/sub-${subID}/ses-${sesID}"
 # load variables needed for processing
 
@@ -156,10 +155,17 @@ if [[ ! -d "${MBA_dir}" ]]; then
   echo "ERROR: MBA directory not found in derivatives. Exiting."
   exit 1
 else
-  T1_RPI="$(find ${subDir}/ses-*/anat -type f -name "sub-${subID}_ses*_T1w.nii.gz" -print -quit)"
+  # when there are T1s from multiple session, ensure T1 with and w/out skull are from same sesson
+  MBA_ses="$(basename "${MBA_dir}")" 
+  T1_RPI="$(find "${subDir}"/"${MBA_ses}"/anat -type f -name "sub-${subID}_ses*_T1w.nii.gz")"
   T1_RPI_brain="$(find ${MBA_dir} -type f -name "sub-${subID}_ses*_T1w_brain.nii.gz")"
   T1_brain_mask="$(find ${MBA_dir} -type f -name "sub-${subID}_ses*_T1w_mask_60_smooth.nii.gz")"
 
+  if [[ -e "${T1_RPI}" ]] && [[ -z "${T1_RPI_brain}" ]]; then
+    fslmaths "${T1_RPI}" -mas "${T1_brain_mask}" "${T1_brain_mask//mask_60_smooth/brain}" 
+    T1_RPI_brain="$(find ${MBA_dir} -type f -name "sub-${subID}_ses*_T1w_brain.nii.gz")"
+
+  fi
 fi
 
 
@@ -175,8 +181,8 @@ elif [ "${scanner}" == "SE" ]; then
   dwellTime=0.00056
 fi
 
-
-if [ -z "${T1_RPI}" ] || [ -z "${T1_RPI_brain}" ] || [ -z "${inFile}" ]; then
+ 
+ if [ -z "${T1_RPI}" ] || [ -z "${T1_RPI_brain}" ] || [ -z "${inFile}" ]; then
   printf "\n%s\nERROR: at least one prerequisite scan is missing. Exiting.\n" "$(date)" 1>&2
   exit 1
 else
@@ -210,7 +216,6 @@ else
       fmap_mag_stripped="$(find ${subDir}/ses-${sesID}/fmap -type f -name "*magnitude_stripped.nii.gz")"
     fi
 
-    clobber ${rsOut}/mcImg_stripped.nii.gz &&\
     ${scriptdir}/qualityCheck.sh --epi="$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
       --t1brain=${T1_RPI_brain} \
       --t1=${T1_RPI} \
@@ -230,7 +235,7 @@ else
       --usefmap \
       "${aromaArg}"
 
-  elif [ "${fieldMapFlag}" != 1 ]; then
+  elif [[ "${fieldMapFlag}" != 1 ]] || [[ -z "${fmap_prepped}" ]]; then
     printf "Process without fieldmap."
     ${scriptdir}/qualityCheck.sh \
       --epi="$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
@@ -240,6 +245,7 @@ else
       --pedir=-y \
       --regmode=6dof
 
+    clobber ${rsOut}/preproc.feat/nonfiltered_smooth_data.nii.gz &&\
     ${scriptdir}/restingStatePreprocess.sh \
       --epi=${rsOut}/mcImg_stripped.nii.gz \
       --t1brain=${T1_RPI_brain} \

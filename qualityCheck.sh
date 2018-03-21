@@ -345,9 +345,6 @@ function EPItoT1reg() {
     mkdir -p ${epiWarpDir}
   fi
 
-  cp $(dirname $fieldMap)/FM_UD* ${epiWarpDir}/
-  cp $(dirname $fieldMap)/fmap* ${epiWarpDir}/
-  cp $(dirname $fieldMap)/grot.nii.gz ${epiWarpDir}/
 
   cp $t1Dir/T1_MNI_brain_wmseg.nii.gz ${epiWarpDir}/EPItoT1_wmseg.nii.gz
   # epi_reg will not link to this file well, have epi_reg create it from T1_brain
@@ -361,7 +358,10 @@ function EPItoT1reg() {
     echo "......Registration With FieldMap Correction."
 
     preprocessFieldmaps ${fieldMap} ${fieldMapMag} ${fieldMapMagSkull}
-
+    
+    cp "$(dirname "${fieldMap}")"/FM_UD* ${epiWarpDir}/
+    cp "$(dirname "${fieldMap}")"/fmap* ${epiWarpDir}/
+    cp "$(dirname "${fieldMap}")"/grot.nii.gz ${epiWarpDir}/
     # Warp using FieldMap correction
     # Output will be a (warp) .nii.gz file
 
