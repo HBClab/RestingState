@@ -28,6 +28,7 @@ get_opt1() {
     echo $arg
 }
 
+
 get_imarg1() {
     arg=$(get_arg1 $1);
     arg=$($FSLDIR/bin/remove_ext $arg);
@@ -93,7 +94,9 @@ gunzip ${epiData}
 echo "Running $0 ..."
 
 
+
 cd $rawEpiDir || exit
+
 
 # Extract image dimensions from the NIFTI File
 numXdim=`fslinfo $epiData | grep ^dim1 | awk '{print $2}'`
@@ -143,7 +146,9 @@ fsl_tsplot -i dvars.txt -t "DVARS" -w 800 -h 300 -u 1 --start=1 -o dvars.png
 ##Echo out the pertinent info for the motion-scrubbed/processed subjects
 
 numvols=`fslinfo ${epiData} | grep ^dim4 | awk '{print $2}'`
+
 delvols=`cat deleted_vols.txt | wc | awk '{print $2}'`
+
 propdel=`echo ${numvols} ${delvols} | awk '{print ($2/$1)}'`
 residvols=`echo ${numvols} ${delvols} | awk '{print ($1-$2)}'`
 echo "${indir},${numvols},${delvols},${propdel},${residvols}" >> motion_scrubbing_info.txt
@@ -158,6 +163,7 @@ echo "<h2>Motion Scrubbing</h2>" >> ${rawEpiDir}/analysisResults.html
 echo "<b>Total Volumes</b>: $numvols<br>" >> ${rawEpiDir}/analysisResults.html
 echo "<b>Deleted Volumes</b>: $delvols<br>" >> ${rawEpiDir}/analysisResults.html
 echo "<b>Remaining Volumes</b>: $residvols<br>" >> ${rawEpiDir}/analysisResults.html
+
 
 scrubDataCheck=`cat deleted_vols.txt | head -1`
 if [[ $scrubDataCheck != "" ]]; then
