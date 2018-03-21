@@ -132,7 +132,6 @@ fi
 
 #################################
 
-gzip
 
 cd ${rawEpiDir}/motionScrub || exit
 #### Process Summary ############
