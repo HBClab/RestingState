@@ -140,6 +140,7 @@ function SimultBandpassNuisanceReg()
     echo "Performing a 'bandpass' filter.  Frequencies between ${lp} & ${hp} will be filtered."
   fi
 
+
   clobber "${outDir}"/"$(basename "${inData%%.nii*}")"_bp_res4d.nii.gz &&\
   rm -rf "${outDir}"/*_mean.nii.gz 2> /dev/null &&\
   rm -rf "${outDir}"/tmp_bp* 2> /dev/null &&\
@@ -257,6 +258,7 @@ if [ "${compcorFlag}" -eq 1 ]; then
 else
   outDir=${rawEpiDir}/nuisanceRegression/classic
 fi
+
 mkdir -p "${outDir}"/rois
 
 # If new nuisance regressors were added, echo them out to the rsParams file (only if they don't already exist in the file)

@@ -194,8 +194,6 @@ fi
 if [ $motionscrubFlag == 0 ]; then
   filename=run_firstlevelseeding_parallel.m
 elif [ $motionscrubFlag = 1 ]; then
-  filename2=run_firstlevelseeding_parallel_ms.m
-else
   filename=run_firstlevelseeding_parallel.m
   filename2=run_firstlevelseeding_parallel_ms.m
 fi
@@ -267,14 +265,10 @@ for roi in "${roiList[@]}"; do
 				clobber ${roiOutDir}/${roiName}_residvol_ts.txt &&\
 				fslmeants -i ${epiData} -o ${roiOutDir}/${roiName}_residvol_ts.txt -m ${roiMask}
 		elif [[ $motionscrubFlag == 1 ]]; then
-				echo ${roiMask}
-				clobber ${roiOutDir}/${roiName}_residvol_ms_ts.txt &&\
-				fslmeants -i ${epiData/.nii.gz/_ms.nii.gz} -o ${roiOutDir}/${roiName}_residvol_ms_ts.txt -m ${roiMask}
-		else
 				clobber ${roiOutDir}/${roiName}_residvol_ts.txt &&\
 				fslmeants -i ${epiData} -o ${roiOutDir}/${roiName}_residvol_ts.txt -m ${roiMask}
 				clobber ${roiOutDir}/${roiName}_residvol_ms_ts.txt &&\
-				fslmeants -i ${epiData/.nii.gz/_ms.nii.gz} -o ${roiOutDir}/${roiName}_residvol_ms_ts.txt -m ${roiMask}
+				fslmeants -i ${rawEpiDir}/motionScrub/"$(basename ${epiData/.nii/_ms.nii})" -o ${roiOutDir}/${roiName}_residvol_ms_ts.txt -m ${roiMask}
 		fi
 
 		# Output of fslmeants is a text file with space-delimited values.  There is only one "true" ts value (first column) and the blank space is interpreted as a "0" value in matlab.  Write to temp file then move (rewrite original)
@@ -282,9 +276,6 @@ for roi in "${roiList[@]}"; do
 			cat ${roiOutDir}/${roiName}_residvol_ts.txt | awk '{print $1}' > ${roiOutDir}/temp_${roiName}_residvol_ts.txt
 			mv ${roiOutDir}/temp_${roiName}_residvol_ts.txt ${roiOutDir}/${roiName}_residvol_ts.txt
 		elif [[ $motionscrubFlag == 1 ]]; then
-			cat ${roiOutDir}/${roiName}_residvol_ms_ts.txt | awk '{print $1}' > ${roiOutDir}/temp_${roiName}_residvol_ms_ts.txt
-			mv ${roiOutDir}/temp_${roiName}_residvol_ms_ts.txt ${roiOutDir}/${roiName}_residvol_ms_ts.txt
-		else
 			cat ${roiOutDir}/${roiName}_residvol_ts.txt | awk '{print $1}' > ${roiOutDir}/temp_${roiName}_residvol_ts.txt
 			cat ${roiOutDir}/${roiName}_residvol_ms_ts.txt | awk '{print $1}' > ${roiOutDir}/temp_${roiName}_residvol_ms_ts.txt
 			mv ${roiOutDir}/temp_${roiName}_residvol_ts.txt ${roiOutDir}/${roiName}_residvol_ts.txt
@@ -445,7 +436,7 @@ niftiScripts=['${scriptDir}','/Octave/nifti'];
 addpath(niftiScripts);statsScripts=['${scriptDir}','/Octave/statistics'];
 statsScripts=['${scriptDir}','/Octave/statistics'];
 addpath(statsScripts);
-fid=fopen('$rawEpiDir/seeds_forQC.txt');
+fid=fopen('$roiOutDir/seeds_forQC.txt');
 roiList=textscan(fid,'%s');
 fclose(fid);
 seedDir='$seedQCdir';
@@ -508,13 +499,10 @@ if [ "${seedmapFlag}" -eq 1 ]; then
 
   # check if seeding results exist, re-populate seeds.txt with non existing seeds
   for roi in $(cat "$roiOutDir"/seeds_orig.txt); do
-  	if [[ $motionscrubFlag == 1 ]] && [ ! -f ${roiOutDir}/${roi}_ms/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_ms_standard_zmap.nii.gz ]; then
-  		echo $roi >> "$roiOutDir"/seeds_ms.txt
-  	fi
   	if [[ $motionscrubFlag == 0 ]] && [ ! -f ${roiOutDir}/${roi}/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_standard_zmap.nii.gz ]; then
   		echo $roi >> "$roiOutDir"/seeds.txt
   	fi
-  	if [[ $motionscrubFlag == 2 ]]; then
+  	if [[ $motionscrubFlag == 1 ]]; then
   		if [ ! -f ${roiOutDir}/${roi}/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_standard_zmap.nii.gz ]; then
   			echo $roi >> "$roiOutDir"/seeds.txt
   		fi
@@ -530,12 +518,11 @@ if [ "${seedmapFlag}" -eq 1 ]; then
 
   # Check into matlab about fixing motion-scrubbing (Power method)
 
-
-  if [[ $motionscrubFlag == 0 ]]; then
-
     # If $motionscrubFlag == 0 (no motionscrub), res4dnormandscaled never gets unzipped
   	clobber "${epiData/.nii.gz/.nii}" &&\
-  	gunzip -f ${epiData}
+  	gunzip -f "${epiData}"
+
+  if [[ $motionscrubFlag == 0 ]]; then
 
     echo "...Creating Octave script"
     cat > $filename << EOF
@@ -556,27 +543,6 @@ firstlevelseeding_parallel(roiList,'$roiOutDir',funcvoldim,input,motion_scrub,do
 quit
 EOF
   elif [[ $motionscrubFlag == 1 ]]; then
-
-    echo "...Creating Octave script (motionscrubbed data)"
-    cat > $filename2 << EOF
-% It is matlab script
-addpath('${scriptDir}')
-statsScripts=['${scriptDir}','/Octave/nifti'];
-addpath(statsScripts)
-fid=fopen('$roiOutDir/seeds_ms.txt');
-roiList=textscan(fid,'%s');
-fclose(fid);
-
-funcvoldim=[$numXdim $numYdim ${numZdim}];
-doFisherZ=1;
-motion_scrub=1;
-input='${epiData/.nii.gz/_ms.nii}';
-
-firstlevelseeding_parallel(roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
-quit
-EOF
-  else
-
     echo "...Creating Octave script"
     cat > $filename << EOF
 % It is matlab script
@@ -596,8 +562,8 @@ firstlevelseeding_parallel(roiList,'$roiOutDir',funcvoldim,input,motion_scrub,do
 quit
 EOF
 
-  echo "...Creating Octave script (motionscrubbed data)"
-  cat > ${filename2} << EOF
+    echo "...Creating Octave script (motionscrubbed data)"
+    cat > $filename2 << EOF
 % It is matlab script
 addpath('${scriptDir}')
 statsScripts=['${scriptDir}','/Octave/nifti'];
@@ -609,7 +575,7 @@ fclose(fid);
 funcvoldim=[$numXdim $numYdim ${numZdim}];
 doFisherZ=1;
 motion_scrub=1;
-input='${epiData/.nii.gz/_ms.nii}';
+input='${rawEpiDir}/motionScrub/$(basename ${epiData/.nii.gz/_ms.nii})';
 
 firstlevelseeding_parallel(roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
 quit
@@ -629,8 +595,6 @@ EOF
     		if [[ $motionscrubFlag == 0 ]]; then
     		    octave --no-window-system "$seedcorrDir"/$filename
     		elif [[ $motionscrubFlag == 1 ]]; then
-    		    octave --no-window-system "$seedcorrDir"/$filename2
-    		else
     		    octave --no-window-system "$seedcorrDir"/$filename
     		    octave --no-window-system "$seedcorrDir"/$filename2
     		fi
@@ -638,8 +602,6 @@ EOF
     		if [[ $motionscrubFlag == 0 ]]; then
     		    matlab -nodisplay -r "run $seedcorrDir/$filename"
     		elif [[ $motionscrubFlag == 1 ]]; then
-    		    matlab -nodisplay -r "run $seedcorrDir/$filename2"
-    		else
     		    matlab -nodisplay -r "run $seedcorrDir/$filename"
     		    matlab -nodisplay -r "run $seedcorrDir/$filename2"
     		fi
@@ -671,7 +633,7 @@ EOF
   echo "<hr><h2>Seed Time Series</h2>" >> "$rawEpiDir"/analysisResults.html
 
   for roi in $(cat "$roiOutDir"/seeds_orig.txt); do
-    echo "...Mapping Correlation For $roi To Subject T1, MNI"
+    echo "...Mapping Correlation For $roi to MNI"
     # Adjust for motion scrubbing
     if [[ $motionscrubFlag == 0 ]]; then
       # No motionscrubbing
@@ -710,7 +672,10 @@ EOF
       echo "<br><img src=\"$roiOutDir/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
 
     elif [[ $motionscrubFlag == 1 ]]; then
-      # Only motionscrubbed data
+      # Non-motionscrubbed data
+      if [ -e ${roi}.png ]; then
+        rm ${roi}.png
+      fi
       if [ -e ${roi}_ms.png ]; then
         rm ${roi}_ms.png
       fi
@@ -736,6 +701,18 @@ EOF
       --interp=nn
 
 
+      # Nonlinear warp from EPI to MNI
+      clobber ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz &&\
+      applywarp --in=${roiOutDir}/${roi}_ms/cope1.nii \
+      --ref=${preprocfeat}/reg/standard.nii.gz \
+      --out=${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz \
+      --warp=${preprocfeat}/reg/example_func2standard_warp.nii.gz \
+      --datatype=float
+
+      # Mask out data with MNI mask
+      fslmaths ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_ms_standard_zmap_masked.nii.gz
+
+
       # Look for the presence of deleted volumes.  ONLY create "spike" (ms) images if found, otherwise default to non-motionscrubbed images
       scrubDataCheck=$(cat ${rawEpiDir}/motionScrub/deleted_vols.txt | head -1)
 
@@ -752,6 +729,7 @@ EOF
         count=1
         while [ $count -le $xNum ]; do
           tsPlotIn=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | head -${count} | tail -1)
+
           delPlotCheck=$(cat ${rawEpiDir}/motionScrub/deleted_vols.txt | awk '{$1=$1}1' | grep -E '(^| )'${count}'( |$)')
           if [ "$delPlotCheck" == "" ]; then
             delPlot=$yMin
@@ -780,103 +758,12 @@ EOF
 
         echo "<br><img src=\"$roiOutDir/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
       fi
-
-    else
-      # Non-motionscrubbed data
-      if [ -e ${roi}.png ]; then
-        rm ${roi}.png
-      fi
-      if [ -e ${roi}_ms.png ]; then
-        rm ${roi}_ms.png
-      fi
-
-      # Nonlinear warp from EPI to MNI
-      clobber ${seedcorrDir}/${roi}_standard_zmap.nii.gz &&\
-      applywarp --in=${roiOutDir}/${roi}/cope1.nii \
-      --ref=${preprocfeat}/reg/standard.nii.gz \
-      --out=${seedcorrDir}/${roi}_standard_zmap.nii.gz \
-      --warp=${preprocfeat}/reg/example_func2standard_warp.nii.gz \
-      --datatype=float
-
-      # Mask out data with MNI mask
-      fslmaths ${seedcorrDir}/${roi}_standard_zmap.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_standard_zmap_masked.nii.gz
-
-      # Warp seed from MNI to T1
-      clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
-      applywarp --in=${roiOutDir}/${roi}_standard.nii.gz \
-      --ref=${preprocfeat}/reg/highres.nii.gz \
-      --out=${seedcorrDir}/${roi}_highres.nii.gz \
-      --warp=${preprocfeat}/reg/standard2highres_warp.nii.gz \
-      --interp=nn
-
-
-      # Motionscrubbed data
-
-      # Nonlinear warp from EPI to MNI
-      clobber ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz &&\
-      applywarp --in=${roiOutDir}/${roi}_ms/cope1.nii \
-      --ref=${preprocfeat}/reg/standard.nii.gz \
-      --out=${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz \
-      --warp=${preprocfeat}/reg/example_func2standard_warp.nii.gz \
-      --datatype=float
-
-      # Mask out data with MNI mask
-      fslmaths ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_ms_standard_zmap_masked.nii.gz
-
-
-      # Look for the presence of deleted volumes.  ONLY create "spike" (ms) images if found, otherwise default to non-motionscrubbed images
-      scrubDataCheck=$(cat ${rawEpiDir}/motionScrub/deleted_vols.txt | head -1)
-
-      if [[ $scrubDataCheck != "" ]]; then
-        #Presence of scrubbed volumes
-
-        # Creating new plots with fsl_tsplot
-        # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
-        yMax=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
-        yMin=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
-
-        # Log the "scrubbed TRs"
-        xNum=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | wc -l)
-        count=1
-        while [ $count -le $xNum ]; do
-          tsPlotIn=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | head -${count} | tail -1)
-          delPlotCheck=$(cat ${rawEpiDir}/motionScrub/deleted_vols.txt | awk '{$1=$1}1' | grep -E '(^| )'${count}'( |$)')
-          if [ "$delPlotCheck" == "" ]; then
-            delPlot=$yMin
-          else
-            delPlot=$yMax
-          fi
-          echo $delPlot >> ${roiOutDir}/${roi}_censored_TRplot.txt
-        let count=count+1
-        done
-
-        # Plot of normal data showing scrubbed TRs
-        fsl_tsplot -i ${roiOutDir}/${roi}_residvol_ts.txt,${roiOutDir}/${roi}_censored_TRplot.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' -a ",Scrubbed_TR" --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$roiOutDir"/${roi}.png
-
-        # Plot of "scrubbed" data
-        fsl_tsplot -i ${roiOutDir}/${roi}_residvol_ms_ts.txt -t "$roi Time Series (Scrubbed)" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$roiOutDir"/${roi}_ms.png
-
-
-        echo "<br><img src=\"$roiOutDir/${roi}.png\" alt=\"${roi} seed\"><img src=\"$roiOutDir/${roi}_ms.png\" alt=\"${roi}_ms seed\"><br>" >> "$rawEpiDir"/analysisResults.html
-
-      else
-        # No scrubbed TRs
-
-        # Creating new plots with fsl_tsplot
-        # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
-        yMax=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
-        yMin=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
-
-        fsl_tsplot -i ${roiOutDir}/${roi}_residvol_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$roiOutDir"/${roi}.png
-
-        echo "<br><img src=\"$roiOutDir/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
-      fi
     fi
   done
 fi
 #################################
 
-
+gzip ${epiData/.nii.gz/.nii}
 echo "$0 Complete"
 echo "Please make sure that the ROI folders were created in the ${roiOutDir}/ folder."
 echo "If resultant warped seeds (to MNI) were too small, they were NOT processed.  Check ${rawEpiDir}/seedsTooSmall for exclusions."
