@@ -700,7 +700,6 @@ EOF
       --warp=${preprocfeat}/reg/standard2highres_warp.nii.gz \
       --interp=nn
 
-# Motionscrubbed data
 
       # Nonlinear warp from EPI to MNI
       clobber ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz &&\
@@ -730,6 +729,7 @@ EOF
         count=1
         while [ $count -le $xNum ]; do
           tsPlotIn=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | head -${count} | tail -1)
+
           delPlotCheck=$(cat ${rawEpiDir}/motionScrub/deleted_vols.txt | awk '{$1=$1}1' | grep -E '(^| )'${count}'( |$)')
           if [ "$delPlotCheck" == "" ]; then
             delPlot=$yMin

@@ -37,34 +37,28 @@ function Usage {
 
 ########## FSL's arg parsing functions ###################
 get_opt1() {
-    arg=$(echo $1 | sed 's/=.*//')
-    echo $arg
-}
-
-get_imarg1() {
-    arg=$(get_arg1 $1);
-    arg=$($FSLDIR/bin/remove_ext $arg);
-    echo $arg
+  arg=$(echo "$1" | sed 's/=.*//')
+  echo "$arg"
 }
 
 get_arg1() {
-    if [ X"`echo $1 | grep '='`" = X ] ; then
-	echo "Option $1 requires an argument" 1>&2
-	exit 1
+    if [ X"$(echo "$1" | grep '=')" = X ] ; then
+      echo "Option $1 requires an argument" 1>&2
+      exit 1
     else
-	arg=`echo $1 | sed 's/.*=//'`
-	if [ X$arg = X ] ; then
-	    echo "Option $1 requires an argument" 1>&2
-	    exit 1
-	fi
-	echo $arg
+      arg=$(echo "$1" | sed 's/.*=//')
+      if [ X"$arg" = X ] ; then
+          echo "Option $1 requires an argument" 1>&2
+          exit 1
+      fi
+	    echo "$arg"
     fi
 }
 
 function get_filename() {
   local input=$1
   file=${input##*/}
-  echo ${file%%.*}
+  echo "${file%%.*}"
 }
 
 #Overwrites material or skips
@@ -111,8 +105,6 @@ function SimultBandpassNuisanceReg()
 {
 	local inData=$1
 	local mask=$2
-  local inDir
-  inDir=$(dirname ${inData})
 
    # If neither lowpass or highpass is set, do an allpass filter (fbot=0 ftop=99999)
    # If ONLY highpass is set, do a highpass filter (fbot=${hp} ftop=99999)
@@ -148,18 +140,21 @@ function SimultBandpassNuisanceReg()
     echo "Performing a 'bandpass' filter.  Frequencies between ${lp} & ${hp} will be filtered."
   fi
 
-  clobber ${outDir}/"$(basename "${inData%%.nii*}")"_bp_res4d.nii.gz &&\
-  rm -rf ${outDir}/*_mean.nii.gz 2> /dev/null &&\
-  rm -rf ${outDir}/tmp_bp* 2> /dev/null &&\
-	3dTproject -input ${inData} -prefix $outDir/tmp_bp.nii.gz -mask ${mask} -bandpass ${fbot} ${ftop} -ort ${regressorsFile} -verb &&\
-  # add mean back in
-	3dTstat -mean -prefix $outDir/orig_mean.nii.gz ${inData} &&\
-	3dTstat -mean -prefix $outDir/bp_mean.nii.gz $outDir/tmp_bp.nii.gz &&\
-	3dcalc -a $outDir/tmp_bp.nii.gz -b $outDir/orig_mean.nii.gz -c $outDir/bp_mean.nii.gz -expr "a+b-c" -prefix ${outDir}/"$(basename "${inData%%.nii*}")"_bp_res4d.nii.gz
 
-  echo "lowpassFilt=$ftop" >> $logDir/rsParams
-  echo "highpassFilt=$fbot" >> $logDir/rsParams
-  echo "_${filtType}" >> $logDir/rsParams
+  clobber "${outDir}"/"$(basename "${inData%%.nii*}")"_bp_res4d.nii.gz &&\
+  rm -rf "${outDir}"/*_mean.nii.gz 2> /dev/null &&\
+  rm -rf "${outDir}"/tmp_bp* 2> /dev/null &&\
+	3dTproject -input "${inData}" -prefix "$outDir"/tmp_bp.nii.gz -mask "${mask}" -bandpass "${fbot}" "${ftop}" -ort "${regressorsFile}" -verb &&\
+  # add mean back in
+	3dTstat -mean -prefix "$outDir"/orig_mean.nii.gz "${inData}" &&\
+	3dTstat -mean -prefix "$outDir"/bp_mean.nii.gz "$outDir"/tmp_bp.nii.gz &&\
+	3dcalc -a "$outDir"/tmp_bp.nii.gz -b "$outDir"/orig_mean.nii.gz -c "$outDir"/bp_mean.nii.gz -expr "a+b-c" -prefix "${outDir}"/"$(basename "${inData%%.nii*}")"_bp_res4d.nii.gz
+
+  {
+    echo "lowpassFilt=$ftop"
+    echo "highpassFilt=$fbot"
+    echo "_${filtType}"
+  } >> "$logDir"/rsParams
 }
 export -f SimultBandpassNuisanceReg
 
@@ -174,14 +169,14 @@ export -f SimultBandpassNuisanceReg
 
 if [ $# -lt 4 ] ; then Usage; exit 0; fi
 while [ $# -ge 1 ] ; do
-    iarg=$(get_opt1 $1);
+    iarg=$(get_opt1 "$1");
     case "$iarg"
 	in
     -h)
         Usage;
         exit 0;;
     --epi)
-  	    epiData=`get_arg1 $1`;
+  	    epiData=$(get_arg1 "$1");
         export epiData;
         if [ "$epiData" == "" ]; then
           echo "Error: The restingStateImage (-E) is a required option"
@@ -189,7 +184,7 @@ while [ $# -ge 1 ] ; do
         fi
   	    shift;;
   	--t1brain)
-  	    t1Data=`get_imarg1 $1`;
+  	    t1Data=$(get_arg1 "$1");
         export t1Data;
         if [ "$t1Data" == "" ]; then
           echo "Error: The T1 image is a required option"
@@ -197,7 +192,7 @@ while [ $# -ge 1 ] ; do
         fi
   	    shift;;
     --nuisanceList)
-      nuisanceInFile=$(get_arg1 $1);
+      nuisanceInFile=$(get_arg1 "$1");
       if [ ! -e "$nuisanceInFile" ]; then
         echo "Error: The nuisanceList file is a required option"
         exit 1
@@ -205,11 +200,11 @@ while [ $# -ge 1 ] ; do
       declare -a nuisanceList=( "$(cat "${nuisanceInFile}")" );
       shift;;
     --lp)
-      lp=$(get_arg1 $1);
+      lp=$(get_arg1 "$1");
       export lp;
       shift;;
     --hp)
-      hp=$(get_arg1 $1);
+      hp=$(get_arg1 "$1");
       export hp;
       shift;;
     --compcor)
@@ -254,8 +249,8 @@ fi
 
 # Source input (~func) directory
 indir=$(dirname "$epiData")
-preprocfeat=$(x=$indir; while [ "$x" != "/" ] ; do x=`dirname "$x"`; find "$x" -maxdepth 1 -type d -name preproc.feat 2>/dev/null; done)
-logDir=$(dirname ${preprocfeat})
+preprocfeat=$(x=$indir; while [ "$x" != "/" ] ; do x=$(dirname "$x"); find "$x" -maxdepth 1 -type d -name preproc.feat 2>/dev/null; done)
+logDir=$(dirname "${preprocfeat}")
 rawEpiDir=$(dirname "$preprocfeat")
 
 if [ "${compcorFlag}" -eq 1 ]; then
@@ -263,7 +258,8 @@ if [ "${compcorFlag}" -eq 1 ]; then
 else
   outDir=${rawEpiDir}/nuisanceRegression/classic
 fi
-mkdir -p ${outDir}/rois
+
+mkdir -p "${outDir}"/rois
 
 # If new nuisance regressors were added, echo them out to the rsParams file (only if they don't already exist in the file)
 # Making a *strong* assumption that any nuisanceROI lists added after initial processing won't reuse the first ROI (e.g. pccrsp)
@@ -294,17 +290,21 @@ done
 
 # Echo out all input parameters into a log
 {
-echo "------------------------------------"; \
-echo "-E $epiData"; \
-echo "-A $t1Data"; } >> "$logDir"/rsParams_log
-echo "-N $nuisanceInFile" >> "$logDir"/rsParams_log
-{ echo "-L $lp"; \
-echo "-H $hp"; } >> "$logDir"/rsParams_log
+echo "------------------------------------"
+echo "-E $epiData"
+echo "-A $t1Data" 
+echo "-N $nuisanceInFile" 
+echo "-L $lp"
+echo "-H $hp"
+} >> "$logDir"/rsParams_log
+
 if [[ $overwriteFlag == 1 ]]; then
   echo "-c" >> "$logDir"/rsParams_log
 fi
+{
 date >> "$logDir"/rsParams_log
-echo -e "\\n\\n" >> "$logDir"/rsParams_log
+echo -e "\\n\\n" 
+} >> "$logDir"/rsParams_log
 
 
 # If user defines overwrite, note in rsParams file
@@ -316,7 +316,7 @@ echo "Running $0 ..."
 
 #################################
 #### Nuisance ROI mapping ############
-for roi in $(cat $nuisanceInFile)
+while IFS= read -r roi
 do
   roiName="$(get_filename "${roi}")"
 
@@ -327,7 +327,7 @@ do
     MNItoEPIwarp=$(grep "MNItoEPIWarp=" "$logDir"/rsParams | tail -1 | awk -F"=" '{print $2}') &&\
     applywarp --ref="$rawEpiDir"/mcImgMean_stripped.nii.gz --in="${roi}" --out="$outDir"/roi/"${roiName}"_native.nii.gz --warp="$MNItoEPIwarp" --datatype=float
 
-  elif [[ "$(fslinfo "${roi}" | grep ^dim1 | awk '{print $2}')" == "$(fslinfo ${epiData} | grep ^dim1 | awk '{print $2}')" ]]; then
+  elif [[ "$(fslinfo "${roi}" | grep ^dim1 | awk '{print $2}')" == "$(fslinfo "${epiData}" | grep ^dim1 | awk '{print $2}')" ]]; then
     echo "${roi} is in native space"
     clobber "$outDir"/rois/"${roiName}"_native.nii.gz &&\
     cp "${roi}" "$outDir"/rois/"${roiName}"_native.nii.gz
@@ -337,7 +337,7 @@ do
     exit 1
   fi
   # check if needs binarize
-  if [[ "$(printf %.0f $(fslstats "$outDir"/rois/"${roiName}"_native.nii.gz -M))" -ne 1 ]]; then
+  if [[ "$(printf %.0f "$(fslstats "$outDir"/rois/"${roiName}"_native.nii.gz -M)")" -ne 1 ]]; then
     fslmaths "$outDir"/rois/"${roiName}"_native.nii.gz -thr 0.5 -bin "$outDir"/rois/"${roiName}"_native.nii.gz
   fi
 
@@ -351,16 +351,16 @@ do
     clobber "$outDir"/rois/mean_"${roiName}"_ts.txt &&\
     fslmeants -i "$epiData" -o "$outDir"/rois/mean_"${roiName}"_ts.txt -m "$outDir"/rois/"${roiName}"_native.nii.gz
   fi
-done
+done < "$(cat "$nuisanceInFile")"
 
 
 ###### simultaneous bandpass + regression #####
 
 # paste regressor timeseries into one file
 if [[ "${compcorFlag}" -eq 1 ]]; then
-  IFS=" " read -r -a arr <<< "$(for i in $(cat $nuisanceInFile); do echo "$outDir"/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' ')"
+  IFS=" " read -r -a arr <<< "$(for i in $(cat "$nuisanceInFile"); do echo "$outDir"/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' ')"
 else # append motion parameters to regressor list
-  IFS=" " read -r -a arr <<< "$(for i in $(cat $nuisanceInFile); do echo "$outDir"/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' '; echo "$rawEpiDir"/mcImg.par)"
+  IFS=" " read -r -a arr <<< "$(for i in $(cat "$nuisanceInFile"); do echo "$outDir"/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' '; echo "$rawEpiDir"/mcImg.par)"
 fi
 
 paste "${arr[@]}" > "$outDir"/NuisanceRegressor_ts.txt
@@ -372,10 +372,10 @@ fsl_tsplot -i "$regressorsFile" -t "Time Series" -u 1 --start=1 -x 'Time Points 
 echo "<br><br><img src=\"${outDir}/NuisanceRegressors_ts.png\" alt=\"$roi nuisance regressor\"><br>" >> "$indir"/analysisResults.html
 
 # simultaneous bandpass + regression
-clobber ${outDir}/"$(basename "${epiData%%.nii*}")"_bp_res4d.nii.gz &&\
-SimultBandpassNuisanceReg ${epiData} "$rawEpiDir"/mcImgMean_mask.nii.gz
+clobber "${outDir}"/"$(basename "${epiData%%.nii*}")"_bp_res4d.nii.gz &&\
+SimultBandpassNuisanceReg "${epiData}" "$rawEpiDir"/mcImgMean_mask.nii.gz
 
-epiDataFiltReg=${outDir}/"$(basename "${epiData%%.nii*}")"_bp_res4d.nii.gz
+epiDataFiltReg="${outDir}"/"$(basename "${epiData%%.nii*}")"_bp_res4d.nii.gz
 export epiDataFiltReg
 
 
@@ -383,7 +383,7 @@ export epiDataFiltReg
 
 # Backup file
 echo "...Scaling data by 1000"
-cp ${epiDataFiltReg} ${epiDataFiltReg/res4d/res4d_orig}
+cp "${epiDataFiltReg}" "${epiDataFiltReg/res4d/res4d_orig}"
 
 # For some reason, this mask isn't very good.  Use the good mask top-level
 echo "...Copy Brain mask"
@@ -392,11 +392,11 @@ fslmaths mask -mul 1000 mask1000 -odt float
 
 # normalize res4d here
 echo "...Normalize Data"
-fslmaths ${epiDataFiltReg} -Tmean ${epiDataFiltReg/res4d/res4d_tmean}
-fslmaths ${epiDataFiltReg} -Tstd ${epiDataFiltReg/res4d/res4d_std}
-fslmaths ${epiDataFiltReg} -sub ${epiDataFiltReg/res4d/res4d_tmean} ${epiDataFiltReg/res4d/res4d_dmean}
-fslmaths ${epiDataFiltReg/res4d/res4d_dmean} -div ${epiDataFiltReg/res4d/res4d_std} ${epiDataFiltReg/res4d/res4d_normed}
-fslmaths ${epiDataFiltReg/res4d/res4d_normed} -add mask1000 ${epiDataFiltReg/res4d/res4d_normandscaled} -odt float
+fslmaths "${epiDataFiltReg}" -Tmean "${epiDataFiltReg/res4d/res4d_tmean}"
+fslmaths "${epiDataFiltReg}" -Tstd "${epiDataFiltReg/res4d/res4d_std}"
+fslmaths "${epiDataFiltReg}" -sub "${epiDataFiltReg/res4d/res4d_tmean}" "${epiDataFiltReg/res4d/res4d_dmean}"
+fslmaths "${epiDataFiltReg/res4d/res4d_dmean}" -div "${epiDataFiltReg/res4d/res4d_std}" "${epiDataFiltReg/res4d/res4d_normed}"
+fslmaths "${epiDataFiltReg/res4d/res4d_normed}" -add mask1000 "${epiDataFiltReg/res4d/res4d_normandscaled}" -odt float
 
 # Echo out final file to rsParams file
 echo "epiNorm=${epiDataFiltReg/res4d/res4d_normed}" >> "$logDir"/rsParams
