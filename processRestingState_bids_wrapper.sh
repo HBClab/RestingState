@@ -147,7 +147,7 @@ scanner="$(echo ${subID} | cut -c -2)" # extract scannerID from subID, works whe
 rsOut="${bidsDir}/derivatives/rsOut/sub-${subID}/ses-${sesID}"
 # load variables needed for processing
 
-MBA_dir="$(dirname "$(find ${bidsDir}/derivatives/MBA/sub-${subID} -type f -print -quit)")" # find dir containing MBA output
+MBA_dir="$(dirname "$(find ${bidsDir}/derivatives/MBA/sub-${subID}/ses-* -type f -name "sub-${subID}_ses*T1w*.nii.gz" -print -quit)")" # find dir containing MBA output
 echo "subDir is ${subDir}."
 echo "MBA_dir is ${MBA_dir}."
 
@@ -177,7 +177,7 @@ if [ "${scanner}" == "GE" ]; then
 elif [ "${scanner}" == "SE" ]; then
   fmap_prepped="$(find ${subDir}/ses-${sesID}/fmap -maxdepth 1 -type f -name "*fieldmap_prepped.nii.gz")"
   fmap_mag="$(find ${subDir}/ses-${sesID}/fmap -maxdepth 1 -type f -name "*magnitude1.nii.gz")"
-  fmap_mag_stripped="$(find ${subDir}/ses-${sesID}/fmap/mag1/ -type f -name "*_stripped.nii.gz")"
+  fmap_mag_stripped="$(find ${subDir}/ses-${sesID}/fmap/mag1/ -type f -name "*mag1*_stripped.nii.gz" -print -quit)"
   dwellTime=0.00056
 fi
 
@@ -193,14 +193,15 @@ else
 
   mkdir -p ${rsOut}
 
-  echo "t1=${T1_RPI_brain}" >> ${rsOut}/rsParams
-  echo "t1Skull=${T1_RPI}" >> ${rsOut}/rsParams
-  echo "t1Mask=${T1_brain_mask}" >> ${rsOut}/rsParams
-  echo "peDir=-y" >> ${rsOut}/rsParams
-  echo "epiDwell=${dwellTime}" >> ${rsOut}/rsParams
-  echo "epiTR=2" >> ${rsOut}/rsParams
-  echo "epiTE=30" >> ${rsOut}/rsParams
-
+  {
+  echo "t1=${T1_RPI_brain}"
+  echo "t1Skull=${T1_RPI}"
+  echo "t1Mask=${T1_brain_mask}"
+  echo "peDir=-y"
+  echo "epiDwell=${dwellTime}"
+  echo "epiTR=2"
+  echo "epiTE=30"
+  } >> ${rsOut}/rsParams
 
   # copy raw rest image from BIDS to derivatives/rsOut_legacy/subID/sesID/
   rsync -a ${inFile} ${rsOut}/
@@ -209,13 +210,13 @@ else
     echo "fieldMapCorrection=1" >> ${rsOut}/rsParams
     #skull strip mag image
     if [ "${fmap_mag_stripped}" == "" ]; then
-      printf "\n%s\nSkull stripping fmap magnitude image..." "$(date)" &&\
-      bet ${fmap_mag} "$(echo ${fmap_mag} | sed -e 's/magnitude/magnitude_stripped/')" -m -n -f 0.3 -B &&\
-      fslmaths "$(find ${subDir}/ses-${sesID}/fmap -type f -name "*magnitude_stripped_mask.nii.gz")" -ero -bin "$(echo ${fmap_mag} | sed -e 's/magnitude/magnitude_stripped_mask_eroded/')" -odt char &&\
-      fslmaths ${fmap_mag} -mas "$(echo ${fmap_mag} | sed -e 's/magnitude/magnitude_stripped_mask_eroded/')" "$(echo ${fmap_mag} | sed -e 's/magnitude/magnitude_stripped/')" &&\
-      fmap_mag_stripped="$(find ${subDir}/ses-${sesID}/fmap -type f -name "*magnitude_stripped.nii.gz")"
+      printf "\n%s\nSkull stripping fmap magnitude image..." "$(date)"
+      bet ${fmap_mag} "${fmap_map//.nii.gz/_stripped.nii.gz}" -m -n -f 0.3 -B
+      fslmaths "$(find ${subDir}/ses-${sesID}/fmap -type f -name "*magnitude*stripped_mask.nii.gz")" -ero -bin "${fmap_mag//.nii.gz/_stripped_mask_eroded.nii.gz}" -odt char
+      fslmaths ${fmap_mag} -mas "${fmap_mag//.nii.gz/_stripped_mask_eroded.nii.gz}" "${fmap_mag//.nii.gz/_stripped.nii.gz}"
+      fmap_mag_stripped="${fmap_mag//.nii.gz/_stripped.nii.gz}"
     fi
-
+    
     ${scriptdir}/qualityCheck.sh --epi="$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
       --t1brain=${T1_RPI_brain} \
       --t1=${T1_RPI} \
@@ -282,7 +283,7 @@ else
     "${compcorArg}"
 
   clobber ${rsOut}/motionScrub/$(basename ${epiDataFiltReg/.nii/_ms.nii}) &&\
-  ${scriptdir}/motionScrub.sh --epi=${epiDataFiltReg//.nii.gz/.nii}
+  ${scriptdir}/motionScrub.sh --epi=${epiDataFiltReg}
 
   ${scriptdir}/seedVoxelCorrelation.sh \
     --epi=${epiDataFiltReg} \
