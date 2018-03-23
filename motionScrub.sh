@@ -171,7 +171,7 @@ fi
 
 #################################
 # clean up gunzipped nifti
-rm ${epiData//.nii.gz/.nii}
+gzip ${epiData//.nii.gz/.nii}
 
 echo "$0 Complete"
 echo ""
