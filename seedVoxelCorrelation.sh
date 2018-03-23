@@ -161,6 +161,10 @@ if [[ -z $seedmapFlag ]]; then
 seedmapFlag=0
 fi
 
+if [[ -e "${epiData//.nii.gz/.nii}" ]] && [[ -e "${epiData}" ]]; then
+  rm "${epiData//.nii.gz/.nii}"
+fi
+
 # If new seeds are added, echo them out to the rsParams file (only if they don't already exist in the file)
 # Making a *strong* assumption that any ROI lists added after initial processing won't reuse the first ROI (e.g. pccrsp)
 indir=$(dirname $epiData)
@@ -519,8 +523,9 @@ if [ "${seedmapFlag}" -eq 1 ]; then
   # Check into matlab about fixing motion-scrubbing (Power method)
 
     # If $motionscrubFlag == 0 (no motionscrub), res4dnormandscaled never gets unzipped
-  	clobber "${epiData/.nii.gz/.nii}" &&\
-  	gunzip -f "${epiData}"
+  	if [[ ! -e "${epiData//.nii.gz/.nii}" ]]; then
+  	  gunzip -f "${epiData}"
+    fi
 
   if [[ $motionscrubFlag == 0 ]]; then
 
@@ -763,7 +768,6 @@ EOF
 fi
 #################################
 
-gzip ${epiData/.nii.gz/.nii}
 echo "$0 Complete"
 echo "Please make sure that the ROI folders were created in the ${roiOutDir}/ folder."
 echo "If resultant warped seeds (to MNI) were too small, they were NOT processed.  Check ${rawEpiDir}/seedsTooSmall for exclusions."
