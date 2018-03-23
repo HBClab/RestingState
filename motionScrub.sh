@@ -116,7 +116,7 @@ addpath('${scriptDir}')
 niftiScripts=['${scriptDir}','/Octave/nifti'];
 addpath(niftiScripts)
 funcvoldim=[${numXdim} ${numYdim} ${numZdim} ${numtimepoint}];
-motionscrub('${rawEpiDir}','${epiData}',funcvoldim)
+motionscrub('${rawEpiDir}','${epiData//.nii.gz/.nii}',funcvoldim)
 quit
 EOF
 
@@ -170,7 +170,8 @@ if [[ $scrubDataCheck != "" ]]; then
 fi
 
 #################################
-
+# clean up gunzipped nifti
+rm ${epiData//.nii.gz/.nii}
 
 echo "$0 Complete"
 echo ""

@@ -258,7 +258,7 @@ if [ "${compcorFlag}" -eq 1 ]; then
 else
   outDir=${rawEpiDir}/nuisanceRegression/classic
 fi
-
+cd "${outDir}"
 mkdir -p "${outDir}"/rois
 
 # If new nuisance regressors were added, echo them out to the rsParams file (only if they don't already exist in the file)
@@ -316,7 +316,7 @@ echo "Running $0 ..."
 
 #################################
 #### Nuisance ROI mapping ############
-while IFS= read -r roi
+for roi in $(cat "$nuisanceInFile")
 do
   roiName="$(get_filename "${roi}")"
 
@@ -337,7 +337,7 @@ do
     exit 1
   fi
   # check if needs binarize
-  if [[ "$(printf %.0f "$(fslstats "$outDir"/rois/"${roiName}"_native.nii.gz -M)")" -ne 1 ]]; then
+  if [[ $(printf %.0f $(fslstats "$outDir"/rois/"${roiName}"_native.nii.gz -M)) -ne 1 ]]; then
     fslmaths "$outDir"/rois/"${roiName}"_native.nii.gz -thr 0.5 -bin "$outDir"/rois/"${roiName}"_native.nii.gz
   fi
 
@@ -351,7 +351,7 @@ do
     clobber "$outDir"/rois/mean_"${roiName}"_ts.txt &&\
     fslmeants -i "$epiData" -o "$outDir"/rois/mean_"${roiName}"_ts.txt -m "$outDir"/rois/"${roiName}"_native.nii.gz
   fi
-done < "$(cat "$nuisanceInFile")"
+done
 
 
 ###### simultaneous bandpass + regression #####
