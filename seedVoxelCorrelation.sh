@@ -73,7 +73,7 @@ function clobber()
 		if [ -s "${arg}" ] && [ "${clob}" == true ]; then
 			rm -rf "${arg}"
 		elif [ -s "${arg}" ] && [ "${clob}" == false ]; then
-			num_existing_files=$(( ${num_existing_files} + 1 ))
+			num_existing_files=$(( num_existing_files + 1 ))
 			continue
 		elif [ ! -s "${arg}" ]; then
 			continue
