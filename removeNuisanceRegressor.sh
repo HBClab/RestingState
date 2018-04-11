@@ -249,9 +249,9 @@ fi
 
 # Source input (~func) directory
 indir=$(dirname "$epiData")
-preprocfeat=$(x=$indir; while [ "$x" != "/" ] ; do x=$(dirname "$x"); find "$x" -maxdepth 1 -type d -name preproc.feat 2>/dev/null; done)
-logDir=$(dirname "${preprocfeat}")
-rawEpiDir=$(dirname "$preprocfeat")
+preproc="${indir%/*}"/preproc
+logDir=$(dirname "${preproc}")
+rawEpiDir=$(dirname "$preproc")
 
 if [ "${compcorFlag}" -eq 1 ]; then
   outDir=${rawEpiDir}/nuisanceRegression/compcor

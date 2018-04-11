@@ -209,9 +209,9 @@ else
   if [ ! -z "${fmap_prepped}" ] && [ "${fieldMapFlag}" == 1 ]; then # process with fmap
     echo "fieldMapCorrection=1" >> ${rsOut}/rsParams
     #skull strip mag image
-    if [ "${fmap_mag_stripped}" == "" ]; then
+    if [ -z "${fmap_mag_stripped}" ]; then
       printf "\n%s\nSkull stripping fmap magnitude image..." "$(date)"
-      bet ${fmap_mag} "${fmap_map//.nii.gz/_stripped.nii.gz}" -m -n -f 0.3 -B
+      bet ${fmap_mag} "${fmap_mag//.nii.gz/_stripped.nii.gz}" -m -n -f 0.3 -B
       fslmaths "$(find ${subDir}/ses-${sesID}/fmap -type f -name "*magnitude*stripped_mask.nii.gz")" -ero -bin "${fmap_mag//.nii.gz/_stripped_mask_eroded.nii.gz}" -odt char
       fslmaths ${fmap_mag} -mas "${fmap_mag//.nii.gz/_stripped_mask_eroded.nii.gz}" "${fmap_mag//.nii.gz/_stripped.nii.gz}"
       fmap_mag_stripped="${fmap_mag//.nii.gz/_stripped.nii.gz}"
@@ -227,7 +227,7 @@ else
       --pedir=-y \
       --regmode=6dof
 
-    clobber ${rsOut}/preproc.feat/nonfiltered_smooth_data.nii.gz &&\
+    clobber ${rsOut}/preproc/nonfiltered_smooth_data.nii.gz &&\
     ${scriptdir}/restingStatePreprocess.sh --epi=${rsOut}/mcImg_stripped.nii.gz \
       --t1brain=${T1_RPI_brain} \
       --tr=2 \
@@ -246,7 +246,7 @@ else
       --pedir=-y \
       --regmode=6dof
 
-    clobber ${rsOut}/preproc.feat/nonfiltered_smooth_data.nii.gz &&\
+    clobber ${rsOut}/preproc/nonfiltered_smooth_data.nii.gz &&\
     ${scriptdir}/restingStatePreprocess.sh \
       --epi=${rsOut}/mcImg_stripped.nii.gz \
       --t1brain=${T1_RPI_brain} \
@@ -264,7 +264,7 @@ else
     echo "$rsOut/SNR/CSF_pve_to_RS_thresh.nii.gz"; \
     echo "$rsOut/SNR/WM_pve_to_RS_thresh_ero.nii.gz"; } > "$rsOut"/nuisanceList.txt
   else
-    epiDataFilt="$rsOut"/preproc.feat/nonfiltered_smooth_data.nii.gz
+    epiDataFilt="$rsOut"/preproc/nonfiltered_smooth_data.nii.gz
     epiDataFiltReg="${rsOut}"/nuisanceRegression/classic/nonfiltered_smooth_data_bp_res4d_normandscaled.nii.gz
     compcorArg=""
     {
@@ -292,5 +292,5 @@ else
     "${compcorArg}"
 
   # prevents permissions denied error when others run new seeds
-  parallel chmod 774 ::: "$(find ${rsOut} -type f \( -name "highres2standard.nii.gz" -o -name "seeds*.txt" -o -name "rsParams*" -o -name "run*.m" -o -name "highres.nii.gz" -o -name "standard.nii.gz" -o -name "analysisResults.html" \))"
+  parallel chmod 774 ::: "$(find "${rsOut}" -type f \( -name "highres2standard.nii.gz" -o -name "seeds*.txt" -o -name "rsParams*" -o -name "run*.m" -o -name "highres.nii.gz" -o -name "standard.nii.gz" -o -name "analysisResults.html" \))"
 fi
