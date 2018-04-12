@@ -251,7 +251,7 @@ fi
 indir=$(dirname "$epiData")
 preproc="${indir%/*}"/preproc
 logDir=$(dirname "${preproc}")
-rawEpiDir=$(dirname "$preproc")
+rawEpiDir=$(dirname "${preproc}")
 
 if [ "${compcorFlag}" -eq 1 ]; then
   outDir=${rawEpiDir}/nuisanceRegression/compcor

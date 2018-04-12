@@ -169,8 +169,8 @@ fi
 # Making a *strong* assumption that any ROI lists added after initial processing won't reuse the first ROI (e.g. pccrsp)
 indir=$(dirname $epiData)
 preproc="${indir%/*/*}"/preproc
-logDir=$(dirname ${preproc})
-rawEpiDir=$(dirname "$preproc")
+logDir=$(dirname "${preproc}")
+rawEpiDir=$(dirname "${preproc}")
 
 if [ "${compcorFlag}" -eq 1 ]; then
   outDir=${rawEpiDir}/seedCorrelation/compcor
