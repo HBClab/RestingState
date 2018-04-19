@@ -73,7 +73,7 @@ function clobber()
 		if [ -s "${arg}" ] && [ "${clob}" == true ]; then
 			rm -rf "${arg}"
 		elif [ -s "${arg}" ] && [ "${clob}" == false ]; then
-			num_existing_files=$(( ${num_existing_files} + 1 ))
+			num_existing_files=$(( num_existing_files + 1 ))
 			continue
 		elif [ ! -s "${arg}" ]; then
 			continue
@@ -168,9 +168,9 @@ fi
 # If new seeds are added, echo them out to the rsParams file (only if they don't already exist in the file)
 # Making a *strong* assumption that any ROI lists added after initial processing won't reuse the first ROI (e.g. pccrsp)
 indir=$(dirname $epiData)
-preprocfeat=$(x=$indir; while [ "$x" != "/" ] ; do x=`dirname "$x"`; find "$x" -maxdepth 1 -type d -name preproc.feat; done 2>/dev/null)
-logDir=$(dirname ${preprocfeat})
-rawEpiDir=$(dirname "$preprocfeat")
+preproc="${indir%/*/*}"/preproc
+logDir=$(dirname "${preproc}")
+rawEpiDir=$(dirname "${preproc}")
 
 if [ "${compcorFlag}" -eq 1 ]; then
   outDir=${rawEpiDir}/seedCorrelation/compcor
@@ -243,7 +243,7 @@ for roi in "${roiList[@]}"; do
       exit 1
     fi
 		# Apply the nonlinear warp from MNI to EPI
-		applywarp --ref=${epiData} --in=${roi} --out=${roiOutDir}/${roiName}_mask.nii.gz --warp=${MNItoEPIWarp} --mask=${preprocfeat}/mask.nii.gz --datatype=float
+		applywarp --ref=${epiData} --in=${roi} --out=${roiOutDir}/${roiName}_mask.nii.gz --warp=${MNItoEPIWarp} --mask=${preproc}/mask.nii.gz --datatype=float
 
 		# Threshold and binarize output
 		fslmaths ${roiOutDir}/${roiName}_mask.nii.gz -thr 0.5 ${roiOutDir}/${roiName}_mask.nii.gz
@@ -625,13 +625,13 @@ EOF
 
   # Copy over anatomical files to results directory
   # T1 (highres)
-  cp ${preprocfeat}/reg/highres.nii.gz ${seedcorrDir}
+  cp ${preproc}/reg/highres.nii.gz ${seedcorrDir}
 
   # T1toMNI (highres2standard)
-  cp ${preprocfeat}/reg/highres2standard.nii.gz ${seedcorrDir}
+  cp ${preproc}/reg/highres2standard.nii.gz ${seedcorrDir}
 
   # MNI (standard)
-  cp ${preprocfeat}/reg/standard.nii.gz ${seedcorrDir}
+  cp ${preproc}/reg/standard.nii.gz ${seedcorrDir}
 
 
   # HTML setup
@@ -650,9 +650,9 @@ EOF
       # Nonlinear warp from EPI to MNI
       clobber ${seedcorrDir}/${roi}_standard_zmap.nii.gz &&\
       applywarp --in=${roiOutDir}/${roi}/cope1.nii \
-      --ref=${preprocfeat}/reg/standard.nii.gz \
+      --ref=${preproc}/reg/standard.nii.gz \
       --out=${seedcorrDir}/${roi}_standard_zmap.nii.gz \
-      --warp=${preprocfeat}/reg/example_func2standard_warp.nii.gz \
+      --warp=${preproc}/reg/example_func2standard_warp.nii.gz \
       --datatype=float
 
       # Mask out data with MNI mask
@@ -661,9 +661,9 @@ EOF
       # Warp seed from MNI to T1
       clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
       applywarp --in=${roiOutDir}/${roi}_standard.nii.gz \
-      --ref=${preprocfeat}/reg/highres.nii.gz \
+      --ref=${preproc}/reg/highres.nii.gz \
       --out=${seedcorrDir}/${roi}_highres.nii.gz \
-      --warp=${preprocfeat}/reg/standard2highres_warp.nii.gz \
+      --warp=${preproc}/reg/standard2highres_warp.nii.gz \
       --interp=nn
 
       # Creating new plots with fsl_tsplot
@@ -689,9 +689,9 @@ EOF
       # Nonlinear warp from EPI to MNI
       clobber ${roiOutDir}/${roi}_ms_standard_zmap.nii.gz &&\
       applywarp --in=${roiOutDir}/${roi}_ms/cope1.nii \
-      --ref=${preprocfeat}/reg/standard.nii.gz \
+      --ref=${preproc}/reg/standard.nii.gz \
       --out=${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz \
-      --warp=${preprocfeat}/reg/example_func2standard_warp.nii.gz \
+      --warp=${preproc}/reg/example_func2standard_warp.nii.gz \
       --datatype=float
 
       # Mask out data with MNI mask
@@ -700,18 +700,18 @@ EOF
       # Warp seed from MNI to T1
       clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
       applywarp --in=${roiOutDir}/${roi}_standard.nii.gz \
-      --ref=${preprocfeat}/reg/highres.nii.gz \
+      --ref=${preproc}/reg/highres.nii.gz \
       --out=${seedcorrDir}/${roi}_highres.nii.gz \
-      --warp=${preprocfeat}/reg/standard2highres_warp.nii.gz \
+      --warp=${preproc}/reg/standard2highres_warp.nii.gz \
       --interp=nn
 
 
       # Nonlinear warp from EPI to MNI
       clobber ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz &&\
       applywarp --in=${roiOutDir}/${roi}_ms/cope1.nii \
-      --ref=${preprocfeat}/reg/standard.nii.gz \
+      --ref=${preproc}/reg/standard.nii.gz \
       --out=${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz \
-      --warp=${preprocfeat}/reg/example_func2standard_warp.nii.gz \
+      --warp=${preproc}/reg/example_func2standard_warp.nii.gz \
       --datatype=float
 
       # Mask out data with MNI mask
