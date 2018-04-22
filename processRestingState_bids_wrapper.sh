@@ -157,10 +157,9 @@ echo "subDir is ${subDir}."
 
 T1w=$(find "${inputDir}"/anat -name "*T1w.nii.gz" | head -n 1)
 
-$scriptdir/fslreorient.sh ${T1w}
 mkdir -p ${rsOut}/anat
-mv "${T1w/.nii.gz/_MNI.nii.gz}" "${rsOut}/anat/$(basename ${T1w})"
-bet "${T1w/.nii.gz/_MNI.nii.gz}" "${rsOut}/anat/$(basename ${T1w/.nii.gz/skullstrip.nii.gz})" -m
+cp "${T1w}" "${rsOut}/anat/$(basename ${T1w})"
+bet "${rsOut}/anat/$(basename ${T1w})" "${rsOut}/anat/$(basename ${T1w/.nii.gz/skullstrip.nii.gz})" -m
 
 T1_RPI_brain="${rsOut}/anat/$(basename ${T1w/.nii.gz/skullstrip.nii.gz})"
 T1_brain_mask="${rsOut}/anat/$(basename ${T1w/.nii.gz/skullstrip_mask.nii.gz})"
