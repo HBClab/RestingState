@@ -99,6 +99,9 @@ while [ $# -ge 1 ] ; do
   iarg=$(get_opt1 $1);
   case "$iarg"
 in
+  --bidsDir)
+      bidsDir=$(get_arg1 $1);
+      shift;;
   --epi)
       inFile=`get_arg1 $1`;
       export inFile;
@@ -114,9 +117,6 @@ in
       compcorFlag=1;
       aromaArg="--aroma";
       export compcorFlag;
-      shift;;
-  --usefmap)
-      fieldMapFlag=1;
       shift;;
   --clobber)
       clob=true;
@@ -146,96 +146,96 @@ subDir="${bidsDir}/sub-${subID}" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imagin
 
 if [ -z "${sesID}" ]; then
   rsOut="${bidsDir}/derivatives/rsOut/sub-${subID}"
+  inputDir=${bidsDir}/sub-${subID}
 else
   rsOut="${bidsDir}/derivatives/rsOut/sub-${subID}/ses-${sesID}"
-fi
-
-# load variables needed for processing
-if [ -z "${sesID}" ]; then
-  T1_brain_mask=$(find "${bidsDir}"/derivatives/"${skullstrip_pipeline}"/sub-"${subID}"/anat -type f -name "sub-${subID}_T1w_brainmask.nii.gz" -print -quit) # find dir containing MBA output
-else
-  T1_brain_mask=$(find "${bidsDir}"/derivatives/"${skullstrip_pipeline}"/sub-"${subID}"/ses-"${sesID}"/anat -type f -name "sub-${subID}_ses-${sesID}_T1w_brainmask.nii.gz" -print -quit)
+  inputDir=${bidsDir}/sub-${subID}/ses-${sesID}
 fi
 
 echo "subDir is ${subDir}."
 
-# TODO: just do skullstripping in here.
-if [ -z "${T1_RPI}" ] || [ -z "${T1_RPI_brain}" ] || [ -z "${inFile}" ]; then
-  printf "\\n%s\\nERROR: at least one prerequisite scan is missing. Exiting.\\n" "$(date)" 1>&2
-  exit 1
-else
 
-  softwareCheck # check dependencies
+T1w=$(find "${inputDir}"/anat -name "*T1w.nii.gz" | head -n 1)
 
-  printf "\\n%s\\nBeginning preprocesssing ...\\n" "$(date)"
+$scriptdir/fslreorient.sh ${T1w}
+mkdir -p ${rsOut}/anat
+mv "${T1w/.nii.gz/_MNI.nii.gz}" "${rsOut}/anat/$(basename ${T1w})"
+bet "${T1w/.nii.gz/_MNI.nii.gz}" "${rsOut}/anat/$(basename ${T1w/.nii.gz/skullstrip.nii.gz})" -m
 
-  mkdir -p "${rsOut}"
+T1_RPI_brain="${rsOut}/anat/$(basename ${T1w/.nii.gz/skullstrip.nii.gz})"
+T1_brain_mask="${rsOut}/anat/$(basename ${T1w/.nii.gz/skullstrip_mask.nii.gz})"
+T1_RPI="${rsOut}/anat/$(basename ${T1w})"
 
-  {
-  echo "t1=${T1_RPI_brain}"
-  echo "t1Skull=${T1_RPI}"
-  echo "t1Mask=${T1_brain_mask}"
-  echo "peDir=-y"
-  echo "epiTR=2"
-  echo "epiTE=30"
-  } >> "${rsOut}"/rsParams
+softwareCheck # check dependencies
 
-  # copy raw rest image from BIDS to derivatives/rsOut_legacy/subID/sesID/
-  rsync -a "${inFile}" "${rsOut}"/
+printf "\\n%s\\nBeginning preprocesssing ...\\n" "$(date)"
+
+mkdir -p "${rsOut}"
+
+{
+echo "t1=${T1_RPI_brain}"
+echo "t1Skull=${T1_RPI}"
+echo "t1Mask=${T1_brain_mask}"
+echo "peDir=-y"
+echo "epiTR=2"
+echo "epiTE=30"
+} >> "${rsOut}"/rsParams
+
+# copy raw rest image from BIDS to derivatives/rsOut_legacy/subID/sesID/
+rsync -a "${inFile}" "${rsOut}"/
 
 
 printf "Process without fieldmap."
 "${scriptdir}"/qualityCheck.sh \
-  --epi="$(find "${rsOut}" -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
-  --t1brain="${T1_RPI_brain}" \
-  --t1="${T1_RPI}" \
-  --pedir=-y \
-  --regmode=6dof
+--epi="$(find "${rsOut}" -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
+--t1brain="${T1_RPI_brain}" \
+--t1="${T1_RPI}" \
+--pedir=-y \
+--regmode=6dof
 
 clobber "${rsOut}"/preproc/nonfiltered_smooth_data.nii.gz &&\
 "${scriptdir}"/restingStatePreprocess.sh \
-  --epi="${rsOut}"/mcImg_stripped.nii.gz \
-  --t1brain="${T1_RPI_brain}" \
-  --tr=2 \
-  --te=30 \
-  --smooth=6 \
-  "${aromaArg}"
+--epi="${rsOut}"/mcImg_stripped.nii.gz \
+--t1brain="${T1_RPI_brain}" \
+--tr=2 \
+--te=30 \
+--smooth=6 \
+"${aromaArg}"
 
-  if [ "${compcorFlag}" -eq 1 ]; then
-    epiDataFilt="${rsOut}"/ica_aroma/denoised_func_data_nonaggr.nii.gz
-    epiDataFiltReg="${rsOut}"/nuisanceRegression/compcor/denoised_func_data_nonaggr_bp_res4d_normandscaled.nii.gz
-    compcorArg="--compcor"
-    {
-    echo "$rsOut/SNR/CSF_pve_to_RS_thresh.nii.gz"; \
-    echo "$rsOut/SNR/WM_pve_to_RS_thresh_ero.nii.gz"; } > "$rsOut"/nuisanceList.txt
-  else
-    epiDataFilt="$rsOut"/preproc/nonfiltered_smooth_data.nii.gz
-    epiDataFiltReg="${rsOut}"/nuisanceRegression/classic/nonfiltered_smooth_data_bp_res4d_normandscaled.nii.gz
-    compcorArg=""
-    {
-    echo "${scriptdir}/ROIs/latvent.nii.gz"; \
-    echo "${scriptdir}/ROIs/global.nii.gz"; \
-    echo "${scriptdir}/ROIs/wmroi.nii.gz"; } > "$rsOut"/nuisanceList.txt
-  fi
-
-  clobber "${epiDataFiltReg}" &&\
-  "${scriptdir}/"removeNuisanceRegressor.sh \
-    --epi="$epiDataFilt" \
-    --t1brain="${T1_RPI_brain}" \
-    --nuisanceList="$rsOut"/nuisanceList.txt \
-    --lp=.08 \
-    --hp=.008 \
-    "${compcorArg}"
-
-  clobber "${rsOut}"/motionScrub/"$(basename "${epiDataFiltReg/.nii/_ms.nii}")" &&\
-  "${scriptdir}"/motionScrub.sh --epi="${epiDataFiltReg}"
-
-  "${scriptdir}"/seedVoxelCorrelation.sh \
-    --epi="${epiDataFiltReg}" \
-    --motionscrub \
-    --roiList="${roilist}" \
-    "${compcorArg}"
-
-  # prevents permissions denied error when others run new seeds
-  parallel chmod 774 ::: "$(find "${rsOut}" -type f \( -name "highres2standard.nii.gz" -o -name "seeds*.txt" -o -name "rsParams*" -o -name "run*.m" -o -name "highres.nii.gz" -o -name "standard.nii.gz" -o -name "analysisResults.html" \))"
+if [ "${compcorFlag}" -eq 1 ]; then
+  epiDataFilt="${rsOut}"/ica_aroma/denoised_func_data_nonaggr.nii.gz
+  epiDataFiltReg="${rsOut}"/nuisanceRegression/compcor/denoised_func_data_nonaggr_bp_res4d_normandscaled.nii.gz
+  compcorArg="--compcor"
+  {
+  echo "$rsOut/SNR/CSF_pve_to_RS_thresh.nii.gz"; \
+  echo "$rsOut/SNR/WM_pve_to_RS_thresh_ero.nii.gz"; } > "$rsOut"/nuisanceList.txt
+else
+  epiDataFilt="$rsOut"/preproc/nonfiltered_smooth_data.nii.gz
+  epiDataFiltReg="${rsOut}"/nuisanceRegression/classic/nonfiltered_smooth_data_bp_res4d_normandscaled.nii.gz
+  compcorArg=""
+  {
+  echo "${scriptdir}/ROIs/latvent.nii.gz"; \
+  echo "${scriptdir}/ROIs/global.nii.gz"; \
+  echo "${scriptdir}/ROIs/wmroi.nii.gz"; } > "$rsOut"/nuisanceList.txt
 fi
+
+clobber "${epiDataFiltReg}" &&\
+"${scriptdir}/"removeNuisanceRegressor.sh \
+  --epi="$epiDataFilt" \
+  --t1brain="${T1_RPI_brain}" \
+  --nuisanceList="$rsOut"/nuisanceList.txt \
+  --lp=.08 \
+  --hp=.008 \
+  "${compcorArg}"
+
+clobber "${rsOut}"/motionScrub/"$(basename "${epiDataFiltReg/.nii/_ms.nii}")" &&\
+"${scriptdir}"/motionScrub.sh --epi="${epiDataFiltReg}"
+
+"${scriptdir}"/seedVoxelCorrelation.sh \
+  --epi="${epiDataFiltReg}" \
+  --motionscrub \
+  --roiList="${roilist}" \
+  "${compcorArg}"
+
+# prevents permissions denied error when others run new seeds
+parallel chmod 774 ::: "$(find "${rsOut}" -type f \( -name "highres2standard.nii.gz" -o -name "seeds*.txt" -o -name "rsParams*" -o -name "run*.m" -o -name "highres.nii.gz" -o -name "standard.nii.gz" -o -name "analysisResults.html" \))"
