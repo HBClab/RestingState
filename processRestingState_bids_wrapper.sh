@@ -181,12 +181,12 @@ echo "epiTE=30"
 } >> "${rsOut}"/rsParams
 
 # copy raw rest image from BIDS to derivatives/rsOut_legacy/subID/sesID/
-rsync -a "${inFile}" "${rsOut}"/
-
+cp "${inFile}" "${rsOut}"/
+inputEpi="${rsOut}/$(basename ${inFile})"
 
 printf "Process without fieldmap."
 "${scriptdir}"/qualityCheck.sh \
---epi="$(find "${rsOut}" -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
+--epi=${inputEpi} \
 --t1brain="${T1_RPI_brain}" \
 --t1="${T1_RPI}" \
 --pedir=-y \
