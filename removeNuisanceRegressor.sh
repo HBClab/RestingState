@@ -219,7 +219,6 @@ while [ $# -ge 1 ] ; do
       echo "ERROR: Invalid option"
       printCommandLine
       shift;;
-      ;;
     *)
       echo "oops"
       shift;;
