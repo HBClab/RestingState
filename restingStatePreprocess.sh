@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 ########################################################################
 # FEAT directory setup, smoothing, registration fixes
@@ -307,6 +307,9 @@ while [ $# -ge 1 ] ; do
       rm -rf "${indir:?}"/preproc
       rm -rf "${indir:?}"/ica_aroma;
       shift;;
+  *)
+    echo "oops"
+    shift;;
   esac
 done
 
@@ -353,18 +356,18 @@ mkdir -p "$preprocDir"
 # Echo out all input parameters into a log
 logDir=$(dirname "$epiData")
 {
-  echo "------------------------------------" 
-  echo "-E $epiData" 
-  echo "-A $t1Data" 
-  echo "-t $tr" 
-  echo "-T $te" 
-  echo "-s $smooth" 
+  echo "------------------------------------"
+  echo "-E $epiData"
+  echo "-A $t1Data"
+  echo "-t $tr"
+  echo "-T $te"
+  echo "-s $smooth"
   if [[ $fieldMapFlag == 1 ]]; then
-    echo "-f" 
+    echo "-f"
   fi
-  date 
-  echo "" 
-  echo "" 
+  date
+  echo ""
+  echo ""
 } >> "$logDir"/rsParams_log
 
 
@@ -395,11 +398,11 @@ cd "$indir" || exit
 
 # Log results to HTML file
 {
-  echo "<hr><h2>Preprocessing Results</h2>" 
-  echo "<b>Spatial Filter Size (mm)</b>: $smooth<br>" 
-  echo "<b>TR (s): $tr</b><br>" 
-  echo "<b>TE (ms): $te</b><br>" 
-  echo "<b>Number of Time Points</b>: $numtimepoint<br>" 
+  echo "<hr><h2>Preprocessing Results</h2>"
+  echo "<b>Spatial Filter Size (mm)</b>: $smooth<br>"
+  echo "<b>TR (s): $tr</b><br>"
+  echo "<b>TE (ms): $te</b><br>"
+  echo "<b>Number of Time Points</b>: $numtimepoint<br>"
 } >> "$indir"/analysisResults.html
 
 echo "$0 Complete"

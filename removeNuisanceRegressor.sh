@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 ##################################################################################################################
 # Removal of Nuisance Signal, Filtering
@@ -218,7 +218,10 @@ while [ $# -ge 1 ] ; do
     ?)
       echo "ERROR: Invalid option"
       printCommandLine
-      ;;
+      shift;;
+    *)
+      echo "oops"
+      shift;;
      esac
 done
 
@@ -293,8 +296,8 @@ done
 {
 echo "------------------------------------"
 echo "-E $epiData"
-echo "-A $t1Data" 
-echo "-N $nuisanceInFile" 
+echo "-A $t1Data"
+echo "-N $nuisanceInFile"
 echo "-L $lp"
 echo "-H $hp"
 } >> "$logDir"/rsParams_log
@@ -304,7 +307,7 @@ if [[ $overwriteFlag == 1 ]]; then
 fi
 {
 date >> "$logDir"/rsParams_log
-echo -e "\\n\\n" 
+echo -e "\\n\\n"
 } >> "$logDir"/rsParams_log
 
 

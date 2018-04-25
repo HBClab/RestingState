@@ -46,7 +46,7 @@ for r=1:roiN
   seed=char(seed);
 
   %Loop through 3 cardinal orientations
-  for orientation={'coronal','sagittal','axial'}  
+  for orientation={'coronal','sagittal','axial'}
     orientation=char(orientation);
 
     %Variable for underlay/overlay inputs
@@ -128,7 +128,7 @@ for r=1:roiN
     % Form an RGB truecolor image by concatenating the channel matrices along
     % the third dimension.
     MergedOut = cat(3, out_red, out_green, out_blue);
-    imwrite(MergedOut,[imageDir,'/',seed,'_',orientation,'.png'],'BitDepth',16)
+    imwrite(MergedOut,[imageDir,'/',seed,'_',orientation,'.png'])
 
   end
 end
