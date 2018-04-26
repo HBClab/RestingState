@@ -373,7 +373,7 @@ function EPItoT1reg() {
       --t1=${t1SkullData} \
       --t1brain=${t1Data} \
       --out=$epiWarpDir/EPItoT1 \
-      --fmap=FM_UD_fmap_mag \
+      --fmap=FM_UD_fmap \
       --fmapmag=FM_UD_fmap_mag \
       --fmapmagbrain=FM_UD_fmap_mag_brain \
       --echospacing=${dwellTime} \
