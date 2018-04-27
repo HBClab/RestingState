@@ -50,26 +50,26 @@ imagedimsx=funcvoldim(1);
 imagedimsy=funcvoldim(2);
 imagedimsz=funcvoldim(3);
 
-numclusters = parcluster('local'); %find the number of workers available on your machine/server
+%numclusters = parcluster('local'); %find the number of workers available on your machine/server
 
-if roiN <= 4
-    dcpoolsize = roiN; %for cases when there's only 1 or 2 ROIs
-elseif numclusters.NumWorkers > 4
-    dcpoolsize = numclusters.NumWorkers-2; %if you have more than 4 workers available, set pool size to N-2, limits tying up server
-else
-    dcpoolsize = numclusters.NumWorkers; %if you have 4 or less workers available, set pool size to all available workers (may bog down local machines).
-end
+%if roiN <= 4
+%    dcpoolsize = roiN; %for cases when theres only 1 or 2 ROIs
+%elseif numclusters.NumWorkers > 4
+%    dcpoolsize = numclusters.NumWorkers-2; %if you have more than 4 workers available, set pool size to N-2, limits tying up server
+%else
+%    dcpoolsize = numclusters.NumWorkers; %if you have 4 or less workers available, set pool size to all available workers (may bog down local machines).
+%end
 
-try
-matlabpool(num2str(dcpoolsize))
+%try
+%matlabpool(num2str(dcpoolsize))
 %http://www.mathworks.com/help/distcomp/parpool.html#btyaboo-7
 %parpool(local,num2str(dcpoolsize))
 %Warning: matlabpool will be removed in a future release.
 %Use parpool instead.
 %PARPOOL was introduced in R2013b to replace MATLABPOOL. In R2013a and earlier, use MATLABPOOL.
-catch err
-    warning(err.message)
-end
+%catch err
+%    warning(err.message)
+%end
 
 warning off all
 mypath=[roiOutDir];
@@ -96,7 +96,7 @@ totalslices=imagedimsx*roiN;
 %index=1;
 
 
-parfor r=1:roiN
+for r=1:roiN
 
   fcmap=zeros(imagedimsx,imagedimsy,imagedimsz);
 
