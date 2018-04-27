@@ -12,15 +12,15 @@
 ########################################################################
 
 function Usage {
-  echo "restingStatePreprocess.sh --epi=restingStateImage --t1brain=anatomicalImage --tr=tr --te= --s=smooth -f -c"
+  echo "restingStatePreprocess.sh --epi=restingStateImage --t1brain=anatomicalImage --tr=tr --te=te --smooth=smoothing kernel -f -c"
   echo ""
   echo "   where:"
   echo "   --epi Resting State file"
-  echo "   --t1brain T1 file"
+  echo "   --t1brain skull-stripped T1 file"
   echo "   --tr TR time (seconds)"
   echo "   --te TE (milliseconds)"
-  echo "   --s spatial smoothing kernel size"
-  echo "   -f fieldmap registration correction"
+  echo "   --smooth spatial smoothing kernel size"
+  echo "   --usefmap fieldmap registration correction"
   echo "   --aroma run ICA_AROMA"
   echo "   -c clobber/overwrite previous results"
   exit 1
