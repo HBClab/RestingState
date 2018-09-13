@@ -767,6 +767,8 @@ EOF
   done
 fi
 #################################
+# workaround to prevent permissions 
+parallel chmod 774 ::: "$(find "${seedcorrDir}" -type f \( -name "highres2standard.nii.gz" -o -name "seeds*.txt" -o -name "rsParams*" -o -name "run*.m" -o -name "highres.nii.gz" -o -name "standard.nii.gz" \))"
 
 echo "$0 Complete"
 echo "Please make sure that the ROI folders were created in the ${roiOutDir}/ folder."
