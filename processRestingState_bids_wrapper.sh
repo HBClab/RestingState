@@ -131,7 +131,7 @@ in
     esac
 done
 
-scriptdir="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
+scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 # if no user-defined roilist, default to first .nii.gz file found in ROIs dir
 if [[ "${roilist}" == "" ]]; then
