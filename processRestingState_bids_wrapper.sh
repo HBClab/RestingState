@@ -175,15 +175,9 @@ if [ "${scanner}" == "GE" ]; then
   fmap_mag_stripped="$(find "${subDir}"/ses-"${sesID}"/fmap -type f -name "*magnitude_stripped.nii.gz")"
   dwellTime="$(grep "dwellTime=" "$(find "${subDir}"/ses-"${sesID}"/func -type f -name "*rest_bold_info.txt")" | awk -F"=" '{print $2}' | tail -1)"
 elif [ "${scanner}" == "SE" ]; then
-<<<<<<< HEAD
-  fmap_prepped="$(find ${subDir}/ses-${sesID}/fmap -maxdepth 1 -type f -name "*fieldmap_prepped.nii.gz")"
-  fmap_mag="$(find ${subDir}/ses-${sesID}/fmap -maxdepth 1 -type f -name "*magnitude1.nii.gz")"
-  fmap_mag_stripped="$(find ${subDir}/ses-${sesID}/fmap/mag1/ -type f -name "*mag1*_stripped.nii.gz" -print -quit)"
-=======
   fmap_prepped="$(find "${subDir}"/ses-"${sesID}"/fmap -maxdepth 1 -type f -name "*fieldmap_prepped.nii.gz")"
   fmap_mag="$(find "${subDir}"/ses-"${sesID}"/fmap -maxdepth 1 -type f -name "*magnitude1.nii.gz")"
   fmap_mag_stripped="$(find "${subDir}"/ses-"${sesID}"/fmap/mag1/ -type f -name "*mag1*_stripped.nii.gz" -print -quit)"
->>>>>>> e8492684f311b46e3df86b32473ba28e708d64b2
   dwellTime=0.00056
 fi
 
@@ -197,11 +191,7 @@ else
 
   printf "\\n%s\\nBeginning preprocesssing ...\\n" "$(date)"
 
-<<<<<<< HEAD
-  mkdir -p ${rsOut}
-=======
   mkdir -p "${rsOut}"
->>>>>>> e8492684f311b46e3df86b32473ba28e708d64b2
 
   {
   echo "t1=${T1_RPI_brain}"
@@ -211,11 +201,7 @@ else
   echo "epiDwell=${dwellTime}"
   echo "epiTR=2"
   echo "epiTE=30"
-<<<<<<< HEAD
-  } >> ${rsOut}/rsParams
-=======
   } >> "${rsOut}"/rsParams
->>>>>>> e8492684f311b46e3df86b32473ba28e708d64b2
 
   # copy raw rest image from BIDS to derivatives/rsOut_legacy/subID/sesID/
   rsync -a "${inFile}" "${rsOut}"/
@@ -223,23 +209,6 @@ else
   if [ ! -z "${fmap_prepped}" ] && [ "${fieldMapFlag}" == 1 ]; then # process with fmap
     echo "fieldMapCorrection=1" >> "${rsOut}"/rsParams
     #skull strip mag image
-<<<<<<< HEAD
-    if [ "${fmap_mag_stripped}" == "" ]; then
-      printf "\n%s\nSkull stripping fmap magnitude image..." "$(date)"
-      bet ${fmap_mag} "${fmap_map//.nii.gz/_stripped.nii.gz}" -m -n -f 0.3 -B
-      fslmaths "$(find ${subDir}/ses-${sesID}/fmap -type f -name "*magnitude*stripped_mask.nii.gz")" -ero -bin "${fmap_mag//.nii.gz/_stripped_mask_eroded.nii.gz}" -odt char
-      fslmaths ${fmap_mag} -mas "${fmap_mag//.nii.gz/_stripped_mask_eroded.nii.gz}" "${fmap_mag//.nii.gz/_stripped.nii.gz}"
-      fmap_mag_stripped="${fmap_mag//.nii.gz/_stripped.nii.gz}"
-    fi
-    
-    ${scriptdir}/qualityCheck.sh --epi="$(find ${rsOut} -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
-      --t1brain=${T1_RPI_brain} \
-      --t1=${T1_RPI} \
-      --fmap=${fmap_prepped} \
-      --fmapmag=${fmap_mag} \
-      --fmapmagbrain=${fmap_mag_stripped} \
-      --dwelltime=${dwellTime} \
-=======
     if [ -z "${fmap_mag_stripped}" ]; then
       printf "\\n%s\\nSkull stripping fmap magnitude image..." "$(date)"
       bet "${fmap_mag}" "${fmap_mag//.nii.gz/_stripped.nii.gz}" -m -n -f 0.3 -B
@@ -255,7 +224,6 @@ else
       --fmapmag="${fmap_mag}" \
       --fmapmagbrain="${fmap_mag_stripped}" \
       --dwelltime="${dwellTime}" \
->>>>>>> e8492684f311b46e3df86b32473ba28e708d64b2
       --pedir=-y \
       --regmode=6dof
 
@@ -314,13 +282,8 @@ else
     --hp=.008 \
     "${compcorArg}"
 
-<<<<<<< HEAD
-  clobber ${rsOut}/motionScrub/$(basename ${epiDataFiltReg/.nii/_ms.nii}) &&\
-  ${scriptdir}/motionScrub.sh --epi=${epiDataFiltReg}
-=======
   clobber "${rsOut}"/motionScrub/"$(basename "${epiDataFiltReg/.nii/_ms.nii}")" &&\
   "${scriptdir}"/motionScrub.sh --epi="${epiDataFiltReg}"
->>>>>>> e8492684f311b46e3df86b32473ba28e708d64b2
 
   "${scriptdir}"/seedVoxelCorrelation.sh \
     --epi="${epiDataFiltReg}" \
