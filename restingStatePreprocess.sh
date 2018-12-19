@@ -11,26 +11,16 @@
 #         replicating needed steps (slicer/pngappend)
 ########################################################################
 
-
-scriptDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-
-analysis=preproc
-fsf=${analysis}.fsf
-preprocfeat=${analysis}.feat
-export preprocfeat
-SGE_ROOT='';export SGE_ROOT
-
-
 function Usage {
-  echo "restingStatePreprocess.sh --epi=restingStateImage --t1brain=anatomicalImage --tr=tr --te= --s=smooth -f -c"
+  echo "restingStatePreprocess.sh --epi=restingStateImage --t1brain=anatomicalImage --tr=tr --te=te --smooth=smoothing kernel -f -c"
   echo ""
   echo "   where:"
   echo "   --epi Resting State file"
-  echo "   --t1brain T1 file"
+  echo "   --t1brain skull-stripped T1 file"
   echo "   --tr TR time (seconds)"
   echo "   --te TE (milliseconds)"
-  echo "   --s spatial smoothing kernel size"
-  echo "   -f fieldmap registration correction"
+  echo "   --smooth spatial smoothing kernel size"
+  echo "   --usefmap fieldmap registration correction"
   echo "   --aroma run ICA_AROMA"
   echo "   -c clobber/overwrite previous results"
   exit 1
@@ -125,7 +115,7 @@ function feat_regFix()
   # ss: "How can I insert a custom registration into a FEAT analysis?"
 
   regDir="$preprocDir"/reg
-
+  mkdir -p "$regDir"
   # Remove all FEAT files (after backup), repopulate with proper files
   cp -r "$regDir" "$preprocDir"/regORIG
   rm -f "$regDir"/*
@@ -314,7 +304,7 @@ while [ $# -ge 1 ] ; do
       clob=true;
       export clob;
       echo "-c" >> "$logDir"/rsParams_log
-      rm -rf "${indir:?}"/${preprocfeat};
+      rm -rf "${indir:?}"/preproc
       rm -rf "${indir:?}"/ica_aroma;
       shift;;
   esac
@@ -356,23 +346,26 @@ if [[ $fieldMapFlag == "" ]]; then
 fi
 
 
-preprocDir="$indir"/${preprocfeat}
+preprocDir="$indir"/preproc
 export preprocDir
+mkdir -p "$preprocDir"
 
 # Echo out all input parameters into a log
 logDir=$(dirname "$epiData")
-echo "------------------------------------" >> "$logDir"/rsParams_log
-echo "-E $epiData" >> "$logDir"/rsParams_log
-echo "-A $t1Data" >> "$logDir"/rsParams_log
-echo "-t $tr" >> "$logDir"/rsParams_log
-echo "-T $te" >> "$logDir"/rsParams_log
-echo "-s $smooth" >> "$logDir"/rsParams_log
-if [[ $fieldMapFlag == 1 ]]; then
-  echo "-f" >> "$logDir"/rsParams_log
-fi
-date >> "$logDir"/rsParams_log
-echo "" >> "$logDir"/rsParams_log
-echo "" >> "$logDir"/rsParams_log
+{
+  echo "------------------------------------" 
+  echo "-E $epiData" 
+  echo "-A $t1Data" 
+  echo "-t $tr" 
+  echo "-T $te" 
+  echo "-s $smooth" 
+  if [[ $fieldMapFlag == 1 ]]; then
+    echo "-f" 
+  fi
+  date 
+  echo "" 
+  echo "" 
+} >> "$logDir"/rsParams_log
 
 
 
@@ -380,52 +373,11 @@ echo "Running $0 ..."
 
 cd "$indir" || exit
 
-
-# Set a few variables from data
-# epi_reg peDir setup (e.g. -y) is backwards from FEAT peDir (e.g. y-)
-peDirBase=$(< "$logDir"/rsParams grep "peDir=" | tail -1 | awk -F"=" '{print $2}')
-peDirTmp1=$(echo "$peDirBase" | cut -c1)
-peDirTmp2=$(echo "$peDirBase" | cut -c2)
-if [[ "$peDirTmp1" == "-" ]]; then
-  peDirNEW="${peDirTmp2}${peDirTmp1}"
-else
-  peDirNEW="${peDirBase}"
-fi
-
-numtimepoint=$(fslinfo "$epiData" | grep ^dim4 | awk '{print $2}')
-
-dwellTime=$(< "$logDir"/rsParams grep "epiDwell=" | tail -1 | awk -F"=" '{print $2}')
-
-
-###### FEAT (preproc) ########################################
-echo "...Running FEAT (preproc)"
-epiVoxTot=$(fslstats "${epiData}" -v | awk '{print $1}')
-
-# .fsf setup
-sed -e 's|SUBJECTPATH|'"${indir}"'|g' \
- -e 's|SUBJECTEPIPATH|'"${epiData}"'|g'  \
- -e 's|SUBJECTT1PATH|'"${t1Data}"'|g' \
- -e 's|SCANTE|'"${te}"'|g' \
- -e 's|SUBJECTVOLS|'"${numtimepoint}"'|g' \
- -e 's|SUBJECTSMOOTH|'"${smooth}"'|g' \
- -e 's|SUBJECTTR|'"${tr}"'|g' \
- -e 's|EPIDWELL|'"${dwellTime}"'|g' \
- -e 's|VOXTOT|'"${epiVoxTot}"'|g' \
- -e 's|PEDIR|'"${peDirNEW}"'|g' \
- -e 's|FSLDIR|'"${FSLDIR}"'|g' "$scriptDir"/dummy_preproc_5.0.10.fsf > "${indir}"/"${fsf}"
-
-# Run FEAT
-clobber "$preprocDir"/stats/res4d.nii.gz &&\
-feat "${indir}"/${fsf}
-
-################################################################
-
-
 # spatial smoothing
 clobber "$preprocDir"/nonfiltered_smooth_data.nii.gz &&\
 smooth
 
-#fix feat registration
+# set up registration
 feat_regFix "$preprocDir"
 
 # median scaling (for ICA_AROMA)
@@ -442,12 +394,13 @@ cd "$indir" || exit
 
 
 # Log results to HTML file
-echo "<hr><h2>Preprocessing Results</h2>" >> "$indir"/analysisResults.html
-echo "<b>Spatial Filter Size (mm)</b>: $smooth<br>" >> "$indir"/analysisResults.html
-echo "<b>TR (s): $tr</b><br>" >> "$indir"/analysisResults.html
-echo "<b>TE (ms): $te</b><br>" >> "$indir"/analysisResults.html
-echo "<b>Number of Time Points</b>: $numtimepoint<br>" >> "$indir"/analysisResults.html
-echo "<br><a href=\"$indir/${preprocfeat}/report.html\">FSL Preprocessing Results</a>" >> "$indir"/analysisResults.html
+{
+  echo "<hr><h2>Preprocessing Results</h2>" 
+  echo "<b>Spatial Filter Size (mm)</b>: $smooth<br>" 
+  echo "<b>TR (s): $tr</b><br>" 
+  echo "<b>TE (ms): $te</b><br>" 
+  echo "<b>Number of Time Points</b>: $numtimepoint<br>" 
+} >> "$indir"/analysisResults.html
 
 echo "$0 Complete"
 echo ""

@@ -249,17 +249,18 @@ fi
 
 # Source input (~func) directory
 indir=$(dirname "$epiData")
-preprocfeat=$(x=$indir; while [ "$x" != "/" ] ; do x=$(dirname "$x"); find "$x" -maxdepth 1 -type d -name preproc.feat 2>/dev/null; done)
-logDir=$(dirname "${preprocfeat}")
-rawEpiDir=$(dirname "$preprocfeat")
+preproc="${indir%/*}"/preproc
+logDir=$(dirname "${preproc}")
+rawEpiDir=$(dirname "${preproc}")
 
 if [ "${compcorFlag}" -eq 1 ]; then
   outDir=${rawEpiDir}/nuisanceRegression/compcor
 else
   outDir=${rawEpiDir}/nuisanceRegression/classic
 fi
-cd "${outDir}"
+
 mkdir -p "${outDir}"/rois
+cd "${outDir}"
 
 # If new nuisance regressors were added, echo them out to the rsParams file (only if they don't already exist in the file)
 # Making a *strong* assumption that any nuisanceROI lists added after initial processing won't reuse the first ROI (e.g. pccrsp)
