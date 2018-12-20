@@ -168,19 +168,19 @@ else
   fi
 fi
 
-
-if [ "${scanner}" == "GE" ]; then
-  fmap_prepped="$(find "${subDir}"/ses-"${sesID}"/fmap -type f -name "*fieldmap.nii.gz")"
-  fmap_mag="$(find "${subDir}"/ses-"${sesID}"/fmap -type f -name "*magnitude.nii.gz")"
-  fmap_mag_stripped="$(find "${subDir}"/ses-"${sesID}"/fmap -type f -name "*magnitude_stripped.nii.gz")"
-  dwellTime="$(grep "dwellTime=" "$(find "${subDir}"/ses-"${sesID}"/func -type f -name "*rest_bold_info.txt")" | awk -F"=" '{print $2}' | tail -1)"
-elif [ "${scanner}" == "SE" ]; then
-  fmap_prepped="$(find "${subDir}"/ses-"${sesID}"/fmap -maxdepth 1 -type f -name "*fieldmap_prepped.nii.gz")"
-  fmap_mag="$(find "${subDir}"/ses-"${sesID}"/fmap -maxdepth 1 -type f -name "*magnitude1.nii.gz")"
-  fmap_mag_stripped="$(find "${subDir}"/ses-"${sesID}"/fmap/mag1/ -type f -name "*mag1*_stripped.nii.gz" -print -quit)"
-  dwellTime=0.00056
+if [[ "${fieldMapFlag}" = 1 ]]; then
+  if [ "${scanner}" == "GE" ]; then
+    fmap_prepped="$(find "${subDir}"/ses-"${sesID}"/fmap -type f -name "*fieldmap.nii.gz")"
+    fmap_mag="$(find "${subDir}"/ses-"${sesID}"/fmap -type f -name "*magnitude.nii.gz")"
+    fmap_mag_stripped="$(find "${subDir}"/ses-"${sesID}"/fmap -type f -name "*magnitude_stripped.nii.gz")"
+    dwellTime="$(grep "dwellTime=" "$(find "${subDir}"/ses-"${sesID}"/func -type f -name "*rest_bold_info.txt")" | awk -F"=" '{print $2}' | tail -1)"
+  elif [ "${scanner}" == "SE" ]; then
+    fmap_prepped="$(find "${subDir}"/ses-"${sesID}"/fmap -maxdepth 1 -type f -name "*fieldmap_prepped.nii.gz")"
+    fmap_mag="$(find "${subDir}"/ses-"${sesID}"/fmap -maxdepth 1 -type f -name "*magnitude1.nii.gz")"
+    fmap_mag_stripped="$(find "${subDir}"/ses-"${sesID}"/fmap/mag1/ -type f -name "*mag1*_stripped.nii.gz" -print -quit)"
+    dwellTime=0.00056
+  fi
 fi
-
  
  if [ -z "${T1_RPI}" ] || [ -z "${T1_RPI_brain}" ] || [ -z "${inFile}" ]; then
   printf "\\n%s\\nERROR: at least one prerequisite scan is missing. Exiting.\\n" "$(date)" 1>&2
