@@ -388,6 +388,7 @@ subjectT1_mask=$(basename ${t1_mask%%.nii*})
 
 # make the t1_brain image
 fslmaths ${t1} -mul ${t1_mask} ${subjectT1_dir}/${t1}_brain.nii.gz
+t1_brain="${subjectT1_dir}/${t1}_brain.nii.gz"
 
 
 if [[ "${fieldMapFlag}" = 1 ]]; then
@@ -404,11 +405,6 @@ if [[ "${fieldMapFlag}" = 1 ]]; then
   fi
 fi
  
- if [ -z "${T1_RPI}" ] || [ -z "${T1_RPI_brain}" ] || [ -z "${inFile}" ]; then
-  printf "\\n%s\\nERROR: at least one prerequisite scan is missing. Exiting.\\n" "$(date)" 1>&2
-  exit 1
-else
-
   softwareCheck # check dependencies
 
   printf "\\n%s\\nBeginning preprocesssing ...\\n" "$(date)"
@@ -416,9 +412,9 @@ else
   mkdir -p "${rsOut}"
 
   {
-  echo "t1=${T1_RPI_brain}"
-  echo "t1Skull=${T1_RPI}"
-  echo "t1Mask=${T1_brain_mask}"
+  echo "t1=${t1_brain}"
+  echo "t1Skull=${t1}"
+  echo "t1Mask=${t1_mask}"
   echo "peDir=-y"
   echo "epiDwell=${dwellTime}"
   echo "epiTR=2"
@@ -440,8 +436,8 @@ else
     fi
     
     "${scriptdir}"/qualityCheck.sh --epi="$(find "${rsOut}" -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
-      --t1brain="${T1_RPI_brain}" \
-      --t1="${T1_RPI}" \
+      --t1brain="${t1_brain}" \
+      --t1="${t1}" \
       --fmap="${fmap_prepped}" \
       --fmapmag="${fmap_mag}" \
       --fmapmagbrain="${fmap_mag_stripped}" \
@@ -451,7 +447,7 @@ else
 
     clobber "${rsOut}"/preproc/nonfiltered_smooth_data.nii.gz &&\
     "${scriptdir}"/restingStatePreprocess.sh --epi="${rsOut}"/mcImg_stripped.nii.gz \
-      --t1brain="${T1_RPI_brain}" \
+      --t1brain="${t1_brain}" \
       --tr=2 \
       --te=30 \
       --smooth=6 \
@@ -462,8 +458,8 @@ else
     printf "Process without fieldmap."
     "${scriptdir}"/qualityCheck.sh \
       --epi="$(find "${rsOut}" -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
-      --t1brain="${T1_RPI_brain}" \
-      --t1="${T1_RPI}" \
+      --t1brain="${t1_brain}" \
+      --t1="${t1}" \
       --dwelltime="${dwellTime}" \
       --pedir=-y \
       --regmode=6dof
@@ -471,7 +467,7 @@ else
     clobber "${rsOut}"/preproc/nonfiltered_smooth_data.nii.gz &&\
     "${scriptdir}"/restingStatePreprocess.sh \
       --epi="${rsOut}"/mcImg_stripped.nii.gz \
-      --t1brain="${T1_RPI_brain}" \
+      --t1brain="${t1_brain}" \
       --tr=2 \
       --te=30 \
       --smooth=6 \
@@ -498,7 +494,7 @@ else
   clobber "${epiDataFiltReg}" &&\
   "${scriptdir}/"removeNuisanceRegressor.sh \
     --epi="$epiDataFilt" \
-    --t1brain="${T1_RPI_brain}" \
+    --t1brain="${t1_brain}" \
     --nuisanceList="$rsOut"/nuisanceList.txt \
     --lp=.08 \
     --hp=.008 \
