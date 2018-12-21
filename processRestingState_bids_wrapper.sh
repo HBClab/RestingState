@@ -284,23 +284,17 @@ function RPI_orient() {
 	  echo "flipping by ${flipFlag}"
 
 	  #Reorienting image and checking for warning messages
-	  warnFlag=`fslswapdim ${infile} ${flipFlag} ${infile%.nii.gz}_RPI.nii.gz`
+	  warnFlag=`fslswapdim ${infile} ${flipFlag} ${infile%.nii.gz}.nii.gz`
 	  warnFlagCut=`echo ${warnFlag} | awk -F":" '{print $1}'`
 
 	  #Reorienting the file may require swapping out the flag orientation to match the .img block
 	  if [[ $warnFlagCut == "WARNING" ]]; then
-		fslorient -swaporient ${infile%.nii.gz}_RPI.nii.gz
+		fslorient -swaporient ${infile%.nii.gz}.nii.gz
 	  fi
 
 	else
 
 	  echo "No need to reorient.  Dataset already in RPI orientation."
-
-	  if [ ! -e ${infile%.nii.gz}_RPI.nii.gz ]; then
-
-	    cp ${infile} ${infile%.nii.gz}_RPI.nii.gz
-
-	  fi
 
 	fi
 }
@@ -374,21 +368,25 @@ sesID="$(echo "${inFile}" | grep -o "ses-[a-z0-9A-Z]*" | head -n 1 | sed -e "s|s
 subDir="${bidsDir}/sub-${subID}" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161
 scanner="$(echo "${subID}" | cut -c -2)" # extract scannerID from subID, works when scannerID is embedded in subID. TODO: need a different way to determine scannerID. e.g., dicom header?
 rsOut="${bidsDir}/derivatives/rsOut/sub-${subID}/ses-${sesID}"
+rsOut_anat="${bidsDir}/derivatives/rsOut/anat/sub-${subID}/ses-${sesID}"
+mkdir -p "${rsOut_anat}"
 
-# load variables needed for processing
+# copy t1 files to anat mirrored to functional directories, this will keep T1 intermediate files related to this script contained within rsOut/anat
+cp ${t1} ${rsOut_anat}/T1w.nii.gz
+cp ${t1_mask} ${rsOut_anat}/T1w_mask.nii.gz
 
 # check orientation of t1 and change to RPI if needed
-RPI_orient ${t1}
-RPI_orient ${t1_mask}
+RPI_orient ${rsOut_anat}/T1w.nii.gz
+RPI_orient ${rsOut_anat}/T1w_mask.nii.gz
 
-# t1
-subjectT1_dir=$(dirname ${t1})
-subjectT1_name=$(basename ${t1%%.nii*})
-subjectT1_mask=$(basename ${t1_mask%%.nii*})
+# if these are not RPI, the function above will make them RPI without naming them; they are copies so fine if all in RPI within rsOut
+# rename t1 variable to rsOut/anat file
+t1="${rsOut_anat}/T1w.nii.gz"
+t1_mask="${rsOut_anat}/T1w_mask.nii.gz"
 
 # make the t1_brain image
-fslmaths ${t1} -mul ${t1_mask} ${subjectT1_dir}/${t1}_brain.nii.gz
-t1_brain="${subjectT1_dir}/${t1}_brain.nii.gz"
+fslmaths ${t1} -mul ${t1_mask} ${rsOut_anat}/T1w_brain.nii.gz
+t1_brain="${rsOut_anat}/T1w_brain.nii.gz"
 
 
 if [[ "${fieldMapFlag}" = 1 ]]; then
@@ -421,7 +419,7 @@ fi
   echo "epiTE=30"
   } >> "${rsOut}"/rsParams
 
-  # copy raw rest image from BIDS to derivatives/rsOut_legacy/subID/sesID/
+  # copy raw rest image from BIDS to derivatives/rsOut/subID/sesID/
   rsync -a "${inFile}" "${rsOut}"/
 
   if [ ! -z "${fmap_prepped}" ] && [ "${fieldMapFlag}" == 1 ]; then # process with fmap
