@@ -7,6 +7,8 @@ function Usage {
   echo ""
   echo "Usage: processRestingState_wrapper.sh --epi=rawEpiFile --roiList=roilist"
   echo "--epi path/to/BIDS/sub-GEA161/ses-activepre/func/sub-GEA161_ses-activepre_task-rest_bold.nii.gz"
+  echo "--t1 path/to/BIDS/derivatives/fmriprep/sub-GEA161/anat/sub-GEA161_T1w_preproc.nii.gz"
+  echo "--t1_mask path/to/BIDS/derivatives/fmriprep/sub-GEA161/anat/sub-GEA161_T1w_brainmask.nii.gz"
   echo "--roiList file with list of rois. must include path to roi file."
   exit 1
 }
@@ -107,6 +109,22 @@ in
         exit 1
       fi
       shift;;
+  --t1)
+      inFile=`get_arg1 $1`;
+      export inFile;
+      if [ "$inFile" == "" ]; then
+        echo "Error: The restingStateImage (-E) is a required option"
+        exit 1
+      fi
+      shift;;
+  --t1_mask)
+      inFile=`get_arg1 $1`;
+      export inFile;
+      if [ "$inFile" == "" ]; then
+        echo "Error: The restingStateImage (-E) is a required option"
+        exit 1
+      fi
+      shift;;
   --roiList)
       roilist=$(get_arg1 $1);
       shift;;
@@ -145,28 +163,21 @@ sesID="$(echo "${inFile}" | grep -o "ses-[a-z0-9A-Z]*" | head -n 1 | sed -e "s|s
 subDir="${bidsDir}/sub-${subID}" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161
 scanner="$(echo "${subID}" | cut -c -2)" # extract scannerID from subID, works when scannerID is embedded in subID. TODO: need a different way to determine scannerID. e.g., dicom header?
 rsOut="${bidsDir}/derivatives/rsOut/sub-${subID}/ses-${sesID}"
+
 # load variables needed for processing
 
-MBA_dir="$(dirname "$(find ${bidsDir}/derivatives/MBA/sub-${subID}/ses-* -type f -name "sub-${subID}_ses*T1w*.nii.gz" -print -quit)")" # find dir containing MBA output
-echo "subDir is ${subDir}."
-echo "MBA_dir is ${MBA_dir}."
+# check orientation of t1 and change to RPI if needed
 
-if [[ ! -d "${MBA_dir}" ]]; then
-  echo "ERROR: MBA directory not found in derivatives. Exiting."
-  exit 1
-else
-  # when there are T1s from multiple session, ensure T1 with and w/out skull are from same sesson
-  MBA_ses="$(basename "${MBA_dir}")" 
-  T1_RPI="$(find "${subDir}"/"${MBA_ses}"/anat -type f -name "sub-${subID}_ses*_T1w.nii.gz")"
-  T1_RPI_brain="$(find "${MBA_dir}" -type f -name "sub-${subID}_ses*_T1w_brain.nii.gz")"
-  T1_brain_mask="$(find "${MBA_dir}" -type f -name "sub-${subID}_ses*_T1w_mask_60_smooth.nii.gz")"
 
-  if [[ -e "${T1_RPI}" ]] && [[ -z "${T1_RPI_brain}" ]]; then
-    fslmaths "${T1_RPI}" -mas "${T1_brain_mask}" "${T1_brain_mask//mask_60_smooth/brain}" 
-    T1_RPI_brain="$(find "${MBA_dir}" -type f -name "sub-${subID}_ses*_T1w_brain.nii.gz")"
 
-  fi
-fi
+# t1
+subjectT1_dir=$(dirname ${t1})
+subjectT1_name=$(basename ${t1%%.nii*})
+subjectT1_mask=$(basename ${t1_mask%%.nii*})
+
+# make the t1_brain image
+fslmaths ${t1} -mul ${t1_mask} ${subjectT1_dir}/${t1}_brain.nii.gz
+
 
 if [[ "${fieldMapFlag}" = 1 ]]; then
   if [ "${scanner}" == "GE" ]; then
