@@ -321,18 +321,18 @@ in
       fi
       shift;;
   --t1)
-      inFile=`get_arg1 $1`;
-      export inFile;
-      if [ "$inFile" == "" ]; then
-        echo "Error: The restingStateImage (-E) is a required option"
+      t1=`get_arg1 $1`;
+      export t1;
+      if [ "$t1" == "" ]; then
+        echo "Error: T1 required"
         exit 1
       fi
       shift;;
   --t1_mask)
-      inFile=`get_arg1 $1`;
-      export inFile;
-      if [ "$inFile" == "" ]; then
-        echo "Error: The restingStateImage (-E) is a required option"
+      t1_mask=`get_arg1 $1`;
+      export t1_mask;
+      if [ "$t1_mask" == "" ]; then
+        echo "Error: T1 mask required"
         exit 1
       fi
       shift;;
