@@ -7,6 +7,8 @@ function Usage {
   echo ""
   echo "Usage: processRestingState_wrapper.sh --epi=rawEpiFile --roiList=roilist"
   echo "--epi path/to/BIDS/sub-GEA161/ses-activepre/func/sub-GEA161_ses-activepre_task-rest_bold.nii.gz"
+  echo "--t1 path/to/BIDS/derivatives/fmriprep/sub-GEA161/anat/sub-GEA161_T1w_preproc.nii.gz"
+  echo "--t1_mask path/to/BIDS/derivatives/fmriprep/sub-GEA161/anat/sub-GEA161_T1w_brainmask.nii.gz"
   echo "--roiList file with list of rois. must include path to roi file."
   exit 1
 }
@@ -14,17 +16,17 @@ function Usage {
 ########## FSL's arg parsing functions ###################
 get_opt1() {
     arg=$(echo $1 | sed 's/=.*//')
-    echo $arg
+    echo "$arg"
 }
 
 get_imarg1() {
-    arg=$(get_arg1 $1);
-    arg=$($FSLDIR/bin/remove_ext $arg);
-    echo $arg
+    arg=$(get_arg1 "$1");
+    arg=$("$FSLDIR"/bin/remove_ext "$arg");
+    echo "$arg"
 }
 
 get_arg1() {
-    if [ X"`echo $1 | grep '='`" = X ] ; then
+    if [ X"$(echo $1 | grep '=')" = X ] ; then
 	echo "Option $1 requires an argument" 1>&2
 	exit 1
     else
@@ -33,7 +35,7 @@ get_arg1() {
 	    echo "Option $1 requires an argument" 1>&2
 	    exit 1
 	fi
-	echo $arg
+	echo "$arg"
     fi
 }
 
@@ -94,6 +96,211 @@ function clobber()
 clob=false
 export -f clobber
 
+
+function RPI_orient() {
+    local infile=$1 &&\
+    [ ! -z  "${infile}" ] ||\
+    ( printf '%s\n' "${FUNCNAME[0]}, input not defined" && return 1 )
+
+    #Determine qform-orientation to properly reorient file to RPI (MNI) orientation
+	xorient=`fslhd ${infile} | grep "^qform_xorient" | awk '{print $2}' | cut -c1`
+	yorient=`fslhd ${infile} | grep "^qform_yorient" | awk '{print $2}' | cut -c1`
+	zorient=`fslhd ${infile} | grep "^qform_zorient" | awk '{print $2}' | cut -c1`
+
+	native_orient=${xorient}${yorient}${zorient}
+
+	echo "native orientation = ${native_orient}"
+
+	if [ "${native_orient}" != "RPI" ]; then
+
+	  case ${native_orient} in
+
+		#L PA IS
+		LPI)
+			flipFlag="-x y z"
+			;;
+		LPS)
+			flipFlag="-x y -z"
+	    		;;
+		LAI)
+			flipFlag="-x -y z"
+	    		;;
+		LAS)
+			flipFlag="-x -y -z"
+	    		;;
+
+		#R PA IS
+		RPS)
+			flipFlag="x y -z"
+	    		;;
+		RAI)
+			flipFlag="x -y z"
+	    		;;
+		RAS)
+			flipFlag="x -y -z"
+	    		;;
+
+		#L IS PA
+		LIP)
+			flipFlag="-x z y"
+	    		;;
+		LIA)
+			flipFlag="-x -z y"
+	    		;;
+		LSP)
+			flipFlag="-x z -y"
+	    		;;
+		LSA)
+			flipFlag="-x -z -y"
+	    		;;
+
+		#R IS PA
+		RIP)
+			flipFlag="x z y"
+	    		;;
+		RIA)
+			flipFlag="x -z y"
+	    		;;
+		RSP)
+			flipFlag="x z -y"
+	    		;;
+		RSA)
+			flipFlag="x -z -y"
+	    		;;
+
+		#P IS LR
+		PIL)
+			flipFlag="-z x y"
+	    		;;
+		PIR)
+			flipFlag="z x y"
+	    		;;
+		PSL)
+			flipFlag="-z x -y"
+	    		;;
+		PSR)
+			flipFlag="z x -y"
+	    		;;
+
+		#A IS LR
+		AIL)
+			flipFlag="-z -x y"
+	    		;;
+		AIR)
+			flipFlag="z -x y"
+	    		;;
+		ASL)
+			flipFlag="-z -x -y"
+	    		;;
+		ASR)
+			flipFlag="z -x -y"
+	    		;;
+
+		#P LR IS
+		PLI)
+			flipFlag="-y x z"
+	    		;;
+		PLS)
+			flipFlag="-y x -z"
+	    		;;
+		PRI)
+			flipFlag="y x z"
+	    		;;
+		PRS)
+			flipFlag="y x -z"
+	    		;;
+
+		#A LR IS
+		ALI)
+			flipFlag="-y -x z"
+	    		;;
+		ALS)
+			flipFlag="-y -x -z"
+	    		;;
+		ARI)
+			flipFlag="y -x z"
+	    		;;
+		ARS)
+			flipFlag="y -x -z"
+	    		;;
+
+		#I LR PA
+		ILP)
+			flipFlag="-y z x"
+	    		;;
+		ILA)
+			flipFlag="-y -z x"
+	    		;;
+		IRP)
+			flipFlag="y z x"
+	    		;;
+		IRA)
+			flipFlag="y -z x"
+	    		;;
+
+		#S LR PA
+		SLP)
+			flipFlag="-y z -x"
+	    		;;
+		SLA)
+			flipFlag="-y -z -x"
+	    		;;
+		SRP)
+			flipFlag="y z -x"
+	    		;;
+		SRA)
+			flipFlag="y -z -x"
+	    		;;
+
+		#I PA LR
+		IPL)
+			flipFlag="-z y x"
+	    		;;
+		IPR)
+			flipFlag="z y x"
+	    		;;
+		IAL)
+			flipFlag="-z -y x"
+	    		;;
+		IAR)
+			flipFlag="z -y x"
+	    		;;
+
+		#S PA LR
+		SPL)
+			flipFlag="-z y -x"
+	    		;;
+		SPR)
+			flipFlag="z y -x"
+	    		;;
+		SAL)
+			flipFlag="-z -y -x"
+	    		;;
+		SAR)
+			flipFlag="z -y -x"
+	    		;;
+	  esac
+
+	  echo "flipping by ${flipFlag}"
+
+	  #Reorienting image and checking for warning messages
+	  warnFlag=`fslswapdim ${infile} ${flipFlag} ${infile%.nii.gz}.nii.gz`
+	  warnFlagCut=`echo ${warnFlag} | awk -F":" '{print $1}'`
+
+	  #Reorienting the file may require swapping out the flag orientation to match the .img block
+	  if [[ $warnFlagCut == "WARNING" ]]; then
+		fslorient -swaporient ${infile%.nii.gz}.nii.gz
+	  fi
+
+	else
+
+	  echo "No need to reorient.  Dataset already in RPI orientation."
+
+	fi
+}
+
+
+
 if [ $# -lt 2 ] ; then Usage; exit 0; fi
 while [ $# -ge 1 ] ; do
   iarg=$(get_opt1 $1);
@@ -104,6 +311,22 @@ in
       export inFile;
       if [ "$inFile" == "" ]; then
         echo "Error: The restingStateImage (-E) is a required option"
+        exit 1
+      fi
+      shift;;
+  --t1)
+      t1=`get_arg1 $1`;
+      export t1;
+      if [ "$t1" == "" ]; then
+        echo "Error: T1 required"
+        exit 1
+      fi
+      shift;;
+  --t1_mask)
+      t1_mask=`get_arg1 $1`;
+      export t1_mask;
+      if [ "$t1_mask" == "" ]; then
+        echo "Error: T1 mask required"
         exit 1
       fi
       shift;;
@@ -145,28 +368,26 @@ sesID="$(echo "${inFile}" | grep -o "ses-[a-z0-9A-Z]*" | head -n 1 | sed -e "s|s
 subDir="${bidsDir}/sub-${subID}" # e.g., /vosslabhpc/Projects/Bike_ATrain/Imaging/BIDS/sub-GEA161
 scanner="$(echo "${subID}" | cut -c -2)" # extract scannerID from subID, works when scannerID is embedded in subID. TODO: need a different way to determine scannerID. e.g., dicom header?
 rsOut="${bidsDir}/derivatives/rsOut/sub-${subID}/ses-${sesID}"
-# load variables needed for processing
+rsOut_anat="${bidsDir}/derivatives/rsOut/anat/sub-${subID}/ses-${sesID}"
+mkdir -p "${rsOut_anat}"
 
-MBA_dir="$(dirname "$(find ${bidsDir}/derivatives/MBA/sub-${subID}/ses-* -type f -name "sub-${subID}_ses*T1w*.nii.gz" -print -quit)")" # find dir containing MBA output
-echo "subDir is ${subDir}."
-echo "MBA_dir is ${MBA_dir}."
+# copy t1 files to anat mirrored to functional directories, this will keep T1 intermediate files related to this script contained within rsOut/anat
+cp ${t1} ${rsOut_anat}/T1w.nii.gz
+cp ${t1_mask} ${rsOut_anat}/T1w_mask.nii.gz
 
-if [[ ! -d "${MBA_dir}" ]]; then
-  echo "ERROR: MBA directory not found in derivatives. Exiting."
-  exit 1
-else
-  # when there are T1s from multiple session, ensure T1 with and w/out skull are from same sesson
-  MBA_ses="$(basename "${MBA_dir}")" 
-  T1_RPI="$(find "${subDir}"/"${MBA_ses}"/anat -type f -name "sub-${subID}_ses*_T1w.nii.gz")"
-  T1_RPI_brain="$(find "${MBA_dir}" -type f -name "sub-${subID}_ses*_T1w_brain.nii.gz")"
-  T1_brain_mask="$(find "${MBA_dir}" -type f -name "sub-${subID}_ses*_T1w_mask_60_smooth.nii.gz")"
+# check orientation of t1 and change to RPI if needed
+RPI_orient ${rsOut_anat}/T1w.nii.gz
+RPI_orient ${rsOut_anat}/T1w_mask.nii.gz
 
-  if [[ -e "${T1_RPI}" ]] && [[ -z "${T1_RPI_brain}" ]]; then
-    fslmaths "${T1_RPI}" -mas "${T1_brain_mask}" "${T1_brain_mask//mask_60_smooth/brain}" 
-    T1_RPI_brain="$(find "${MBA_dir}" -type f -name "sub-${subID}_ses*_T1w_brain.nii.gz")"
+# if these are not RPI, the function above will make them RPI without naming them; they are copies so fine if all in RPI within rsOut
+# rename t1 variable to rsOut/anat file
+t1="${rsOut_anat}/T1w.nii.gz"
+t1_mask="${rsOut_anat}/T1w_mask.nii.gz"
 
-  fi
-fi
+# make the t1_brain image
+fslmaths ${t1} -mul ${t1_mask} ${rsOut_anat}/T1w_brain.nii.gz
+t1_brain="${rsOut_anat}/T1w_brain.nii.gz"
+
 
 if [[ "${fieldMapFlag}" = 1 ]]; then
   if [ "${scanner}" == "GE" ]; then
@@ -182,11 +403,6 @@ if [[ "${fieldMapFlag}" = 1 ]]; then
   fi
 fi
  
- if [ -z "${T1_RPI}" ] || [ -z "${T1_RPI_brain}" ] || [ -z "${inFile}" ]; then
-  printf "\\n%s\\nERROR: at least one prerequisite scan is missing. Exiting.\\n" "$(date)" 1>&2
-  exit 1
-else
-
   softwareCheck # check dependencies
 
   printf "\\n%s\\nBeginning preprocesssing ...\\n" "$(date)"
@@ -194,16 +410,16 @@ else
   mkdir -p "${rsOut}"
 
   {
-  echo "t1=${T1_RPI_brain}"
-  echo "t1Skull=${T1_RPI}"
-  echo "t1Mask=${T1_brain_mask}"
+  echo "t1=${t1_brain}"
+  echo "t1Skull=${t1}"
+  echo "t1Mask=${t1_mask}"
   echo "peDir=-y"
   echo "epiDwell=${dwellTime}"
   echo "epiTR=2"
   echo "epiTE=30"
   } >> "${rsOut}"/rsParams
 
-  # copy raw rest image from BIDS to derivatives/rsOut_legacy/subID/sesID/
+  # copy raw rest image from BIDS to derivatives/rsOut/subID/sesID/
   rsync -a "${inFile}" "${rsOut}"/
 
   if [ ! -z "${fmap_prepped}" ] && [ "${fieldMapFlag}" == 1 ]; then # process with fmap
@@ -218,8 +434,8 @@ else
     fi
     
     "${scriptdir}"/qualityCheck.sh --epi="$(find "${rsOut}" -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
-      --t1brain="${T1_RPI_brain}" \
-      --t1="${T1_RPI}" \
+      --t1brain="${t1_brain}" \
+      --t1="${t1}" \
       --fmap="${fmap_prepped}" \
       --fmapmag="${fmap_mag}" \
       --fmapmagbrain="${fmap_mag_stripped}" \
@@ -229,7 +445,7 @@ else
 
     clobber "${rsOut}"/preproc/nonfiltered_smooth_data.nii.gz &&\
     "${scriptdir}"/restingStatePreprocess.sh --epi="${rsOut}"/mcImg_stripped.nii.gz \
-      --t1brain="${T1_RPI_brain}" \
+      --t1brain="${t1_brain}" \
       --tr=2 \
       --te=30 \
       --smooth=6 \
@@ -240,8 +456,8 @@ else
     printf "Process without fieldmap."
     "${scriptdir}"/qualityCheck.sh \
       --epi="$(find "${rsOut}" -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
-      --t1brain="${T1_RPI_brain}" \
-      --t1="${T1_RPI}" \
+      --t1brain="${t1_brain}" \
+      --t1="${t1}" \
       --dwelltime="${dwellTime}" \
       --pedir=-y \
       --regmode=6dof
@@ -249,7 +465,7 @@ else
     clobber "${rsOut}"/preproc/nonfiltered_smooth_data.nii.gz &&\
     "${scriptdir}"/restingStatePreprocess.sh \
       --epi="${rsOut}"/mcImg_stripped.nii.gz \
-      --t1brain="${T1_RPI_brain}" \
+      --t1brain="${t1_brain}" \
       --tr=2 \
       --te=30 \
       --smooth=6 \
@@ -276,7 +492,7 @@ else
   clobber "${epiDataFiltReg}" &&\
   "${scriptdir}/"removeNuisanceRegressor.sh \
     --epi="$epiDataFilt" \
-    --t1brain="${T1_RPI_brain}" \
+    --t1brain="${t1_brain}" \
     --nuisanceList="$rsOut"/nuisanceList.txt \
     --lp=.08 \
     --hp=.008 \
@@ -293,4 +509,3 @@ else
 
   # prevents permissions denied error when others run new seeds
   parallel chmod 774 ::: "$(find "${rsOut}" -type f \( -name "highres2standard.nii.gz" -o -name "seeds*.txt" -o -name "rsParams*" -o -name "run*.m" -o -name "highres.nii.gz" -o -name "standard.nii.gz" -o -name "analysisResults.html" \))"
-fi
