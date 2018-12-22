@@ -386,15 +386,19 @@ elif
 	fi
 fi
 
-rsOut="${bidsDir}/derivatives/rsOut/sub-${subID}/ses-${sesID}"
-rsOut_anat="${bidsDir}/derivatives/rsOut/anat/sub-${subID}/ses-${sesID}"
+# only make the rsOut_anat if it doesn't already exist
+clobber "${rsOut_anat}" &&\
 mkdir -p "${rsOut_anat}"
 
 # copy t1 files to anat mirrored to functional directories, this will keep T1 intermediate files related to this script contained within rsOut/anat
+clobber ${rsOut_anat}/T1w.nii.gz &&\
 cp ${t1} ${rsOut_anat}/T1w.nii.gz
+
+clobber ${rsOut_anat}/T1w_mask.nii.gz &&\
 cp ${t1_mask} ${rsOut_anat}/T1w_mask.nii.gz
 
 # check orientation of t1 and change to RPI if needed
+# ok to check existing files, orientation will stay as RPI and filename will not change
 RPI_orient ${rsOut_anat}/T1w.nii.gz
 RPI_orient ${rsOut_anat}/T1w_mask.nii.gz
 
@@ -403,8 +407,10 @@ RPI_orient ${rsOut_anat}/T1w_mask.nii.gz
 t1="${rsOut_anat}/T1w.nii.gz"
 t1_mask="${rsOut_anat}/T1w_mask.nii.gz"
 
-# make the t1_brain image
+# make the t1_brain image if it doesn't exist
+clobber ${rsOut_anat}/T1w_brain.nii.gz &&\
 fslmaths ${t1} -mul ${t1_mask} ${rsOut_anat}/T1w_brain.nii.gz
+
 t1_brain="${rsOut_anat}/T1w_brain.nii.gz"
 
 
