@@ -383,7 +383,6 @@ elif
 	elif
 		rsOut="${bidsDir}/derivatives/rsOut/sub-${subID}/ses-${sesID}"
 		rsOut_anat="${bidsDir}/derivatives/rsOut/anat/sub-${subID}/ses-${sesID_anat}"
-	fi
 fi
 
 # only make the rsOut_anat if it doesn't already exist
@@ -413,7 +412,8 @@ fslmaths ${t1} -mul ${t1_mask} ${rsOut_anat}/T1w_brain.nii.gz
 
 t1_brain="${rsOut_anat}/T1w_brain.nii.gz"
 
-
+# note we will make the field map files as input specifications so not fixing ses hard-coding
+# fieldmap filenames have no standard so the find command is too much of a moving target..
 if [[ "${fieldMapFlag}" = 1 ]]; then
   if [ "${scanner}" == "GE" ]; then
     fmap_prepped="$(find "${subDir}"/ses-"${sesID}"/fmap -type f -name "*fieldmap.nii.gz")"
