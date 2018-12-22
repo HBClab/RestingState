@@ -16,17 +16,17 @@ function Usage {
 ########## FSL's arg parsing functions ###################
 get_opt1() {
     arg=$(echo $1 | sed 's/=.*//')
-    echo $arg
+    echo "$arg"
 }
 
 get_imarg1() {
-    arg=$(get_arg1 $1);
-    arg=$($FSLDIR/bin/remove_ext $arg);
-    echo $arg
+    arg=$(get_arg1 "$1");
+    arg=$("$FSLDIR"/bin/remove_ext "$arg");
+    echo "$arg"
 }
 
 get_arg1() {
-    if [ X"`echo $1 | grep '='`" = X ] ; then
+    if [ X"$(echo $1 | grep '=')" = X ] ; then
 	echo "Option $1 requires an argument" 1>&2
 	exit 1
     else
@@ -35,7 +35,7 @@ get_arg1() {
 	    echo "Option $1 requires an argument" 1>&2
 	    exit 1
 	fi
-	echo $arg
+	echo "$arg"
     fi
 }
 
@@ -509,4 +509,3 @@ fi
 
   # prevents permissions denied error when others run new seeds
   parallel chmod 774 ::: "$(find "${rsOut}" -type f \( -name "highres2standard.nii.gz" -o -name "seeds*.txt" -o -name "rsParams*" -o -name "run*.m" -o -name "highres.nii.gz" -o -name "standard.nii.gz" -o -name "analysisResults.html" \))"
-fi
