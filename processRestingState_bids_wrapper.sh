@@ -374,15 +374,16 @@ if [[ "${sesID}" == "" ]]; then
 	echo "no sesID"
 	rsOut="${bidsDir}/derivatives/rsOut/sub-${subID}"
 	rsOut_anat="${bidsDir}/derivatives/rsOut/anat/sub-${subID}"
-elif
+else
 	echo "session is ${sesID}"
 	# test whether epi and t1 are from the same session
 	if [ "${sesID}" == "${sesID_anat}" ]; then
 		rsOut="${bidsDir}/derivatives/rsOut/sub-${subID}/ses-${sesID}"
 		rsOut_anat="${bidsDir}/derivatives/rsOut/anat/sub-${subID}/ses-${sesID}"
-	elif
+	else
 		rsOut="${bidsDir}/derivatives/rsOut/sub-${subID}/ses-${sesID}"
 		rsOut_anat="${bidsDir}/derivatives/rsOut/anat/sub-${subID}/ses-${sesID_anat}"
+	fi
 fi
 
 # only make the rsOut_anat if it doesn't already exist
