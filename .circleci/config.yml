@@ -114,3 +114,25 @@ jobs:
               --t1_mask=/data/derivatives/bet/sub-01/anat/sub-01_desc-brainmask_T1w.nii.gz \
               --roiList=/data/derivatives/data/roi_list.txt \
               --compcor
+
+workflows:
+  version: 2
+  build_test:
+    jobs:
+      - build:
+          filters:
+            tags:
+              only: /.*/
+
+      - get_data:
+          filters:
+            tags:
+              only: /.*/ 
+
+      - test_data:
+          requires:
+            - build
+            - get_data
+          filters:
+            tags:
+              only: /.*/         
