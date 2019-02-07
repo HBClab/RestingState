@@ -62,8 +62,8 @@ jobs:
 
   get_data:
     machine:
-    # Ubuntu 14.04 with Docker 17.10.0-ce
-    image: circleci/classic:201711-01
+      # Ubuntu 14.04 with Docker 17.10.0-ce
+      image: circleci/classic:201711-01
     working_directory: /home/circleci/data
     steps:
       - restore_cache:
@@ -93,29 +93,29 @@ jobs:
   test_data:
     machine:
       image: circleci/classic:201711-01
-      steps:
-        - run:
-            name: Load Docker image layer cache
-            no_output_timeout: 30m
-            command: |
-              docker info
-              set +o pipefail
-              if [ -f /tmp/cache/docker.tar.gz ]; then
-                sudo apt update && sudo apt -y install pigz
-                pigz -d --stdout /tmp/cache/docker.tar.gz | docker load
-                docker images
-              fi
-        - run:
-            name: Run Docker image on test data
-            command: |
-              docker run -ti --rm=false --name rs_app \
-              -v /tmp/data/ds005:/data \
-              hbclab/restingstate:latest \
-              --epi=/data/sub-01/func/sub-01_task-rest_run-01_bold.nii.gz \
-              --t1=/data/sub-01/anat/sub-01_T1w.nii.gz \
-              --t1_mask=/data/derivatives/bet/sub-01/anat/sub-01_desc-brainmask_T1w.nii.gz \
-              --roiList=/data/derivatives/data/roi_list.txt \
-              --compcor
+    steps:
+      - run:
+          name: Load Docker image layer cache
+          no_output_timeout: 30m
+          command: |
+            docker info
+            set +o pipefail
+            if [ -f /tmp/cache/docker.tar.gz ]; then
+              sudo apt update && sudo apt -y install pigz
+              pigz -d --stdout /tmp/cache/docker.tar.gz | docker load
+              docker images
+            fi
+      - run:
+          name: Run Docker image on test data
+          command: |
+            docker run -ti --rm=false --name rs_app \
+            -v /tmp/data/ds005:/data \
+            hbclab/restingstate:latest \
+            --epi=/data/sub-01/func/sub-01_task-rest_run-01_bold.nii.gz \
+            --t1=/data/sub-01/anat/sub-01_T1w.nii.gz \
+            --t1_mask=/data/derivatives/bet/sub-01/anat/sub-01_desc-brainmask_T1w.nii.gz \
+            --roiList=/data/derivatives/data/roi_list.txt \
+            --compcor
 
 workflows:
   version: 2
