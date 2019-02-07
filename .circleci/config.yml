@@ -7,22 +7,22 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
-      - run
-          name: Build Docker image
-          no_output_timout: 60m
-          command: |
-              docker build \
-              -t hbclab/RestingState:latest \
-              --build-arg BUILD_DATE=`date -u +"%Y-%m-%dT%H:%M:%SZ"` \
-              --build-arg VCS_REF=`git rev-parse --short HEAD` .
-    - run
+      - run:
+        name: Build Docker image
+        no_output_timeout: 60m
+        command: |
+            docker build \
+            -t hbclab/RestingState:latest \
+            --build-arg BUILD_DATE=`date -u +"%Y-%m-%dT%H:%M:%SZ"` \
+            --build-arg VCS_REF=`git rev-parse --short HEAD` .
+      - run:
         name: Get test data from ds000005
-            command: |
-              mkdir -p /tmp/data
-              wget --retry-connrefused --waitretry=5 --read-timeout=20 --timeout=15 -t 0 -q \
-                -O ds005_RestingState.tar.gz "https://dl.dropboxusercontent.com/s/pbs1a6ivppj4atq/ds005_RestingState.tar.gz"
-              tar xvzf ds005_RestingState.tar.gz -C /tmp/data/
-    - run
+        command: |
+            mkdir -p /tmp/data
+            wget --retry-connrefused --waitretry=5 --read-timeout=20 --timeout=15 -t 0 -q \
+              -O ds005_RestingState.tar.gz "https://dl.dropboxusercontent.com/s/pbs1a6ivppj4atq/ds005_RestingState.tar.gz"
+            tar xvzf ds005_RestingState.tar.gz -C /tmp/data/
+      - run:
         name: Run Docker image on test data
         command: |
             docker run -ti --rm=false --name rs_app \
