@@ -12,7 +12,7 @@ jobs:
           no_output_timeout: 60m
           command: |
             docker build \
-            -t hbclab/RestingState:latest \
+            -t hbclab/restingstate:latest \
             --build-arg BUILD_DATE=`date -u +"%Y-%m-%dT%H:%M:%SZ"` \
             --build-arg VCS_REF=`git rev-parse --short HEAD` .
       - run:
@@ -27,7 +27,7 @@ jobs:
           command: |
             docker run -ti --rm=false --name rs_app \
             -v /tmp/data/ds005:/data \
-            hbclab/RestingState:latest \
+            hbclab/restingstate:latest \
             --epi=/data/sub-01/func/sub-01_task-rest_run-01_bold.nii.gz \
             --t1=/data/sub-01/anat/sub-01_T1w.nii.gz \
             --t1_mask=/data/derivatives/bet/sub-01/anat/sub-01_desc-brainmask_T1w.nii.gz \
