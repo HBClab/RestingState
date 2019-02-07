@@ -1,0 +1,35 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: docker:18.01.0-ce-git
+    working_directory: /tmp/src/RestingState
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run
+          name: Build Docker image
+          no_output_timout: 60m
+          command: |
+              docker build \
+              -t hbclab/RestingState:latest \
+              --build-arg BUILD_DATE=`date -u +"%Y-%m-%dT%H:%M:%SZ"` \
+              --build-arg VCS_REF=`git rev-parse --short HEAD` .
+    - run
+        name: Get test data from ds000005
+            command: |
+              mkdir -p /tmp/data
+              wget --retry-connrefused --waitretry=5 --read-timeout=20 --timeout=15 -t 0 -q \
+                -O ds005_RestingState.tar.gz "https://dl.dropboxusercontent.com/s/pbs1a6ivppj4atq/ds005_RestingState.tar.gz"
+              tar xvzf ds005_RestingState.tar.gz -C /tmp/data/
+    - run
+        name: Run Docker image on test data
+        command: |
+            docker run -ti --rm=false --name rs_app \
+            -v /tmp/data/ds005:/data \
+            hbclab/RestingState:latest \
+            --epi=/data/sub-01/func/sub-01_task-rest_run-01_bold.nii.gz \
+            --t1=/data/sub-01/anat/sub-01_T1w.nii.gz \
+            --t1_mask=/data/derivatives/bet/sub-01/anat/sub-01_desc-brainmask_T1w.nii.gz \
+            --roiList=/data/derivatives/data/roi_list.txt \
+            --compcor
