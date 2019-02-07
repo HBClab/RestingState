@@ -118,6 +118,15 @@ jobs:
             --t1_mask=/data/derivatives/bet/sub-01/anat/sub-01_desc-brainmask_T1w.nii.gz \
             --roiList=/data/derivatives/data/roi_list.txt \
             --compcor
+      - run:
+          name: Check outputs
+          command: |
+            mkdir -p /tmp/ds005/test
+            find /tmp/data/ds005/derivatives/rsOut -type f | sed s+/tmp/data/ds005/derivatives++ | sort > /tmp/ds005/test/outputs.out
+            diff /tmp/src/RestingState/.circleci/ds005_outputs.txt /tmp/ds005/test/outputs.out
+            exit $?
+      - store_artifacts:
+          path: /tmp/data/ds005/derivatives/rsOut
 
 workflows:
   version: 2
