@@ -37,21 +37,27 @@ function Usage {
 
 ########## FSL's arg parsing functions ###################
 get_opt1() {
-  arg=$(echo "$1" | sed 's/=.*//')
-  echo "$arg"
+    arg=$(echo $1 | sed 's/=.*//')
+    echo "$arg"
+}
+
+get_imarg1() {
+    arg=$(get_arg1 "$1");
+    arg=$("$FSLDIR"/bin/remove_ext "$arg");
+    echo "$arg"
 }
 
 get_arg1() {
-    if [ X"$(echo "$1" | grep '=')" = X ] ; then
-      echo "Option $1 requires an argument" 1>&2
-      exit 1
+    if [ X"$(echo $1 | grep '=')" = X ] ; then
+	echo "Option $1 requires an argument" 1>&2
+	exit 1
     else
-      arg=$(echo "$1" | sed 's/.*=//')
-      if [ X"$arg" = X ] ; then
-          echo "Option $1 requires an argument" 1>&2
-          exit 1
-      fi
-	    echo "$arg"
+	arg=`echo $1 | sed 's/.*=//'`
+	if [ X$arg = X ] ; then
+	    echo "Option $1 requires an argument" 1>&2
+	    exit 1
+	fi
+	echo "$arg"
     fi
 }
 
@@ -248,12 +254,12 @@ if [[ ${overwriteFlag} == "" ]]; then
 fi
 
 # Source input (~func) directory
-indir=$(dirname "$epiData")
+indir=$(dirname "${epiData}")
 preproc="${indir%/*}"/preproc
 logDir=$(dirname "${preproc}")
 rawEpiDir=$(dirname "${preproc}")
 
-if [ "${compcorFlag}" -eq 1 ]; then
+if [[ "${compcorFlag}" = 1 ]]; then
   outDir=${rawEpiDir}/nuisanceRegression/compcor
 else
   outDir=${rawEpiDir}/nuisanceRegression/classic
