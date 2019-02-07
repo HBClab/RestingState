@@ -94,6 +94,8 @@ jobs:
     machine:
       image: circleci/classic:201711-01
     steps:
+      - attach_workspace:
+          at: /tmp
       - run:
           name: Load Docker image layer cache
           no_output_timeout: 30m
