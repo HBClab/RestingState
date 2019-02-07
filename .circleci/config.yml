@@ -59,6 +59,7 @@ jobs:
           key: docker-v1-{{ .Branch }}-{{ epoch }}
           paths:
             - /tmp/cache/docker.tar.gz
+
   get_data:
     machine:
     # Ubuntu 14.04 with Docker 17.10.0-ce
@@ -88,6 +89,7 @@ jobs:
           key: data-v1-{{ epoch }}
           paths:
             - /tmp/data
+
   test_data:
     machine:
       image: circleci/classic:201711-01
