@@ -432,40 +432,40 @@ fi
  
 softwareCheck # check dependencies
 
-  if [[ "${compcorFlag}" = 1 ]]; then
-    epiDataFilt="${rsOut}"/ica_aroma/denoised_func_data_nonaggr.nii.gz
-    epiDataFiltReg="${rsOut}"/nuisanceRegression/compcor/denoised_func_data_nonaggr_bp_res4d_normandscaled.nii.gz
-    compcorArg="--compcor"
-    {
-    echo "$rsOut/SNR/CSF_pve_to_RS_thresh.nii.gz"; \
-    echo "$rsOut/SNR/WM_pve_to_RS_thresh_ero.nii.gz"; } > "$rsOut"/nuisanceList.txt
-  else
-    epiDataFilt="$rsOut"/preproc/nonfiltered_smooth_data.nii.gz
-    epiDataFiltReg="${rsOut}"/nuisanceRegression/classic/nonfiltered_smooth_data_bp_res4d_normandscaled.nii.gz
-    compcorArg=""
-    {
-    echo "${scriptdir}/ROIs/latvent.nii.gz"; \
-    echo "${scriptdir}/ROIs/global.nii.gz"; \
-    echo "${scriptdir}/ROIs/wmroi.nii.gz"; } > "$rsOut"/nuisanceList.txt
-  fi
+if [[ "${compcorFlag}" = 1 ]]; then
+epiDataFilt="${rsOut}"/ica_aroma/denoised_func_data_nonaggr.nii.gz
+epiDataFiltReg="${rsOut}"/nuisanceRegression/compcor/denoised_func_data_nonaggr_bp_res4d_normandscaled.nii.gz
+compcorArg="--compcor"
+{
+echo "$rsOut/SNR/CSF_pve_to_RS_thresh.nii.gz"; \
+echo "$rsOut/SNR/WM_pve_to_RS_thresh_ero.nii.gz"; } > "$rsOut"/nuisanceList.txt
+else
+epiDataFilt="$rsOut"/preproc/nonfiltered_smooth_data.nii.gz
+epiDataFiltReg="${rsOut}"/nuisanceRegression/classic/nonfiltered_smooth_data_bp_res4d_normandscaled.nii.gz
+compcorArg=""
+{
+echo "${scriptdir}/ROIs/latvent.nii.gz"; \
+echo "${scriptdir}/ROIs/global.nii.gz"; \
+echo "${scriptdir}/ROIs/wmroi.nii.gz"; } > "$rsOut"/nuisanceList.txt
+fi
 
-  clobber "${epiDataFiltReg}" &&\
-  "${scriptdir}/"removeNuisanceRegressor.sh \
-    --epi="${epiDataFilt}" \
-    --t1brain="${t1_brain}" \
-    --nuisanceList="${rsOut}"/nuisanceList.txt \
-    --lp=.08 \
-    --hp=.008 \
-    "${compcorArg}"
+clobber "${epiDataFiltReg}" &&\
+"${scriptdir}/"removeNuisanceRegressor.sh \
+--epi="${epiDataFilt}" \
+--t1brain="${t1_brain}" \
+--nuisanceList="${rsOut}"/nuisanceList.txt \
+--lp=.08 \
+--hp=.008 \
+"${compcorArg}"
 
-  clobber "${rsOut}"/motionScrub/"$(basename "${epiDataFiltReg/.nii/_ms.nii}")" &&\
-  "${scriptdir}"/motionScrub.sh --epi="${epiDataFiltReg}"
+clobber "${rsOut}"/motionScrub/"$(basename "${epiDataFiltReg/.nii/_ms.nii}")" &&\
+"${scriptdir}"/motionScrub.sh --epi="${epiDataFiltReg}"
 
-  "${scriptdir}"/seedVoxelCorrelation.sh \
-    --epi="${epiDataFiltReg}" \
-    --motionscrub \
-    --roiList="${roilist}" \
-    "${compcorArg}"
+"${scriptdir}"/seedVoxelCorrelation.sh \
+--epi="${epiDataFiltReg}" \
+--motionscrub \
+--roiList="${roilist}" \
+"${compcorArg}"
 
-  # prevents permissions denied error when others run new seeds
-  parallel chmod 774 ::: "$(find "${rsOut}" -type f \( -name "highres2standard.nii.gz" -o -name "seeds*.txt" -o -name "rsParams*" -o -name "run*.m" -o -name "highres.nii.gz" -o -name "standard.nii.gz" -o -name "analysisResults.html" \))"
+# prevents permissions denied error when others run new seeds
+parallel chmod 774 ::: "$(find "${rsOut}" -type f \( -name "highres2standard.nii.gz" -o -name "seeds*.txt" -o -name "rsParams*" -o -name "run*.m" -o -name "highres.nii.gz" -o -name "standard.nii.gz" -o -name "analysisResults.html" \))"
