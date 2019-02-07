@@ -498,7 +498,7 @@ fi
       "${aromaArg}"
   fi
 
-  if [ "${compcorFlag}" -eq 1 ]; then
+  if [[ "${compcorFlag}" = 1 ]]; then
     epiDataFilt="${rsOut}"/ica_aroma/denoised_func_data_nonaggr.nii.gz
     epiDataFiltReg="${rsOut}"/nuisanceRegression/compcor/denoised_func_data_nonaggr_bp_res4d_normandscaled.nii.gz
     compcorArg="--compcor"
@@ -517,9 +517,9 @@ fi
 
   clobber "${epiDataFiltReg}" &&\
   "${scriptdir}/"removeNuisanceRegressor.sh \
-    --epi="$epiDataFilt" \
+    --epi="${epiDataFilt}" \
     --t1brain="${t1_brain}" \
-    --nuisanceList="$rsOut"/nuisanceList.txt \
+    --nuisanceList="${rsOut}"/nuisanceList.txt \
     --lp=.08 \
     --hp=.008 \
     "${compcorArg}"
