@@ -1,4 +1,5 @@
 #!/bin/bash
+
 # wrapper script for calling legacy resting state scripts
 # assumes BIDS directory structure
 # TODOS:
@@ -310,7 +311,7 @@ in
       inFile=`get_arg1 $1`;
       export inFile;
       if [ "$inFile" == "" ]; then
-        echo "Error: The restingStateImage (-E) is a required option"
+        echo "Error: The restingStateImage (--epi) is a required option"
         exit 1
       fi
       shift;;
@@ -318,7 +319,7 @@ in
       t1=`get_arg1 $1`;
       export t1;
       if [ "$t1" == "" ]; then
-        echo "Error: T1 required"
+        echo "Error: T1 (--t1) required"
         exit 1
       fi
       shift;;
@@ -326,7 +327,7 @@ in
       t1_mask=`get_arg1 $1`;
       export t1_mask;
       if [ "$t1_mask" == "" ]; then
-        echo "Error: T1 mask required"
+        echo "Error: T1 mask (--t1_mask) required"
         exit 1
       fi
       shift;;
@@ -429,109 +430,110 @@ if [[ "${fieldMapFlag}" = 1 ]]; then
   fi
 fi
  
-  softwareCheck # check dependencies
+softwareCheck # check dependencies
 
-  printf "\\n%s\\nBeginning preprocesssing ...\\n" "$(date)"
+printf "\\n%s\\nBeginning preprocesssing ...\\n" "$(date)"
 
-  mkdir -p "${rsOut}"
+mkdir -p "${rsOut}"
 
-  {
-  echo "t1=${t1_brain}"
-  echo "t1Skull=${t1}"
-  echo "t1Mask=${t1_mask}"
-  echo "peDir=-y"
-  echo "epiDwell=${dwellTime}"
-  echo "epiTR=2"
-  echo "epiTE=30"
-  } >> "${rsOut}"/rsParams
+{
+echo "t1=${t1_brain}"
+echo "t1Skull=${t1}"
+echo "t1Mask=${t1_mask}"
+echo "peDir=-y"
+echo "epiDwell=${dwellTime}"
+echo "epiTR=2"
+echo "epiTE=30"
+} >> "${rsOut}"/rsParams
 
-  # copy raw rest image from BIDS to derivatives/rsOut/subID/sesID/
-  rsync -a "${inFile}" "${rsOut}"/
+# copy raw rest image from BIDS to derivatives/rsOut/subID/sesID/
+rsync -a "${inFile}" "${rsOut}"/
 
-  if [ ! -z "${fmap_prepped}" ] && [ "${fieldMapFlag}" == 1 ]; then # process with fmap
-    echo "fieldMapCorrection=1" >> "${rsOut}"/rsParams
-    #skull strip mag image
-    if [ -z "${fmap_mag_stripped}" ]; then
-      printf "\\n%s\\nSkull stripping fmap magnitude image..." "$(date)"
-      bet "${fmap_mag}" "${fmap_mag//.nii.gz/_stripped.nii.gz}" -m -n -f 0.3 -B
-      fslmaths "$(find "${subDir}"/ses-"${sesID}"/fmap -type f -name "*magnitude*stripped_mask.nii.gz")" -ero -bin "${fmap_mag//.nii.gz/_stripped_mask_eroded.nii.gz}" -odt char
-      fslmaths "${fmap_mag}" -mas "${fmap_mag//.nii.gz/_stripped_mask_eroded.nii.gz}" "${fmap_mag//.nii.gz/_stripped.nii.gz}"
-      fmap_mag_stripped="${fmap_mag//.nii.gz/_stripped.nii.gz}"
-    fi
-    
-    "${scriptdir}"/qualityCheck.sh --epi="$(find "${rsOut}" -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
-      --t1brain="${t1_brain}" \
-      --t1="${t1}" \
-      --fmap="${fmap_prepped}" \
-      --fmapmag="${fmap_mag}" \
-      --fmapmagbrain="${fmap_mag_stripped}" \
-      --dwelltime="${dwellTime}" \
-      --pedir=-y \
-      --regmode=6dof
+if [ ! -z "${fmap_prepped}" ] && [ "${fieldMapFlag}" == 1 ]; then # process with fmap
+	echo "fieldMapCorrection=1" >> "${rsOut}"/rsParams
+	#skull strip mag image
+	if [ -z "${fmap_mag_stripped}" ]; then
+		printf "\\n%s\\nSkull stripping fmap magnitude image..." "$(date)"
+		bet "${fmap_mag}" "${fmap_mag//.nii.gz/_stripped.nii.gz}" -m -n -f 0.3 -B
+		fslmaths "$(find "${subDir}"/ses-"${sesID}"/fmap -type f -name "*magnitude*stripped_mask.nii.gz")" -ero -bin "${fmap_mag//.nii.gz/_stripped_mask_eroded.nii.gz}" -odt char
+		fslmaths "${fmap_mag}" -mas "${fmap_mag//.nii.gz/_stripped_mask_eroded.nii.gz}" "${fmap_mag//.nii.gz/_stripped.nii.gz}"
+		fmap_mag_stripped="${fmap_mag//.nii.gz/_stripped.nii.gz}"
+	fi
 
-    clobber "${rsOut}"/preproc/nonfiltered_smooth_data.nii.gz &&\
-    "${scriptdir}"/restingStatePreprocess.sh --epi="${rsOut}"/mcImg_stripped.nii.gz \
-      --t1brain="${t1_brain}" \
-      --tr=2 \
-      --te=30 \
-      --smooth=6 \
-      --usefmap \
-      "${aromaArg}"
+	"${scriptdir}"/qualityCheck.sh --epi="$(find "${rsOut}" -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
+		--t1brain="${t1_brain}" \
+		--t1="${t1}" \
+		--fmap="${fmap_prepped}" \
+		--fmapmag="${fmap_mag}" \
+		--fmapmagbrain="${fmap_mag_stripped}" \
+		--dwelltime="${dwellTime}" \
+		--pedir=-y \
+		--regmode=6dof
 
-  elif [[ "${fieldMapFlag}" != 1 ]] || [[ -z "${fmap_prepped}" ]]; then
-    printf "Process without fieldmap."
-    "${scriptdir}"/qualityCheck.sh \
-      --epi="$(find "${rsOut}" -maxdepth 1 -type f -name "*rest_bold*.nii.gz")" \
-      --t1brain="${t1_brain}" \
-      --t1="${t1}" \
-      --dwelltime="${dwellTime}" \
-      --pedir=-y \
-      --regmode=6dof
+	clobber "${rsOut}"/preproc/nonfiltered_smooth_data.nii.gz &&\
+	"${scriptdir}"/restingStatePreprocess.sh --epi="${rsOut}"/mcImg_stripped.nii.gz \
+		--t1brain="${t1_brain}" \
+		--tr=2 \
+		--te=30 \
+		--smooth=6 \
+		--usefmap \
+		"${aromaArg}"
 
-    clobber "${rsOut}"/preproc/nonfiltered_smooth_data.nii.gz &&\
-    "${scriptdir}"/restingStatePreprocess.sh \
-      --epi="${rsOut}"/mcImg_stripped.nii.gz \
-      --t1brain="${t1_brain}" \
-      --tr=2 \
-      --te=30 \
-      --smooth=6 \
-      "${aromaArg}"
-  fi
+elif [[ "${fieldMapFlag}" != 1 ]] || [[ -z "${fmap_prepped}" ]]; then
+	printf "Process without fieldmap."
+	"${scriptdir}"/qualityCheck.sh \
+		--epi="$(find "${rsOut}" -maxdepth 1 -type f -name "*rest*bold.nii.gz")" \
+		--t1brain="${t1_brain}" \
+		--t1="${t1}" \
+		--dwelltime="${dwellTime:-0.00056}" \
+		--pedir=-y \
+		--regmode=6dof
 
-  if [[ "${compcorFlag}" = 1 ]]; then
-    epiDataFilt="${rsOut}"/ica_aroma/denoised_func_data_nonaggr.nii.gz
-    epiDataFiltReg="${rsOut}"/nuisanceRegression/compcor/denoised_func_data_nonaggr_bp_res4d_normandscaled.nii.gz
-    compcorArg="--compcor"
-    {
-    echo "$rsOut/SNR/CSF_pve_to_RS_thresh.nii.gz"; \
-    echo "$rsOut/SNR/WM_pve_to_RS_thresh_ero.nii.gz"; } > "$rsOut"/nuisanceList.txt
-  else
-    epiDataFilt="$rsOut"/preproc/nonfiltered_smooth_data.nii.gz
-    epiDataFiltReg="${rsOut}"/nuisanceRegression/classic/nonfiltered_smooth_data_bp_res4d_normandscaled.nii.gz
-    compcorArg=""
-    {
-    echo "${scriptdir}/ROIs/latvent.nii.gz"; \
-    echo "${scriptdir}/ROIs/global.nii.gz"; \
-    echo "${scriptdir}/ROIs/wmroi.nii.gz"; } > "$rsOut"/nuisanceList.txt
-  fi
+	clobber "${rsOut}"/preproc/nonfiltered_smooth_data.nii.gz &&\
+	"${scriptdir}"/restingStatePreprocess.sh \
+		--epi="${rsOut}"/mcImg_stripped.nii.gz \
+		--t1brain="${t1_brain}" \
+		--tr=2 \
+		--te=30 \
+		--smooth=6 \
+		"${aromaArg}"
+fi
 
-  clobber "${epiDataFiltReg}" &&\
-  "${scriptdir}/"removeNuisanceRegressor.sh \
-    --epi="${epiDataFilt}" \
-    --t1brain="${t1_brain}" \
-    --nuisanceList="${rsOut}"/nuisanceList.txt \
-    --lp=.08 \
-    --hp=.008 \
-    "${compcorArg}"
+if [[ "${compcorFlag}" = 1 ]]; then
+	epiDataFilt="${rsOut}"/ica_aroma/denoised_func_data_nonaggr.nii.gz
+	epiDataFiltReg="${rsOut}"/nuisanceRegression/compcor/denoised_func_data_nonaggr_bp_res4d_normandscaled.nii.gz
+	compcorArg="--compcor"
+	echo "COPY THIS: ${rsOut}"
+	{
+	echo "$rsOut/SNR/CSF_pve_to_RS_thresh.nii.gz"; \
+	echo "$rsOut/SNR/WM_pve_to_RS_thresh_ero.nii.gz"; } > "$rsOut"/nuisanceList.txt
+else
+	epiDataFilt="$rsOut"/preproc/nonfiltered_smooth_data.nii.gz
+	epiDataFiltReg="${rsOut}"/nuisanceRegression/classic/nonfiltered_smooth_data_bp_res4d_normandscaled.nii.gz
+	compcorArg=""
+	{
+	echo "${scriptdir}/ROIs/latvent.nii.gz"; \
+	echo "${scriptdir}/ROIs/global.nii.gz"; \
+	echo "${scriptdir}/ROIs/wmroi.nii.gz"; } > "$rsOut"/nuisanceList.txt
+fi
 
-  clobber "${rsOut}"/motionScrub/"$(basename "${epiDataFiltReg/.nii/_ms.nii}")" &&\
-  "${scriptdir}"/motionScrub.sh --epi="${epiDataFiltReg}"
+clobber "${epiDataFiltReg}" &&\
+"${scriptdir}/"removeNuisanceRegressor.sh \
+--epi="${epiDataFilt}" \
+--t1brain="${t1_brain}" \
+--nuisanceList="${rsOut}"/nuisanceList.txt \
+--lp=.08 \
+--hp=.008 \
+"${compcorArg}"
 
-  "${scriptdir}"/seedVoxelCorrelation.sh \
-    --epi="${epiDataFiltReg}" \
-    --motionscrub \
-    --roiList="${roilist}" \
-    "${compcorArg}"
+clobber "${rsOut}"/motionScrub/"$(basename "${epiDataFiltReg/.nii/_ms.nii}")" &&\
+"${scriptdir}"/motionScrub.sh --epi="${epiDataFiltReg}"
 
-  # prevents permissions denied error when others run new seeds
-  parallel chmod 774 ::: "$(find "${rsOut}" -type f \( -name "highres2standard.nii.gz" -o -name "seeds*.txt" -o -name "rsParams*" -o -name "run*.m" -o -name "highres.nii.gz" -o -name "standard.nii.gz" -o -name "analysisResults.html" \))"
+"${scriptdir}"/seedVoxelCorrelation.sh \
+--epi="${epiDataFiltReg}" \
+--motionscrub \
+--roiList="${roilist}" \
+"${compcorArg}"
+
+# prevents permissions denied error when others run new seeds
+parallel chmod 774 ::: "$(find "${rsOut}" -type f \( -name "highres2standard.nii.gz" -o -name "seeds*.txt" -o -name "rsParams*" -o -name "run*.m" -o -name "highres.nii.gz" -o -name "standard.nii.gz" -o -name "analysisResults.html" \))"

@@ -1,0 +1,151 @@
+version: 2
+jobs:
+
+  build:
+    docker:
+      - image: docker:18.01.0-ce-git
+    working_directory: /tmp/src/RestingState
+    steps:
+      - run:
+          name: Install parallel gzip and python3
+          command: |
+            apk add --no-cache pigz python3
+      - restore_cache:
+          keys:
+            - docker-v1-{{ .Branch }}-{{ epoch }}
+            - docker-v1-{{ .Branch }}-
+            - docker-v1-master-
+            - docker-v1-
+          paths:
+            - /tmp/cache/docker.tar.gz
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Load Docker image layer cache
+          no_output_timeout: 30m
+          command: |
+            docker info
+            set +o pipefail
+            if [ -f /tmp/cache/docker.tar.gz ]; then
+              pigz -d --stdout /tmp/cache/docker.tar.gz | docker load
+              docker images
+            fi
+      - run:
+          name: Build Docker image
+          no_output_timeout: 60m
+          command: |
+            e=1 && for i in {1..5}; do
+              docker build \
+                --cache-from=hbclab/restingstate \
+                --rm=false \
+                -t hbclab/restingstate:latest \
+                --build-arg BUILD_DATE=`date -u +"%Y-%m-%dT%H:%M:%SZ"` \
+                --build-arg VCS_REF=`git rev-parse --short HEAD` . \
+              && e=0 && break || sleep 15
+            done && [ "$e" -eq "0" ]
+      - run:
+          name: Docker save
+          no_output_timeout: 40m
+          command: |
+            mkdir -p /tmp/cache
+            docker save hbclab/restingstate:latest \
+            | pigz -8 -p 3 > /tmp/cache/docker.tar.gz
+      - persist_to_workspace:
+          root: /tmp
+          paths:
+            - cache/docker.tar.gz
+            - src/RestingState
+      - save_cache:
+          key: docker-v1-{{ .Branch }}-{{ epoch }}
+          paths:
+            - /tmp/cache/docker.tar.gz
+
+  get_data:
+    machine:
+      # Ubuntu 14.04 with Docker 17.10.0-ce
+      image: circleci/classic:201711-01
+    working_directory: /home/circleci/data
+    steps:
+      - restore_cache:
+          keys:
+            - data-v1-{{ epoch }}
+            - data-v1-
+      - run:
+          name: Get test data from ds000005
+          command: |
+            mkdir -p /tmp/data
+            if [[ ! -d /tmp/data/ds005 ]]; then
+              wget --retry-connrefused --waitretry=5 --read-timeout=20 --timeout=15 -t 0 -q \
+                -O ds005_RestingState.tar.gz "https://dl.dropboxusercontent.com/s/pbs1a6ivppj4atq/ds005_RestingState.tar.gz"
+              tar xvzf ds005_RestingState.tar.gz -C /tmp/data/
+            else
+              echo "Dataset ds000005 was cached"
+            fi
+      - persist_to_workspace:
+          root: /tmp
+          paths:
+            - data
+      - save_cache:
+          key: data-v1-{{ epoch }}
+          paths:
+            - /tmp/data
+
+  test_data:
+    machine:
+      image: circleci/classic:201711-01
+    steps:
+      - attach_workspace:
+          at: /tmp
+      - run:
+          name: Load Docker image layer cache
+          no_output_timeout: 30m
+          command: |
+            docker info
+            set +o pipefail
+            if [ -f /tmp/cache/docker.tar.gz ]; then
+              sudo apt update && sudo apt -y install pigz
+              pigz -d --stdout /tmp/cache/docker.tar.gz | docker load
+              docker images
+            fi
+      - run:
+          name: Run Docker image on test data
+          command: |
+            docker run -ti --rm=false --name rs_app \
+            -v /tmp/data/ds005:/data \
+            hbclab/restingstate:latest \
+            --epi=/data/sub-01/func/sub-01_task-rest_run-01_bold.nii.gz \
+            --t1=/data/sub-01/anat/sub-01_T1w.nii.gz \
+            --t1_mask=/data/derivatives/bet/sub-01/anat/sub-01_desc-brainmask_T1w.nii.gz \
+            --roiList=/data/derivatives/data/roi_list.txt \
+            --compcor
+      - run:
+          name: Check outputs
+          command: |
+            mkdir -p /tmp/ds005/test
+            find /tmp/data/ds005/derivatives/rsOut -type f | sed s+/tmp/data/ds005/derivatives++ | sort > /tmp/ds005/test/outputs.out
+            diff /tmp/src/RestingState/.circleci/ds005_outputs.txt /tmp/ds005/test/outputs.out
+            exit $?
+      - store_artifacts:
+          path: /tmp/data/ds005/derivatives/rsOut
+
+workflows:
+  version: 2
+  build_test:
+    jobs:
+      - build:
+          filters:
+            tags:
+              only: /.*/
+
+      - get_data:
+          filters:
+            tags:
+              only: /.*/ 
+
+      - test_data:
+          requires:
+            - build
+            - get_data
+          filters:
+            tags:
+              only: /.*/         
