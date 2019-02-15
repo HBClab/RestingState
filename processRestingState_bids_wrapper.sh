@@ -514,7 +514,7 @@ if [[ "${compcorFlag}" = 1 ]]; then
 	echo "$rsOut/SNR/WM_pve_to_RS_thresh_ero.nii.gz"; } > "$rsOut"/nuisanceList.txt
 elif [[ "${compcor_globalFlag}" = 1 ]]; then
 	epiDataFilt="$rsOut"/preproc/nonfiltered_smooth_data.nii.gz
-	epiDataFiltReg="${rsOut}"/nuisanceRegression/classic/nonfiltered_smooth_data_bp_res4d_normandscaled.nii.gz
+	epiDataFiltReg="${rsOut}"/nuisanceRegression/compcor_global/nonfiltered_smooth_data_bp_res4d_normandscaled.nii.gz
 	compcorArg="--compcor_global"
 	{
 	echo "${scriptdir}/ROIs/global.nii.gz"; \
