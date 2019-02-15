@@ -120,11 +120,11 @@ jobs:
             --compcor
             mv /tmp/data/ds005/derivatives/rsOut /tmp/data/ds005/derivatives/rsOutCompcor
       - run:
-          name: Check outputs
+          name: Check compcor outputs
           command: |
             mkdir -p /tmp/ds005/test
-            find /tmp/data/ds005/derivatives/rsOutCompcor -type f | sed s+/tmp/data/ds005/derivatives/rsOutCompcor++ | sort > /tmp/ds005/test/outputs.out
-            diff /tmp/src/RestingState/.circleci/ds005_compcor.txt /tmp/ds005/test/outputs.out
+            find /tmp/data/ds005/derivatives/rsOutCompcor -type f | sed s+/tmp/data/ds005/derivatives/rsOutCompcor++ | sort > /tmp/ds005/test/outputs-compcor.out
+            diff /tmp/src/RestingState/.circleci/ds005_compcor.txt /tmp/ds005/test/outputs-compcor.out
             exit $?
       - store_artifacts:
           path: /tmp/data/ds005/derivatives/rsOutCompcor
@@ -140,6 +140,13 @@ jobs:
             --roiList=/data/derivatives/data/roi_list.txt \
             --compcor_global
             mv /tmp/data/ds005/derivatives/rsOut /tmp/data/ds005/derivatives/rsOutCompcorGlobal
+      - run:
+          name: Check compcor_global outputs
+          command: |
+            mkdir -p /tmp/ds005/test
+            find /tmp/data/ds005/derivatives/rsOutCompcorGlobal -type f | sed s+/tmp/data/ds005/derivatives/rsOutCompcorGlobal++ | sort > /tmp/ds005/test/outputs-compcor_global.out
+            diff /tmp/src/RestingState/.circleci/ds005_compcor_global.txt /tmp/ds005/test/outputs-compcor_global.out
+            exit $?
       - store_artifacts:
           path: /tmp/data/ds005/derivatives/rsOutCompcorGlobal
       
