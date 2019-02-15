@@ -342,7 +342,7 @@ do
     echo "${roi} is in MNI space"
     clobber "$outDir"/rois/"${roiName}"_native.nii.gz &&\
     MNItoEPIwarp=$(grep "MNItoEPIWarp=" "$logDir"/rsParams | tail -1 | awk -F"=" '{print $2}') &&\
-    applywarp --ref="$rawEpiDir"/mcImgMean_stripped.nii.gz --in="${roi}" --out="$outDir"/roi/"${roiName}"_native.nii.gz --warp="$MNItoEPIwarp" --datatype=float
+    applywarp --ref="$rawEpiDir"/mcImgMean_stripped.nii.gz --in="${roi}" --out="$outDir"/rois/"${roiName}"_native.nii.gz --warp="$MNItoEPIwarp" --datatype=float
 
   elif [[ "$(fslinfo "${roi}" | grep ^dim1 | awk '{print $2}')" == "$(fslinfo "${epiData}" | grep ^dim1 | awk '{print $2}')" ]]; then
     echo "${roi} is in native space"
@@ -368,7 +368,7 @@ do
     fslmeants -i "$epiData" -o "$outDir"/rois/mean_global_ts.txt -m "$outDir"/rois/global_native.nii.gz
     # eigenvariates for WM and CSF
     fslmeants -i "$epiData" -o "$outDir"/rois/mean_CSF_pve_to_RS_thresh_ts.txt -m "$outDir"/rois/CSF_pve_to_RS_thresh_native.nii.gz --eig --order=5
-    fslmeants -i "$epiData" -o "$outDir"/rois/WM_pve_to_RS_thresh_ero_ts.txt -m "$outDir"/rois/WM_pve_to_RS_thresh_ero_native.nii.gz --eig --order=5
+    fslmeants -i "$epiData" -o "$outDir"/rois/mean_WM_pve_to_RS_thresh_ero_ts.txt -m "$outDir"/rois/WM_pve_to_RS_thresh_ero_native.nii.gz --eig --order=5
   else
     clobber "$outDir"/rois/mean_"${roiName}"_ts.txt &&\
     fslmeants -i "$epiData" -o "$outDir"/rois/mean_"${roiName}"_ts.txt -m "$outDir"/rois/"${roiName}"_native.nii.gz
