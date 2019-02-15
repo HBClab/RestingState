@@ -139,7 +139,7 @@ jobs:
             --t1_mask=/data/derivatives/bet/sub-01/anat/sub-01_desc-brainmask_T1w.nii.gz \
             --roiList=/data/derivatives/data/roi_list.txt \
             --compcor_global
-            mv /tmp/data/ds005/derivatives/rsOut /tmp/data/ds005/derivatives/rsOutCompcorrGlobal
+            mv /tmp/data/ds005/derivatives/rsOut /tmp/data/ds005/derivatives/rsOutCompcorGlobal
       - store_artifacts:
           path: /tmp/data/ds005/derivatives/rsOutCompcorGlobal
       
