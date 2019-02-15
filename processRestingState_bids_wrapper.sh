@@ -515,7 +515,7 @@ if [[ "${compcorFlag}" = 1 ]]; then
 elif [[ "${compcor_globalFlag}" = 1 ]]; then
 	epiDataFilt="$rsOut"/preproc/nonfiltered_smooth_data.nii.gz
 	epiDataFiltReg="${rsOut}"/nuisanceRegression/classic/nonfiltered_smooth_data_bp_res4d_normandscaled.nii.gz
-	compcorArg="--compcor"
+	compcorArg="--compcor_global"
 	{
 	echo "${scriptdir}/ROIs/global.nii.gz"; \
 	echo "$rsOut/SNR/CSF_pve_to_RS_thresh.nii.gz"; \

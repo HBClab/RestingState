@@ -129,6 +129,10 @@ while [ $# -ge 1 ] ; do
       compcorFlag=1;
       export compcorFlag;
       shift;;
+    --compcor_global)
+      compcor_globalFlag=1;
+      export compcor_globalFlag;
+      shift;;
     --seedmaps)
       seedmapFlag=1;
       export seedmapFlag;
@@ -174,6 +178,8 @@ rawEpiDir=$(dirname "${preproc}")
 
 if [ "${compcorFlag}" -eq 1 ]; then
   outDir=${rawEpiDir}/seedCorrelation/compcor
+elif [[ "${compcor_globalFlag}" = 1 ]]; then
+  outDir=${rawEpiDir}/seedCorrelation/compcor_global
 else
   outDir=${rawEpiDir}/seedCorrelation/classic
 fi
