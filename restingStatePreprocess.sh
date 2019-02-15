@@ -300,6 +300,10 @@ while [ $# -ge 1 ] ; do
         exit 1
       fi
       shift;;
+  --noaroma)
+      aromaFlag=0;
+      export aromaFlag;
+      shift;;
   -c)
       clob=true;
       export clob;

@@ -339,6 +339,11 @@ in
       aromaArg="--aroma";
       export compcorFlag;
       shift;;
+  --compcor_global)
+	  compcor_globalFlag=1;
+	  aromaArg="--noaroma";
+	  export compcor_globalFlag;
+	  shift;;
   --usefmap)
       fieldMapFlag=1;
       shift;;
@@ -507,10 +512,18 @@ if [[ "${compcorFlag}" = 1 ]]; then
 	{
 	echo "$rsOut/SNR/CSF_pve_to_RS_thresh.nii.gz"; \
 	echo "$rsOut/SNR/WM_pve_to_RS_thresh_ero.nii.gz"; } > "$rsOut"/nuisanceList.txt
+elif [[ "${compcor_globalFlag}" = 1 ]]; then
+	epiDataFilt="$rsOut"/preproc/nonfiltered_smooth_data.nii.gz
+	epiDataFiltReg="${rsOut}"/nuisanceRegression/classic/nonfiltered_smooth_data_bp_res4d_normandscaled.nii.gz
+	compcorArg="--compcor"
+	{
+	echo "${scriptdir}/ROIs/global.nii.gz"; \
+	echo "$rsOut/SNR/CSF_pve_to_RS_thresh.nii.gz"; \
+	echo "$rsOut/SNR/WM_pve_to_RS_thresh_ero.nii.gz"; } > "$rsOut"/nuisanceList.txt
 else
 	epiDataFilt="$rsOut"/preproc/nonfiltered_smooth_data.nii.gz
 	epiDataFiltReg="${rsOut}"/nuisanceRegression/classic/nonfiltered_smooth_data_bp_res4d_normandscaled.nii.gz
-	compcorArg=""
+	compcorArg="--nocompcor"
 	{
 	echo "${scriptdir}/ROIs/latvent.nii.gz"; \
 	echo "${scriptdir}/ROIs/global.nii.gz"; \
