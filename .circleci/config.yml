@@ -108,9 +108,9 @@ jobs:
               docker images
             fi
       - run:
-          name: Run Docker image on test data
+          name: Test --compcor
           command: |
-            docker run -ti --rm=false --name rs_app \
+            docker run -ti --rm=false \
             -v /tmp/data/ds005:/data \
             hbclab/restingstate:latest \
             --epi=/data/sub-01/func/sub-01_task-rest_run-01_bold.nii.gz \
@@ -118,16 +118,32 @@ jobs:
             --t1_mask=/data/derivatives/bet/sub-01/anat/sub-01_desc-brainmask_T1w.nii.gz \
             --roiList=/data/derivatives/data/roi_list.txt \
             --compcor
+            mv /tmp/data/ds005/derivatives/rsOut /tmp/data/ds005/derivatives/rsOutCompcor
       - run:
           name: Check outputs
           command: |
             mkdir -p /tmp/ds005/test
-            find /tmp/data/ds005/derivatives/rsOut -type f | sed s+/tmp/data/ds005/derivatives++ | sort > /tmp/ds005/test/outputs.out
-            diff /tmp/src/RestingState/.circleci/ds005_outputs.txt /tmp/ds005/test/outputs.out
+            find /tmp/data/ds005/derivatives/rsOutCompcor -type f | sed s+/tmp/data/ds005/derivatives/rsOutCompcor++ | sort > /tmp/ds005/test/outputs.out
+            diff /tmp/src/RestingState/.circleci/ds005_compcor.txt /tmp/ds005/test/outputs.out
             exit $?
       - store_artifacts:
-          path: /tmp/data/ds005/derivatives/rsOut
-
+          path: /tmp/data/ds005/derivatives/rsOutCompcor
+      - run:
+          name: Test --compcor_global
+          command: |
+            docker run -ti --rm=false \
+            -v /tmp/data/ds005:/data \
+            hbclab/restingstate:latest \
+            --epi=/data/sub-01/func/sub-01_task-rest_run-01_bold.nii.gz \
+            --t1=/data/sub-01/anat/sub-01_T1w.nii.gz \
+            --t1_mask=/data/derivatives/bet/sub-01/anat/sub-01_desc-brainmask_T1w.nii.gz \
+            --roiList=/data/derivatives/data/roi_list.txt \
+            --compcor_global
+            mv /tmp/data/ds005/derivatives/rsOut /tmp/data/ds005/derivatives/rsOutCompcorrGlobal
+      - store_artifacts:
+          path: /tmp/data/ds005/derivatives/rsOutCompcorGlobal
+      
+          
 workflows:
   version: 2
   build_test:
@@ -148,4 +164,4 @@ workflows:
             - get_data
           filters:
             tags:
-              only: /.*/         
+              only: /.*/
