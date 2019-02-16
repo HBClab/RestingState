@@ -217,6 +217,14 @@ while [ $# -ge 1 ] ; do
       compcorFlag=1;
       export compcorFlag;
       shift;;
+    --compcor_global)
+      compcor_globalFlag=1;
+      export compcor_globalFlag;
+      shift;;
+    --nocompcor)
+      compcorFlag=0;
+      export compcorFlag;
+      shift;;
     --clobber)
       clob=true;
       export clob;
@@ -261,6 +269,8 @@ rawEpiDir=$(dirname "${preproc}")
 
 if [[ "${compcorFlag}" = 1 ]]; then
   outDir=${rawEpiDir}/nuisanceRegression/compcor
+elif [[ "${compcor_globalFlag}" = 1 ]]; then
+  outDir=${rawEpiDir}/nuisanceRegression/compcor_global
 else
   outDir=${rawEpiDir}/nuisanceRegression/classic
 fi
@@ -332,7 +342,7 @@ do
     echo "${roi} is in MNI space"
     clobber "$outDir"/rois/"${roiName}"_native.nii.gz &&\
     MNItoEPIwarp=$(grep "MNItoEPIWarp=" "$logDir"/rsParams | tail -1 | awk -F"=" '{print $2}') &&\
-    applywarp --ref="$rawEpiDir"/mcImgMean_stripped.nii.gz --in="${roi}" --out="$outDir"/roi/"${roiName}"_native.nii.gz --warp="$MNItoEPIwarp" --datatype=float
+    applywarp --ref="$rawEpiDir"/mcImgMean_stripped.nii.gz --in="${roi}" --out="$outDir"/rois/"${roiName}"_native.nii.gz --warp="$MNItoEPIwarp" --datatype=float
 
   elif [[ "$(fslinfo "${roi}" | grep ^dim1 | awk '{print $2}')" == "$(fslinfo "${epiData}" | grep ^dim1 | awk '{print $2}')" ]]; then
     echo "${roi} is in native space"
@@ -353,7 +363,12 @@ do
     clobber "$outDir"/rois/mean_"${roiName}"_ts.txt &&\
     echo "extracting timeseries for $roiName" &&\
     fslmeants -i "$epiData" -o "$outDir"/rois/mean_"${roiName}"_ts.txt -m "$outDir"/rois/"${roiName}"_native.nii.gz --eig --order=5
-
+  elif [[ "${compcor_globalFlag}" -eq 1 ]]; then
+    # mean for global
+    fslmeants -i "$epiData" -o "$outDir"/rois/mean_global_ts.txt -m "$outDir"/rois/global_native.nii.gz
+    # eigenvariates for WM and CSF
+    fslmeants -i "$epiData" -o "$outDir"/rois/mean_CSF_pve_to_RS_thresh_ts.txt -m "$outDir"/rois/CSF_pve_to_RS_thresh_native.nii.gz --eig --order=5
+    fslmeants -i "$epiData" -o "$outDir"/rois/mean_WM_pve_to_RS_thresh_ero_ts.txt -m "$outDir"/rois/WM_pve_to_RS_thresh_ero_native.nii.gz --eig --order=5
   else
     clobber "$outDir"/rois/mean_"${roiName}"_ts.txt &&\
     fslmeants -i "$epiData" -o "$outDir"/rois/mean_"${roiName}"_ts.txt -m "$outDir"/rois/"${roiName}"_native.nii.gz
@@ -366,6 +381,8 @@ done
 # paste regressor timeseries into one file
 if [[ "${compcorFlag}" -eq 1 ]]; then
   IFS=" " read -r -a arr <<< "$(for i in $(cat "$nuisanceInFile"); do echo "$outDir"/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' ')"
+elif [[ "${compcor_globalFlag}" -eq 1 ]]; then
+  IFS=" " read -r -a arr <<< "$(for i in $(cat "$nuisanceInFile"); do echo "$outDir"/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' '; echo "$rawEpiDir"/mcImg.par)"
 else # append motion parameters to regressor list
   IFS=" " read -r -a arr <<< "$(for i in $(cat "$nuisanceInFile"); do echo "$outDir"/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' '; echo "$rawEpiDir"/mcImg.par)"
 fi
