@@ -9,12 +9,10 @@ function [corrlist_subs avgcorrmat_subs]=getroicorrs(subList,roiList,sess,mypwd,
 %INPUTS set up by the run_getroicorrs.m script   
 %%
 
-
-
-
 %%%%%%%%%%%%%
 
-cd(mypwd)
+cd('/data/derivatives/rsOut/')
+numvols=180
 
 %prepare matrix to hold timeseries data
 timeseries=repmat(struct('rest',1),1,3); %one cell per run
@@ -31,6 +29,7 @@ timeseries(1,1,3).rest=zeros([length(roiList),length(roiList),length(subList)]);
 
 
 N=length(subList)
+disp(N)
 
 for u=1:N;
       for roi=1:length(roiList);
@@ -46,20 +45,13 @@ for u=1:N;
             l(u)=numvols;
             timeseries(1,1,1).rest(:,roi,u)=load([char(roiList{roi}),'_residvol_ts.txt']);
         end
-        % timeseries(1,1,1).rest(:,:,1)=timeseries data for  rois of first subject
       end
-
 end
-
-
-%now have structure with timeseries data per sub
-%make correlation matrix for each now
 
 
 for u=1:length(subList);
             for roi=1:length(roiList);
             timeseries(1,1,2).rest(:,:,u)=corrcoef(timeseries(1,1,1).rest(1:l(u),:,u)); 
-            %timeseries(1,1,2).rest(:,:,1)=correlation matrix between rois for first subject
             end
 end
 
