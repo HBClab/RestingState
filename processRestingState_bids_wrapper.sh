@@ -542,6 +542,7 @@ clobber "${epiDataFiltReg}" &&\
 clobber "${rsOut}"/motionScrub/"$(basename "${epiDataFiltReg/.nii/_ms.nii}")" &&\
 "${scriptdir}"/motionScrub.sh --epi="${epiDataFiltReg}"
 
+# add --seedmaps option if you want to get 3D seed-to-voxel fishers correlation map
 "${scriptdir}"/seedVoxelCorrelation.sh \
 --epi="${epiDataFiltReg}" \
 --motionscrub \
