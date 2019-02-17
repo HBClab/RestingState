@@ -1,3 +1,5 @@
+#!/usr/bin/octave 
+
 % This is a wrapper script that calles the actual matlab script getroicorrs.m that does
 % the actual correlation computations. Save these two scripts in your current working folder or 
 % where you start matlab from or in a place that is in your matlab search
