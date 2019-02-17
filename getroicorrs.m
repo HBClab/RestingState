@@ -25,9 +25,8 @@ timeseries(1,1,1).rest=zeros([numvols,length(roiList),length(subList)]); %volume
     %store correlation matrix
 timeseries(1,1,2).rest=zeros([length(roiList),length(roiList),length(subList)]); %volumes x numrois x subs
     
-    %store fisher's z correlation matrix
+    %store fishers z correlation matrix
 timeseries(1,1,3).rest=zeros([length(roiList),length(roiList),length(subList)]); %volumes x numrois x subs
-
 
 
 
@@ -35,9 +34,9 @@ N=length(subList)
 
 for u=1:N;
       for roi=1:length(roiList);
-        %DEPENDING ON HOW YOUR DATA IS STORED, YOU MAY HAVE TO CHANGE ...
-         %   THIS LINE!!
-        path=[mypwd,char(subList{u,1}),'/ses-',sess,'/seedCorrelation/compcor/rois'];
+        % DEPENDING ON HOW YOUR DATA IS STORED, YOU MAY HAVE TO CHANGE PATH HERE
+        % you want mypwd/sub-label/path-below to get you to the seed files ending in _residvol_ts.txt
+        path=[mypwd,char(subList{u,1}),'/seedCorrelation/compcor_global/rois'];
         cd(path)
         if(ms==1)
             ts=load([char(roiList{roi}),'_residvol_ms_ts.txt']);
@@ -47,7 +46,7 @@ for u=1:N;
             l(u)=numvols;
             timeseries(1,1,1).rest(:,roi,u)=load([char(roiList{roi}),'_residvol_ts.txt']);
         end
-        %timeseries(1,1,1).rest(:,:,1)=timeseries data for six rois for first subject
+        % timeseries(1,1,1).rest(:,:,1)=timeseries data for  rois of first subject
       end
 
 end
@@ -65,7 +64,7 @@ for u=1:length(subList);
 end
 
 
-%now want to do fisher's z on correlation matrices 
+%now want to do fishers z on correlation matrices 
 if (fisherz==1)
     for u=1:length(subList);
                 for roi=1:length(roiList);
@@ -108,15 +107,15 @@ end
 %dlmwrite('fztmat_allsubs_rest.txt',avgcorrmat_subs,'delimiter',' ','precision',3)
 
 
-%output a text file subjects x roi-pairs that has fisher's z estimates per roi-pair
+%output a text file subjects x roi-pairs that has fishers z estimates per roi-pair
 
-%make all diagonals zero for first sub as test matrix to get index for lower-triangular matrix
+% make all diagonals zero for first sub as test matrix to get index for lower-triangular matrix
 x=tril(avgcorrmat_subs); %x is roi x roi
 for roi=1:length(roiList)
     x(roi,roi)=0;
 end
 
-%index x's row,col addresses that have non-zero entries
+%index x row,col addresses that have non-zero entries
 [r,c]=find(x);
 
 %make a matrix that is sub x roi-pairs
