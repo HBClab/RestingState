@@ -2,13 +2,21 @@
 % the result per subject (subject_roi-pair_corr_compcor_global.csv) 
 % and as an average correlation matrix (roi-roi_corr.csv)
 
-
 close all;
 clear all;
 
+% Arguments
+arg_list = argv ();
+subList=arg_list{1};
+roiList=arg_list{2};
+
+for i = 1:nargin
+  printf (" %s", arg_list{i});
+endfor
+
 % Specify a text file that has all the subjects listed one per line. 
 
-fid1=fopen('/data/derivatives/sublists/sublist.txt');
+fid1=fopen(subList);
 subList_tmp=textscan(fid1,'%s');fclose(fid1);
 N=length(subList_tmp{1,1});
 subList=cell(N,1);
@@ -18,7 +26,7 @@ end
 
 % Specify a textfile that has all your regions of interest listed one per line without extensions. 
 
-fid2=fopen('/data/derivatives/sublists/sublist-rois.txt');   %ROI LIST HERE
+fid2=fopen(roiList);   
 roiList_tmp=textscan(fid2,'%s');fclose(fid2);
 N1=length(roiList_tmp{1,1});
 roiList=cell(N1,1);
@@ -38,9 +46,8 @@ ms=1;
 % Specify if you want fishers z (usually yes)
 fisherz=1;
 
-% Specify the number of time points in the functional data.  
-% If different runs have different volumes, use the least common value
-numvols=180;
+% This is a filler number for setting up matrices, and it is dynamically adjusted based on timeseries length below
+numvols=10; 
 
 % The following code now goes and gets fc for each sub.
 
@@ -56,6 +63,8 @@ timeseries(1,1,2).rest=zeros([length(roiList),length(roiList),length(subList)]);
     %store fishers z correlation matrix
 timeseries(1,1,3).rest=zeros([length(roiList),length(roiList),length(subList)]); %volumes x numrois x subs
 
+% uncomment to show size of filler structure
+% size(timeseries(1,1,1).rest)
 
 
 N=length(subList)
@@ -73,11 +82,15 @@ for u=1:N;
             l(u)=length(ts);
             timeseries(1,1,1).rest(1:l(u),roi,u)=ts(1:l(u));
         else
-            l(u)=numvols;
+            ts=load([char(roiList{roi}),'_residvol_ts.txt']);
+            l(u)=length(ts);
             timeseries(1,1,1).rest(:,roi,u)=load([char(roiList{roi}),'_residvol_ts.txt']);
         end
       end
 end
+
+% uncomment to show size of filled structure
+% size(timeseries(1,1,1).rest)
 
 
 for u=1:length(subList);
@@ -177,8 +190,8 @@ for roi1=1:length(roiList)
     roi_row=cat(2,roi_row, [char(r2),' ']);
 end
 
-if(exist('subject_roi-pair_corr'))
-    delete('subject_roi-pair_corr');
+if(exist('subject_roi-pair_corr.csv'))
+    delete('subject_roi-pair_corr.csv');
 end
 
 fid = fopen('subject_roi-pair_corr.csv','w');
@@ -196,8 +209,8 @@ for row=1:N
 end
 
 
-if(exist('roi-roi_corr'));
-    delete('roi-roi_corr');
+if(exist('roi-roi_corr.csv'));
+    delete('roi-roi_corr.csv');
 end
 
 fid = fopen('roi-roi_corr.csv','a');
