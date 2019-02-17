@@ -1,15 +1,12 @@
-% This is a wrapper script that calles the actual matlab script getroicorrs.m that does
-% the actual correlation computations. Save these two scripts in your current working folder or 
-% where you start matlab from or in a place that is in your matlab search
-% path and run this code after making necessary changes to your path
-% structure. Read on...
+% This script will set up variables for computing roi-roi correlations per subject, and ouputs
+% the result per subject (subject_roi-pair_corr_compcor_global.csv) 
+% and as an average correlation matrix (roi-roi_corr.csv)
 
 
 close all;
 clear all;
 
-%Specify a text file that has all the subjects listed one per line. (It is better
-% if you can give the full path).
+% Specify a text file that has all the subjects listed one per line. 
 
 fid1=fopen('/data/derivatives/sublists/sublist.txt');
 subList_tmp=textscan(fid1,'%s');fclose(fid1);
@@ -19,8 +16,7 @@ for i=1:N
     subList{i,1}=strcat(subList_tmp{1,1}(i));
 end
 
-% Please specify a textfile that has all your regions of interest listed one per line without extensions. (It is better
-% if you can give the full path).
+% Specify a textfile that has all your regions of interest listed one per line without extensions. 
 
 fid2=fopen('/data/derivatives/sublists/sublist-rois.txt');   %ROI LIST HERE
 roiList_tmp=textscan(fid2,'%s');fclose(fid2);
@@ -30,27 +26,23 @@ for i=1:N1
     roiList{i,1}=(roiList_tmp{1,1}(i));
 end
 
-% Please specify the path where your subject data is 
-% If this part is different for you, please change it according to
-% your directory structure. 
+% Specify the path where your subject data is and where you want outputs
 
 mypwd='/data/derivatives/rsOut/';
 outdir='/data/derivatives/rsOut/roicorrs/'
 
-% if your data is motion scrubbed, use motion_scrub=1 else use
-% motion_scrub=0. If motion scrubbed; it will look for
-% roi_residvol_ms_ts.txt in the location: mypwd/sub-label/path-to-roi-resid-textfiles
+% Specify if your data is motion scrubbed, use ms=1 else use ms=0
 
 ms=1; 
 
-% want fishers z
+% Specify if you want fishers z (usually yes)
 fisherz=1;
 
-% This specifies the number of time points in the functional data. Change
-% it according to your data. If different runs have different volumes, use the least common value
+% Specify the number of time points in the functional data.  
+% If different runs have different volumes, use the least common value
 numvols=180;
 
-% Now that you have changed all the necessary fields, the following code goes and gets fc for each sub.
+% The following code now goes and gets fc for each sub.
 
 %prepare matrix to hold timeseries data
 timeseries=repmat(struct('rest',1),1,3); %one cell per run
@@ -71,8 +63,9 @@ disp(N)
 
 for u=1:N;
       for roi=1:length(roiList);
-        % DEPENDING ON HOW YOUR DATA IS STORED, YOU MAY HAVE TO CHANGE PATH HERE
-        % you want mypwd/sub-label/path-below to get you to the seed files ending in _residvol_ts.txt
+        % Specify where the _residvol_*_ts.txt files are
+        % you want mypwd/sub-label/path-below to get you to the seed files ending in _residvol_*_ts.txt
+        % this will change based on nuisance regression approach
         path=[mypwd,char(subList{u,1}),'/seedCorrelation/compcor_global/rois'];
         cd(path)
         if(ms==1)
@@ -93,8 +86,9 @@ for u=1:length(subList);
             end
 end
 
+
+%now want to do fishers z on correlation matrices, turn warnings of divide by zero off
 warning('off', 'all');
-%now want to do fishers z on correlation matrices 
 if (fisherz==1)
     for u=1:length(subList);
                 for roi=1:length(roiList);
@@ -115,6 +109,7 @@ end
 
 %prepare to hold average matrix of subjects (average across runs per condition)
 avgcorrmat_subs=mean(timeseries(1,1,3).rest(:,:,:),3);
+% below would do the same for pearson instead of fishers
 % avgcorrmat_subs=mean(timeseries(1,1,2).rest(:,:,:),3);
 
 %write to text file
@@ -162,15 +157,13 @@ end
 
 
 %%
-% if you are familiar with matlab, then:
-% -the matrix corrlist_subs gives you the correlation of each subject to each roi-pairs.
-% -the matrix avgcorrmat_subs gives you the cross-correlation of roi time-series averaged over all subjects.
+% the matrix corrlist_subs gives you the correlation of each subject to each roi-pairs.
+% the matrix avgcorrmat_subs gives you the cross-correlation of roi time-series averaged over all subjects.
 %    
-% if do not like to work with matlab, the above matrices are written to some text files for your convenience. 
-% Look for the text files 'subject_roi-pair_corr' and 'roi-roi_corr' in your current working directory.
+% the above matrices are written to .csv files
+% Look for the text files 'subject_roi-pair_corr' and 'roi-roi_corr' in your specified outdir
 
-% the following code creates a text file 'subject_roi-pair_corr' in your current directory with the correlation values for each subject
-% to each roi-pairs 
+% the following code creates a text file 'subject_roi-pair_corr' 
 
 pair=[char(9)];roi_row=[char(9)];
 for roi1=1:length(roiList)
@@ -188,15 +181,14 @@ if(exist('subject_roi-pair_corr'))
     delete('subject_roi-pair_corr');
 end
 
-fid = fopen('subject_roi-pair_corr_compcor_global.csv','w');
+fid = fopen('subject_roi-pair_corr.csv','w');
 fprintf(fid, '%s \n', pair);
 fclose(fid);
 
-% the following code creates a text file 'roi-roi_corr' in your current directory with the cross-correlation
-% of rois averaged over all subjects
+% the following code creates a text file 'roi-roi_corr' 
 
 for row=1:N
-    fid = fopen('subject_roi-pair_corr_compcor_global.csv','a');
+    fid = fopen('subject_roi-pair_corr.csv','a');
     clear a;
     a=char(num2str(corrlist_subs(row,:)));
     fprintf(fid,'%s %s \n',char(subList{row,1}),a);
