@@ -8,11 +8,11 @@ clear all;
 % Arguments
 arg_list = argv ();
 mypwd=arg_list{1};
-outdir=[mypwd,'/roicorrs'];
-subList=arg_list{1};
-roiList=arg_list{2};
+subList=arg_list{2};
+roiList=arg_list{3};
 
 % make the roicorrs directory
+outdir=[mypwd,'/roicorrs'];
 mkdir(outdir)
 
 for i = 1:nargin
