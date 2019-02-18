@@ -7,8 +7,13 @@ clear all;
 
 % Arguments
 arg_list = argv ();
+mypwd=arg_list{1};
+outdir=[mypwd,'/roicorrs'];
 subList=arg_list{1};
 roiList=arg_list{2};
+
+% make the roicorrs directory
+mkdir(outdir)
 
 for i = 1:nargin
   printf (" %s", arg_list{i});
@@ -33,11 +38,6 @@ roiList=cell(N1,1);
 for i=1:N1
     roiList{i,1}=(roiList_tmp{1,1}(i));
 end
-
-% Specify the path where your subject data is and where you want outputs
-
-mypwd='/data/derivatives/rsOut/';
-outdir='/data/derivatives/rsOut/roicorrs/'
 
 % Specify if your data is motion scrubbed, use ms=1 else use ms=0
 
