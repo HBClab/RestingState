@@ -152,7 +152,7 @@ jobs:
             docker run -it \
             -v /tmp/data/ds005:/data \
             -v /tmp:/tmp \
-            --entrypoint /opt/RestingState/run_getroicorrs-shell-wrapper.sh \
+            --entrypoint /opt/RestingState/run_getroicorrs_shell_wrapper.sh \
             hbclab/restingstate:latest \
             /data/derivatives/rsOut/ \
             /tmp/ds005/test/subList.txt \
