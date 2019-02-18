@@ -365,10 +365,19 @@ do
     fslmeants -i "$epiData" -o "$outDir"/rois/mean_"${roiName}"_ts.txt -m "$outDir"/rois/"${roiName}"_native.nii.gz --eig --order=5
   elif [[ "${compcor_globalFlag}" -eq 1 ]]; then
     # mean for global
-    fslmeants -i "$epiData" -o "$outDir"/rois/mean_global_ts.txt -m "$outDir"/rois/global_native.nii.gz
+    clobber "$outDir"/rois/mean_global_ts.txt &&\
+      if [ -f "$outDir"/rois/global_native.nii.gz ]; then
+        fslmeants -i "$epiData" -o "$outDir"/rois/mean_global_ts.txt -m "$outDir"/rois/global_native.nii.gz
+      fi
     # eigenvariates for WM and CSF
-    fslmeants -i "$epiData" -o "$outDir"/rois/mean_CSF_pve_to_RS_thresh_ts.txt -m "$outDir"/rois/CSF_pve_to_RS_thresh_native.nii.gz --eig --order=5
-    fslmeants -i "$epiData" -o "$outDir"/rois/mean_WM_pve_to_RS_thresh_ero_ts.txt -m "$outDir"/rois/WM_pve_to_RS_thresh_ero_native.nii.gz --eig --order=5
+    clobber "$outDir"/rois/mean_CSF_pve_to_RS_thresh_ts.txt &&\
+      if [ -f "$outDir"/rois/CSF_pve_to_RS_thresh_native.nii.gz ]; then
+        fslmeants -i "$epiData" -o "$outDir"/rois/mean_CSF_pve_to_RS_thresh_ts.txt -m "$outDir"/rois/CSF_pve_to_RS_thresh_native.nii.gz --eig --order=5
+      fi
+    clobber "$outDir"/rois/mean_WM_pve_to_RS_thresh_ero_ts.txt &&\
+      if [ -f "$outDir"/rois/WM_pve_to_RS_thresh_ero_native.nii.gz ]; then
+        fslmeants -i "$epiData" -o "$outDir"/rois/mean_WM_pve_to_RS_thresh_ero_ts.txt -m "$outDir"/rois/WM_pve_to_RS_thresh_ero_native.nii.gz --eig --order=5
+      fi
   else
     clobber "$outDir"/rois/mean_"${roiName}"_ts.txt &&\
     fslmeants -i "$epiData" -o "$outDir"/rois/mean_"${roiName}"_ts.txt -m "$outDir"/rois/"${roiName}"_native.nii.gz
