@@ -129,9 +129,9 @@ avgcorrmat_subs=mean(timeseries(1,1,3).rest(:,:,:),3);
 cd(outdir)
 for u=1:length(subList);
     if (fisherz==1)
-        fname=[sprintf('%05d',sscanf(char(subList{u,1}),'sub%d')),'.mat']; % zeropad subID
+        fname=[sprintf('%05d',sscanf(char(subList{u,1}),'sub-%d')),'.mat']; % zeropad subID
     else 
-        fname=[sprintf('%05d',sscanf(char(subList{u,1}),'sub%d')),'_rawcorr.mat']
+        fname=[sprintf('%05d',sscanf(char(subList{u,1}),'sub-%d')),'_rawcorr.mat']
     end
     
     sub_mat=timeseries(1,1,3).rest(:,:,u);
