@@ -20,6 +20,9 @@
 /anat/sub-01/tissueSeg/T1_seg_1.nii.gz
 /anat/sub-01/tissueSeg/T1_seg_2.nii.gz
 /anat/sub-01/tissueSeg/T1_seg.nii.gz
+/roicorrs/00001.mat
+/roicorrs/roi-roi_corr.csv
+/roicorrs/subject_roi-pair_corr.csv
 /sub-01/3dTqual.png
 /sub-01/analysisResults.html
 /sub-01/AntNoise_Mean.par
