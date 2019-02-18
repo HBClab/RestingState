@@ -118,10 +118,10 @@ jobs:
             --t1_mask=/data/derivatives/bet/sub-01/anat/sub-01_desc-brainmask_T1w.nii.gz \
             --roiList=/data/derivatives/data/roi_list.txt \
             --compcor
-            mv /tmp/data/ds005/derivatives/rsOut /tmp/data/ds005/derivatives/rsOutCompcor
       - run:
           name: Check compcor outputs
           command: |
+            mv /tmp/data/ds005/derivatives/rsOut /tmp/data/ds005/derivatives/rsOutCompcor
             mkdir -p /tmp/ds005/test
             find /tmp/data/ds005/derivatives/rsOutCompcor -type f | sed s+/tmp/data/ds005/derivatives/rsOutCompcor++ | sort > /tmp/ds005/test/outputs-compcor.out
             diff /tmp/src/RestingState/.circleci/ds005_compcor.txt /tmp/ds005/test/outputs-compcor.out
@@ -157,12 +157,12 @@ jobs:
             /data/derivatives/rsOut/ \
             /tmp/ds005/test/subList.txt \
             /tmp/ds005/test/roiList.txt
-            
-            # move rsOut to it's own directory
-            mv /tmp/data/ds005/derivatives/rsOut /tmp/data/ds005/derivatives/rsOutCompcorGlobal
       - run:
           name: Check compcor_global outputs
           command: |
+            # move rsOut to it's own directory
+            mv /tmp/data/ds005/derivatives/rsOut /tmp/data/ds005/derivatives/rsOutCompcorGlobal
+
             mkdir -p /tmp/ds005/test
             find /tmp/data/ds005/derivatives/rsOutCompcorGlobal -type f | sed s+/tmp/data/ds005/derivatives/rsOutCompcorGlobal++ | sort > /tmp/ds005/test/outputs-compcor_global.out
             diff /tmp/src/RestingState/.circleci/ds005_compcor_global.txt /tmp/ds005/test/outputs-compcor_global.out
