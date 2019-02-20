@@ -165,9 +165,6 @@ if [[ -z $seedmapFlag ]]; then
 seedmapFlag=0
 fi
 
-if [[ -e "${epiData//.nii.gz/.nii}" ]] && [[ -e "${epiData}" ]]; then
-  rm "${epiData//.nii.gz/.nii}"
-fi
 
 # If new seeds are added, echo them out to the rsParams file (only if they don't already exist in the file)
 # Making a *strong* assumption that any ROI lists added after initial processing won't reuse the first ROI (e.g. pccrsp)
