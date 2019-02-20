@@ -635,15 +635,6 @@ if [ "${seedmapFlag}" -eq 1 ]; then
       --warp=${preproc}/reg/standard2highres_warp.nii.gz \
       --interp=nn
 
-
-      # Nonlinear warp from EPI to MNI
-      clobber ${seedcorrDir}/${roi}_ms_corrmap_standard.nii.gz &&\
-      applywarp --in=${roiOutDir}/${roi}_ms/cope1.nii \
-      --ref=${preproc}/reg/standard.nii.gz \
-      --out=${seedcorrDir}/${roi}_ms_corrmap_standard.nii.gz \
-      --warp=${preproc}/reg/example_func2standard_warp.nii.gz \
-      --datatype=float
-
       # Mask out data with MNI mask
       fslmaths ${seedcorrDir}/${roi}_ms_corrmap_standard.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_ms_corrmap_standard_masked.nii.gz
 
