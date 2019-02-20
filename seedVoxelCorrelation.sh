@@ -509,14 +509,14 @@ if [ "${seedmapFlag}" -eq 1 ]; then
 
   # check if seeding results exist, re-populate seeds.txt with non existing seeds
   for roi in $(cat "$roiOutDir"/seeds_orig.txt); do
-  	if [[ $motionscrubFlag == 0 ]] && [ ! -f ${roiOutDir}/${roi}/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_standard_zmap.nii.gz ]; then
+  	if [[ $motionscrubFlag == 0 ]] && [ ! -f ${roiOutDir}/${roi}/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_corrmap_standard.nii.gz ]; then
   		echo $roi >> "$roiOutDir"/seeds.txt
   	fi
   	if [[ $motionscrubFlag == 1 ]]; then
-  		if [ ! -f ${roiOutDir}/${roi}/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_standard_zmap.nii.gz ]; then
+  		if [ ! -f ${roiOutDir}/${roi}/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_corrmap_standard.nii.gz ]; then
   			echo $roi >> "$roiOutDir"/seeds.txt
   		fi
-  		if [ ! -f ${roiOutDir}/${roi}_ms/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_ms_standard_zmap.nii.gz ]; then
+  		if [ ! -f ${roiOutDir}/${roi}_ms/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_ms_corrmap_standard.nii.gz ]; then
   			echo $roi >> "$roiOutDir"/seeds_ms.txt
   		fi
   	fi
@@ -533,12 +533,12 @@ if [ "${seedmapFlag}" -eq 1 ]; then
       
       seedList=$(cat "$roiOutDir"/seeds.txt)
       3dTcorr1D -prefix ${seedcorrDir}/${roi}_corrmap_native -Fisher ${epiData} ${roiOutDir}/${roi}_residvol_ts.txt
-      3dAFNItoNIFTI ${seedcorrDir}/${roi}_corrmap_native+orig -prefix ${seedcorrDir}/${roi}_corrmap_native.nii.gz
+      3dAFNItoNIFTI ${seedcorrDir}/${roi}_corrmap_native+orig -prefix ${seedcorrDir}/${roi}_corrmap_native.nii
 
     if [[ $motionscrubFlag == 1 ]]; then
       seedList=$(cat "$roiOutDir"/seeds_ms.txt)
       3dTcorr1D -prefix ${seedcorrDir}/${roi}_corrmap_ms_native -Fisher ${epiData} ${roiOutDir}/${roi}_residvol_ms_ts.txt
-      3dAFNItoNIFTI ${seedcorrDir}/${roi}_corrmap_ms_native+orig -prefix ${seedcorrDir}/${roi}_corrmap_ms_native.nii.gz
+      3dAFNItoNIFTI ${seedcorrDir}/${roi}_corrmap_ms_native+orig -prefix ${seedcorrDir}/${roi}_corrmap_ms_native.nii
     fi
 
   else
@@ -578,15 +578,15 @@ if [ "${seedmapFlag}" -eq 1 ]; then
 
 
       # Nonlinear warp from EPI to MNI
-      clobber ${seedcorrDir}/${roi}_standard_zmap.nii.gz &&\
-      applywarp --in=${roiOutDir}/${roi}/cope1.nii \
+      clobber ${seedcorrDir}/${roi}_corrmap_standard.nii.gz &&\
+      applywarp --in=${seedcorrDir}/${roi}_corrmap_native.nii \
       --ref=${preproc}/reg/standard.nii.gz \
-      --out=${seedcorrDir}/${roi}_standard_zmap.nii.gz \
+      --out=${seedcorrDir}/${roi}_corrmap_standard.nii.gz \
       --warp=${preproc}/reg/example_func2standard_warp.nii.gz \
       --datatype=float
 
       # Mask out data with MNI mask
-      fslmaths ${seedcorrDir}/${roi}_standard_zmap.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_standard_zmap_masked.nii.gz
+      fslmaths ${seedcorrDir}/${roi}_corrmap_standard.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_corrmap_standard_masked.nii.gz
 
       # Warp seed from MNI to T1
       clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
@@ -617,15 +617,15 @@ if [ "${seedmapFlag}" -eq 1 ]; then
 
 
       # Nonlinear warp from EPI to MNI
-      clobber ${roiOutDir}/${roi}_ms_standard_zmap.nii.gz &&\
-      applywarp --in=${roiOutDir}/${roi}_ms/cope1.nii \
+      clobber ${roiOutDir}/${roi}_ms_corrmap_standard.nii.gz &&\
+      applywarp --in=${seedcorrDir}/${roi}_corrmap_ms_native.nii \
       --ref=${preproc}/reg/standard.nii.gz \
-      --out=${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz \
+      --out=${seedcorrDir}/${roi}_ms_corrmap_standard.nii.gz \
       --warp=${preproc}/reg/example_func2standard_warp.nii.gz \
       --datatype=float
 
       # Mask out data with MNI mask
-      fslmaths ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_ms_standard_zmap_masked.nii.gz
+      fslmaths ${seedcorrDir}/${roi}_ms_corrmap_standard.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_ms_corrmap_standard_masked.nii.gz
 
       # Warp seed from MNI to T1
       clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
@@ -637,15 +637,15 @@ if [ "${seedmapFlag}" -eq 1 ]; then
 
 
       # Nonlinear warp from EPI to MNI
-      clobber ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz &&\
+      clobber ${seedcorrDir}/${roi}_ms_corrmap_standard.nii.gz &&\
       applywarp --in=${roiOutDir}/${roi}_ms/cope1.nii \
       --ref=${preproc}/reg/standard.nii.gz \
-      --out=${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz \
+      --out=${seedcorrDir}/${roi}_ms_corrmap_standard.nii.gz \
       --warp=${preproc}/reg/example_func2standard_warp.nii.gz \
       --datatype=float
 
       # Mask out data with MNI mask
-      fslmaths ${seedcorrDir}/${roi}_ms_standard_zmap.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_ms_standard_zmap_masked.nii.gz
+      fslmaths ${seedcorrDir}/${roi}_ms_corrmap_standard.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_ms_corrmap_standard_masked.nii.gz
 
 
       # Look for the presence of deleted volumes.  ONLY create "spike" (ms) images if found, otherwise default to non-motionscrubbed images
