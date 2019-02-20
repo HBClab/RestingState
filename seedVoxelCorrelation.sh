@@ -524,99 +524,23 @@ if [ "${seedmapFlag}" -eq 1 ]; then
 
 
   # Perform the Correlation
-  # Take into account $motionscrubFlag
-
-  # Check into matlab about fixing motion-scrubbing (Power method)
-
-    # If $motionscrubFlag == 0 (no motionscrub), res4dnormandscaled never gets unzipped
-  	if [[ ! -e "${epiData//.nii.gz/.nii}" ]]; then
-  	  gunzip -f "${epiData}"
-    fi
-
-  if [[ $motionscrubFlag == 0 ]]; then
-
-    echo "...Creating Octave script"
-    cat > $filename << EOF
-% It is matlab script
-addpath('${scriptDir}')
-statsScripts=['${scriptDir}','/Octave/nifti'];
-addpath(statsScripts)
-fid=fopen('$roiOutDir/seeds.txt');
-roiList=textscan(fid,'%s');
-fclose(fid);
-
-funcvoldim=[$numXdim $numYdim ${numZdim}];
-doFisherZ=1;
-motion_scrub=0;
-input='${epiData/.nii.gz/.nii}';
-
-firstlevelseeding_parallel(roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
-quit
-EOF
-  elif [[ $motionscrubFlag == 1 ]]; then
-    echo "...Creating Octave script"
-    cat > $filename << EOF
-% It is matlab script
-addpath('${scriptDir}')
-statsScripts=['${scriptDir}','/Octave/nifti'];
-addpath(statsScripts)
-fid=fopen('$roiOutDir/seeds.txt');
-roiList=textscan(fid,'%s');
-fclose(fid);
-
-funcvoldim=[$numXdim $numYdim ${numZdim}];
-doFisherZ=1;
-motion_scrub=0;
-input='${epiData/.nii.gz/.nii}';
-
-firstlevelseeding_parallel(roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
-quit
-EOF
-
-    echo "...Creating Octave script (motionscrubbed data)"
-    cat > $filename2 << EOF
-% It is matlab script
-addpath('${scriptDir}')
-statsScripts=['${scriptDir}','/Octave/nifti'];
-addpath(statsScripts)
-fid=fopen('$roiOutDir/seeds_ms.txt');
-roiList=textscan(fid,'%s');
-fclose(fid);
-
-funcvoldim=[$numXdim $numYdim ${numZdim}];
-doFisherZ=1;
-motion_scrub=1;
-input='${rawEpiDir}/motionScrub/$(basename ${epiData/.nii.gz/_ms.nii})';
-
-firstlevelseeding_parallel(roiList,'$roiOutDir',funcvoldim,input,motion_scrub,doFisherZ)
-quit
-EOF
-  fi
 
 #################################
 
   if [ ! "$(head -n 1 "$roiOutDir"/seeds.txt 2> /dev/null)" = ""  ] || [ ! "$(head -n 1 "$roiOutDir"/seeds_ms.txt 2> /dev/null)" = ""  ]; then
       #### Seed Voxel Correlation (Execution) ############
       echo "...Correlating Seeds With Time Series Data"
+      
+      seedList=$(cat "$roiOutDir"/seeds.txt)
+      3dTcorr1D -prefix ${seedcorrDir}/${roi}_corrmap_native -Fisher ${epiData} ${roiOutDir}/${roi}_residvol_ts.txt
+      3dAFNItoNIFTI ${seedcorrDir}/${roi}_corrmap_native+orig -prefix ${seedcorrDir}/${roi}_corrmap_native.nii.gz
 
-      # Run script using Matlab or Octave
-      # Check for $motionscrubFlag, run appropriate file(s)
-      haveMatlab=$(which matlab)
-      if [[ "$haveMatlab" == "" ]]; then
-    		if [[ $motionscrubFlag == 0 ]]; then
-    		    octave --no-window-system "$seedcorrDir"/$filename
-    		elif [[ $motionscrubFlag == 1 ]]; then
-    		    octave --no-window-system "$seedcorrDir"/$filename
-    		    octave --no-window-system "$seedcorrDir"/$filename2
-    		fi
-  	  else
-    		if [[ $motionscrubFlag == 0 ]]; then
-    		    matlab -nodisplay -r "run $seedcorrDir/$filename"
-    		elif [[ $motionscrubFlag == 1 ]]; then
-    		    matlab -nodisplay -r "run $seedcorrDir/$filename"
-    		    matlab -nodisplay -r "run $seedcorrDir/$filename2"
-    		fi
-      fi
+    if [[ $motionscrubFlag == 1 ]]; then
+      seedList=$(cat "$roiOutDir"/seeds_ms.txt)
+      3dTcorr1D -prefix ${seedcorrDir}/${roi}_corrmap_ms_native -Fisher ${epiData} ${roiOutDir}/${roi}_residvol_ms_ts.txt
+      3dAFNItoNIFTI ${seedcorrDir}/${roi}_corrmap_ms_native+orig -prefix ${seedcorrDir}/${roi}_corrmap_ms_native.nii.gz
+    fi
+
   else
   	echo "no seeds to correlate."
   fi
