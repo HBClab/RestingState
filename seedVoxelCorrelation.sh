@@ -168,10 +168,18 @@ fi
 
 # If new seeds are added, echo them out to the rsParams file (only if they don't already exist in the file)
 # Making a *strong* assumption that any ROI lists added after initial processing won't reuse the first ROI (e.g. pccrsp)
+
+# exit if input data doesn't exist
+if [ ! -e ${epiData} ]; then
+  echo "ERROR: epiData does not exist! check input file..."
+  exit
+fi
+
 indir=$(dirname $epiData)
-preproc="${indir%/*/*}"/preproc
-logDir=$(dirname "${preproc}")
-rawEpiDir=$(dirname "${preproc}")
+rawEpiDir="${indir//\/nuisanceRegression*}"
+preproc="${rawEpiDir}"/preproc
+logDir="${rawEpiDir}"
+
 
 if [ "${compcorFlag}" -eq 1 ]; then
   outDir=${rawEpiDir}/seedCorrelation/compcor
