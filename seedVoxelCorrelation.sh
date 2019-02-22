@@ -529,14 +529,14 @@ if [ "${seedmapFlag}" -eq 1 ]; then
 
   # check if seeding results exist, re-populate seeds.txt with non existing seeds
   for roi in $(cat "$roiOutDir"/seeds_orig.txt); do
-  	if [[ $motionscrubFlag == 0 ]] && [ ! -f ${roiOutDir}/${roi}/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_corrmap_standard.nii.gz ]; then
+  	if [[ $motionscrubFlag == 0 ]] && [ ! -f $seedcorrDir/${roi}_corrmap_native.nii.gz ] && [ ! -f $seedcorrDir/${roi}_corrmap_standard.nii.gz ]; then
   		echo $roi >> "$roiOutDir"/seeds.txt
   	fi
   	if [[ $motionscrubFlag == 1 ]]; then
-  		if [ ! -f ${roiOutDir}/${roi}/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_corrmap_standard.nii.gz ]; then
+  		if [ ! -f $seedcorrDir/${roi}_corrmap_native.nii.gz ] && [ ! -f $seedcorrDir/${roi}_corrmap_standard.nii.gz ]; then
   			echo $roi >> "$roiOutDir"/seeds.txt
   		fi
-  		if [ ! -f ${roiOutDir}/${roi}_ms/cope1.nii ] && [ ! -f $seedcorrDir/${roi}_ms_corrmap_standard.nii.gz ]; then
+  		if [ ! -f $seedcorrDir/${roi}_ms native.nii.gz ] && [ ! -f $seedcorrDir/${roi}_ms_corrmap_standard.nii.gz ]; then
   			echo $roi >> "$roiOutDir"/seeds_ms.txt
   		fi
   	fi
@@ -551,14 +551,14 @@ if [ "${seedmapFlag}" -eq 1 ]; then
       #### Seed Voxel Correlation (Execution) ############
       echo "...Correlating Seeds With Time Series Data"
       
-      seedList=$(cat "$roiOutDir"/seeds.txt)
-      3dTcorr1D -prefix ${seedcorrDir}/${roi}_corrmap_native -Fisher ${epiData} ${roiOutDir}/${roi}_residvol_ts.txt
-      3dAFNItoNIFTI ${seedcorrDir}/${roi}_corrmap_native+orig -prefix ${seedcorrDir}/${roi}_corrmap_native.nii
+      
+      parallel --header : 3dTcorr1D -prefix ${seedcorrDir}/{roi}_corrmap_native -Fisher ${epiData} ${roiOutDir}/{roi}_residvol_ts.txt ::: roi $(cat "$roiOutDir"/seeds.txt)
+      parallel --header : 3dAFNItoNIFTI ${seedcorrDir}/{roi}_corrmap_native+orig -prefix ${seedcorrDir}/{roi}_corrmap_native.nii ::: roi $(cat "$roiOutDir"/seeds.txt)
 
     if [[ $motionscrubFlag == 1 ]]; then
-      seedList=$(cat "$roiOutDir"/seeds_ms.txt)
-      3dTcorr1D -prefix ${seedcorrDir}/${roi}_corrmap_ms_native -Fisher ${epiData} ${roiOutDir}/${roi}_residvol_ms_ts.txt
-      3dAFNItoNIFTI ${seedcorrDir}/${roi}_corrmap_ms_native+orig -prefix ${seedcorrDir}/${roi}_corrmap_ms_native.nii
+      seedList=
+      parallel --header : 3dTcorr1D -prefix ${seedcorrDir}/${roi}_corrmap_ms_native -Fisher ${epiData} ${roiOutDir}/${roi}_residvol_ms_ts.txt ::: roi $(cat "$roiOutDir"/seeds_ms.txt)
+      parallel --header : 3dAFNItoNIFTI ${seedcorrDir}/${roi}_corrmap_ms_native+orig -prefix ${seedcorrDir}/${roi}_corrmap_ms_native.nii ::: roi $(cat "$roiOutDir"/seeds_ms.txt)
     fi
 
   else
@@ -566,7 +566,7 @@ if [ "${seedmapFlag}" -eq 1 ]; then
   fi
 #################################
 
-
+echo "here"; exit
 #### Zstat Results (to T1/MNI) ############
 
 
