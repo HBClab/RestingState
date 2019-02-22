@@ -565,18 +565,6 @@ if [ "${seedmapFlag}" -eq 1 ]; then
 
   echo "...Creating zstat Results Directory"
 
-
-  # Copy over anatomical files to results directory
-  # T1 (highres)
-  cp ${preproc}/reg/highres.nii.gz ${seedcorrDir}
-
-  # T1toMNI (highres2standard)
-  cp ${preproc}/reg/highres2standard.nii.gz ${seedcorrDir}
-
-  # MNI (standard)
-  cp ${preproc}/reg/standard.nii.gz ${seedcorrDir}
-
-
   # HTML setup
   echo "<hr><h2>Seed Time Series</h2>" >> "$rawEpiDir"/analysisResults.html
 
@@ -604,14 +592,7 @@ if [ "${seedmapFlag}" -eq 1 ]; then
       # Mask out data with MNI mask
       fslmaths ${seedcorrDir}/${roi}_corrmap_standard.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_corrmap_standard_masked.nii.gz
 
-      # Warp seed from MNI to T1
-      clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
-      applywarp --in=${roiOutDir}/${roi}_standard.nii.gz \
-      --ref=${preproc}/reg/highres.nii.gz \
-      --out=${seedcorrDir}/${roi}_highres.nii.gz \
-      --warp=${preproc}/reg/standard2highres_warp.nii.gz \
-      --interp=nn
-
+      
       # Creating new plots with fsl_tsplot
       # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
       yMax=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
@@ -642,18 +623,6 @@ if [ "${seedmapFlag}" -eq 1 ]; then
 
       # Mask out data with MNI mask
       fslmaths ${seedcorrDir}/${roi}_ms_corrmap_standard.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_ms_corrmap_standard_masked.nii.gz
-
-      # Warp seed from MNI to T1
-      clobber ${seedcorrDir}/${roi}_highres.nii.gz &&\
-      applywarp --in=${roiOutDir}/${roi}_standard.nii.gz \
-      --ref=${preproc}/reg/highres.nii.gz \
-      --out=${seedcorrDir}/${roi}_highres.nii.gz \
-      --warp=${preproc}/reg/standard2highres_warp.nii.gz \
-      --interp=nn
-
-      # Mask out data with MNI mask
-      fslmaths ${seedcorrDir}/${roi}_ms_corrmap_standard.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_ms_corrmap_standard_masked.nii.gz
-
 
       # Look for the presence of deleted volumes.  ONLY create "spike" (ms) images if found, otherwise default to non-motionscrubbed images
       scrubDataCheck=$(cat ${rawEpiDir}/motionScrub/deleted_vols.txt | head -1)
