@@ -114,8 +114,7 @@ while [ $# -ge 1 ] ; do
     case "$iarg"
 	in
     --epi)
-  	    epiData=`get_arg1 $1`;
-        export epiData;
+  	    export epiData=`get_arg1 $1`;
         if [ "$epiData" == "" ]; then
           echo "Error: The restingStateImage (-E) is a required option"
           exit 1
@@ -176,7 +175,7 @@ if [ ! -e ${epiData} ]; then
 fi
 
 indir=$(dirname $epiData)
-rawEpiDir="${indir//\/nuisanceRegression*}"
+export rawEpiDir="${indir//\/nuisanceRegression*}"
 preproc="${rawEpiDir}"/preproc
 logDir="${rawEpiDir}"
 
@@ -188,7 +187,8 @@ elif [[ "${compcor_globalFlag}" = 1 ]]; then
 else
   outDir=${rawEpiDir}/seedCorrelation/classic
 fi
-roiOutDir=${outDir}/rois
+export outDir
+export roiOutDir=${outDir}/rois
 mkdir -p "$roiOutDir"
 
 seedTestBase=$(cat "$rawEpiDir"/rsParams | grep "seeds=" | awk -F"=" '{print $2}' | awk -F"-r " '{for (i=2; i<=NF; i++) print $i}')
@@ -237,8 +237,10 @@ cd "$rawEpiDir" || exit
 > "$roiOutDir"/seeds_ms.txt
 
 # Map the ROIs
-for roi in "${roiList[@]}"; do
-	roiName=$(basename "$roi" .nii.gz)
+function extractROIts()
+{
+  local roi=$1
+  roiName=$(basename "$roi" .nii.gz)
 	roiMask=$(find "$roiOutDir" -maxdepth 1 -type f -name "${roiName}_mask.nii.gz" | head -n 1)
 	# Copy over Seed ROI
   clobber ${roiOutDir}/${roiName}_standard.nii.gz &&\
@@ -248,7 +250,7 @@ for roi in "${roiList[@]}"; do
 
 		echo "......Mapping $roiName from MNI (standard) to subject EPI (func) space"
 		# Source MNI to EPI warp file
-		MNItoEPIWarp=$(find ${rawEpiDir}/EPItoT1optimized* -maxdepth 1 -name "MNItoEPI_warp.nii.gz")
+		export MNItoEPIWarp=$(find ${rawEpiDir}/EPItoT1optimized* -maxdepth 1 -name "MNItoEPI_warp.nii.gz")
     if [ -z "${MNItoEPIWarp}" ]; then
       echo "Error: MNItoEPIWarp not found"
       exit 1
@@ -298,8 +300,15 @@ for roi in "${roiList[@]}"; do
 		fi
 		echo "$roiName" >> "$roiOutDir"/seeds.txt
 	fi
-done
 
+}
+
+export -f extractROIts
+
+
+printf "will cite\n" | parallel --citation
+
+parallel --progress extractROIts ::: $(cat ${roiInFile})
 
 
 roiList2=$(cat "$roiOutDir"/seeds.txt)
@@ -314,13 +323,15 @@ echo "...QC Image Setup"
 # Create QC images of seed/ROI overlaid on RestingState EPI.  Place in top level directory and report in HTML file
 # Create underlay/overlay NIFTI files for QC check
 # Create a temp directory
-seedQCdir=${roiOutDir}/seedQC
+export seedQCdir=${roiOutDir}/seedQC
 if [ ! -e $seedQCdir/temp ]; then
   mkdir -p $seedQCdir/temp
 fi
 
 # Create underlay/overlay images for each seed
-for roi in ${roiList2}; do
+function roi_qc()
+{
+  local roi=$1
 	echo $roi
 	roiName=$(basename ${roi} .nii.gz)
 	roiMask=$(find "$outDir" -maxdepth 3 -type f -name "${roiName}_mask.nii.gz" | head -n 1)
@@ -416,8 +427,13 @@ for roi in ${roiList2}; do
 	else
 		echo "$roi QC already exists"
 	fi
-done
+}
 
+export -f roi_qc
+
+parallel --progress roi_qc ::: $(cat "$roiOutDir"/seeds.txt)
+
+echo "here"; exit
 
 
 # Create an output directory for QC seed images
