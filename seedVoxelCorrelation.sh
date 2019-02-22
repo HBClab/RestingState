@@ -99,6 +99,179 @@ function clobber()
 clob=false
 export -f clobber
 
+# Map the ROIs
+function extractROIts()
+{
+  local roi=$1
+  roiName=$(basename "$roi" .nii.gz)
+	roiMask=$(find "$roiOutDir" -maxdepth 1 -type f -name "${roiName}_mask.nii.gz" | head -n 1)
+	# Copy over Seed ROI
+  clobber ${roiOutDir}/${roiName}_standard.nii.gz &&\
+	cp ${roi} ${roiOutDir}/${roiName}_standard.nii.gz
+
+	if [ "$(echo ${roiMask})" = "" ]; then
+
+		echo "......Mapping $roiName from MNI (standard) to subject EPI (func) space"
+		# Source MNI to EPI warp file
+		export MNItoEPIWarp=$(find ${rawEpiDir}/EPItoT1optimized* -maxdepth 1 -name "MNItoEPI_warp.nii.gz")
+    if [ -z "${MNItoEPIWarp}" ]; then
+      echo "Error: MNItoEPIWarp not found"
+      exit 1
+    fi
+		# Apply the nonlinear warp from MNI to EPI
+		applywarp --ref=${epiData} --in=${roi} --out=${roiOutDir}/${roiName}_mask.nii.gz --warp=${MNItoEPIWarp} --mask=${preproc}/mask.nii.gz --datatype=float
+
+		# Threshold and binarize output
+		fslmaths ${roiOutDir}/${roiName}_mask.nii.gz -thr 0.5 ${roiOutDir}/${roiName}_mask.nii.gz
+		fslmaths ${roiOutDir}/${roiName}_mask.nii.gz -bin ${roiOutDir}/${roiName}_mask.nii.gz
+		roiMask=${roiOutDir}/${roiName}_mask.nii.gz
+	else
+  	echo "$roiName has already been mapped from MNI to EPI"
+  	echo "roimask: ${roiMask}"
+
+	fi
+
+	# Check to see that resultant, warped file has any volume (if seed is too small, warped output may have a zero volume)
+
+	seedVol=$(fslstats ${roiMask} -V | awk '{print $2}')
+	if [[ $seedVol == 0.000000 ]]; then
+		echo $roiName >> ${roiOutDir}/seedsTooSmall.txt
+		rm ${roiOutDir}/${roiName}_mask.nii.gz
+	else
+		# Account for $motionscrubFlag
+		# Extract the time-series per ROI
+		# Will need the "normal" time-series, regardless of motion-scrubbing flag so, if condition = 1 or 2, write out regular time-series
+		if [[ $motionscrubFlag == 0 ]]; then
+				clobber ${roiOutDir}/${roiName}_residvol_ts.txt &&\
+				fslmeants -i ${epiData} -o ${roiOutDir}/${roiName}_residvol_ts.txt -m ${roiMask}
+		elif [[ $motionscrubFlag == 1 ]]; then
+				clobber ${roiOutDir}/${roiName}_residvol_ts.txt &&\
+				fslmeants -i ${epiData} -o ${roiOutDir}/${roiName}_residvol_ts.txt -m ${roiMask}
+				clobber ${roiOutDir}/${roiName}_residvol_ms_ts.txt &&\
+				fslmeants -i ${rawEpiDir}/motionScrub/"$(basename ${epiData/.nii/_ms.nii})" -o ${roiOutDir}/${roiName}_residvol_ms_ts.txt -m ${roiMask}
+		fi
+
+		# Output of fslmeants is a text file with space-delimited values.  There is only one "true" ts value (first column) and the blank space is interpreted as a "0" value in matlab.  Write to temp file then move (rewrite original)
+		if [[ $motionscrubFlag == 0 ]]; then
+			cat ${roiOutDir}/${roiName}_residvol_ts.txt | awk '{print $1}' > ${roiOutDir}/temp_${roiName}_residvol_ts.txt
+			mv ${roiOutDir}/temp_${roiName}_residvol_ts.txt ${roiOutDir}/${roiName}_residvol_ts.txt
+		elif [[ $motionscrubFlag == 1 ]]; then
+			cat ${roiOutDir}/${roiName}_residvol_ts.txt | awk '{print $1}' > ${roiOutDir}/temp_${roiName}_residvol_ts.txt
+			cat ${roiOutDir}/${roiName}_residvol_ms_ts.txt | awk '{print $1}' > ${roiOutDir}/temp_${roiName}_residvol_ms_ts.txt
+			mv ${roiOutDir}/temp_${roiName}_residvol_ts.txt ${roiOutDir}/${roiName}_residvol_ts.txt
+			mv ${roiOutDir}/temp_${roiName}_residvol_ms_ts.txt ${roiOutDir}/${roiName}_residvol_ms_ts.txt
+		fi
+		echo "$roiName" >> "$roiOutDir"/seeds.txt
+	fi
+
+}
+
+export -f extractROIts
+
+
+# Create underlay/overlay images for each seed
+function roi_qc()
+{
+  local roi=$1
+	echo $roi
+	roiName=$(basename ${roi} .nii.gz)
+	roiMask=$(find "$outDir" -maxdepth 3 -type f -name "${roiName}_mask.nii.gz" | head -n 1)
+	if [ ! -f $seedQCdir/${roi}_axial.png ] || [ ! -f $seedQCdir/${roi}_sagittal.png ] || [ ! -f $seedQCdir/${roi}_coronal.png ]; then
+		for splitdirection in x y z; do
+		    echo "......Preparing $roi ($splitdirection)"
+
+		    underlayBase="$rawEpiDir"/mcImgMean.nii.gz
+		    overlayBase=${roiMask}
+
+		    # Compute Center-Of-Gravity for seed mask to determine which axial slice to use for both underlay and overlay
+		    # Adding 0.5 to COG for xyz dimensions to handle rounding issues
+		    # Need to account for slices named 0007, 0017, 0107, etc. (have to be able to handle 4-digit numbers)
+		    if [[ $splitdirection == "x" ]]; then
+		      suffix=sagittal
+		      sliceCutTEMP=$(fslstats $overlayBase -C | awk '{printf("%d\n",$1 + 0.5)}')
+		      sliceCutLength=$(echo $sliceCutTEMP | awk '{print length($1)}')
+		      if [[ $sliceCutLength == 1 ]]; then
+		        sliceCut=000${sliceCutTEMP}
+		      elif [[ $sliceCutLength == 2 ]]; then
+		        sliceCut=00${sliceCutTEMP}
+		      else
+		        sliceCut=0${sliceCutTEMP}
+		      fi
+		    elif [[ $splitdirection == "y" ]]; then
+		      suffix=coronal
+		      sliceCutTEMP=$(fslstats $overlayBase -C | awk '{printf("%d\n",$2 + 0.5)}')
+		      sliceCutLength=$(echo $sliceCutTEMP | awk '{print length($1)}')
+		      if [[ $sliceCutLength == 1 ]]; then
+		        sliceCut=000${sliceCutTEMP}
+		      elif [[ $sliceCutLength == 2 ]]; then
+		        sliceCut=00${sliceCutTEMP}
+		      else
+		        sliceCut=0${sliceCutTEMP}
+		      fi
+		    else
+		      suffix=axial
+		      sliceCutTEMP=$(fslstats $overlayBase -C | awk '{printf("%d\n",$3 + 0.5)}')
+		      sliceCutLength=$(echo $sliceCutTEMP | awk '{print length($1)}')
+		      if [[ $sliceCutLength == 1 ]]; then
+		        sliceCut=000${sliceCutTEMP}
+		      elif [[ $sliceCutLength == 2 ]]; then
+		        sliceCut=00${sliceCutTEMP}
+		      else
+		        sliceCut=0${sliceCutTEMP}
+		      fi
+		    fi
+
+		    # Split apart seed mask and example EPI image
+		    fslsplit $underlayBase $seedQCdir/temp/underlay_split_${suffix} -${splitdirection}
+		    fslsplit $overlayBase $seedQCdir/temp/overlay_split_${suffix} -${splitdirection}
+
+		    # Set variables for underlay and overlay images
+		    underlayImage=$(find "$seedQCdir" -name "underlay_split_${suffix}${sliceCut}.nii.gz")
+		    overlayImage=$(find "$seedQCdir" -name "overlay_split_${suffix}${sliceCut}.nii.gz")
+		    # Copy over underlay/overlay images, uncompress
+		    # Will need to check for presence of unzipped NIFTI file (from previous runs (otherwise "clobber" won't work))
+		    if [[ -e $seedQCdir/${roi}_underlay_${suffix}.nii ]]; then
+		      if [[ ! -e $seedQCdir/oldSeeds ]]; then
+		        mkdir $seedQCdir/oldSeeds
+		      fi
+
+		      mv $seedQCdir/${roi}_underlay_${suffix}.nii $seedQCdir/oldSeeds
+		    fi
+
+		    cp $underlayImage $seedQCdir/${roi}_underlay_${suffix}.nii.gz
+		    if [[ -e $seedQCdir/${roi}_overlay_${suffix}.nii ]]; then
+		      if [[ ! -e $seedQCdir/oldSeeds ]]; then
+		        mkdir $seedQCdir/oldSeeds
+		      fi
+
+		      mv $seedQCdir/${roi}_overlay_${suffix}.nii $seedQCdir/oldSeeds
+		    fi
+
+		    cp $overlayImage $seedQCdir/${roi}_overlay_${suffix}.nii.gz
+
+		    # Need to reorient coronal and sagittal images in order for matlab to process correctly (axial is already OK)
+		    # Coronal images will also need the orientation swapped to update header AND image info
+		    if [ $suffix == "sagittal" ]; then
+		      fslswapdim $seedQCdir/${roi}_underlay_${suffix}.nii.gz y z x $seedQCdir/${roi}_underlay_${suffix}.nii.gz
+		      fslswapdim $seedQCdir/${roi}_overlay_${suffix}.nii.gz y z x $seedQCdir/${roi}_overlay_${suffix}.nii.gz
+		    elif [ $suffix == "coronal" ]; then
+		      fslswapdim $seedQCdir/${roi}_underlay_${suffix}.nii.gz x z y $seedQCdir/${roi}_underlay_${suffix}.nii.gz
+		      fslorient -swaporient $seedQCdir/${roi}_underlay_${suffix}.nii.gz
+		      fslswapdim $seedQCdir/${roi}_overlay_${suffix}.nii.gz x z y $seedQCdir/${roi}_overlay_${suffix}.nii.gz
+		      fslorient -swaporient $seedQCdir/${roi}_overlay_${suffix}.nii.gz
+		    fi
+
+		    # Need to gunzip the files for use with matlab
+		    gunzip -f $seedQCdir/${roi}_underlay_${suffix}.nii.gz
+		    gunzip -f $seedQCdir/${roi}_overlay_${suffix}.nii.gz
+	  	done
+	else
+		echo "$roi QC already exists"
+	fi
+}
+
+export -f roi_qc
+
 # Parse Command line arguments
 
 ##########
@@ -237,77 +410,6 @@ cd "$rawEpiDir" || exit
 > "$roiOutDir"/seeds_ms.txt
 
 # Map the ROIs
-function extractROIts()
-{
-  local roi=$1
-  roiName=$(basename "$roi" .nii.gz)
-	roiMask=$(find "$roiOutDir" -maxdepth 1 -type f -name "${roiName}_mask.nii.gz" | head -n 1)
-	# Copy over Seed ROI
-  clobber ${roiOutDir}/${roiName}_standard.nii.gz &&\
-	cp ${roi} ${roiOutDir}/${roiName}_standard.nii.gz
-
-	if [ "$(echo ${roiMask})" = "" ]; then
-
-		echo "......Mapping $roiName from MNI (standard) to subject EPI (func) space"
-		# Source MNI to EPI warp file
-		export MNItoEPIWarp=$(find ${rawEpiDir}/EPItoT1optimized* -maxdepth 1 -name "MNItoEPI_warp.nii.gz")
-    if [ -z "${MNItoEPIWarp}" ]; then
-      echo "Error: MNItoEPIWarp not found"
-      exit 1
-    fi
-		# Apply the nonlinear warp from MNI to EPI
-		applywarp --ref=${epiData} --in=${roi} --out=${roiOutDir}/${roiName}_mask.nii.gz --warp=${MNItoEPIWarp} --mask=${preproc}/mask.nii.gz --datatype=float
-
-		# Threshold and binarize output
-		fslmaths ${roiOutDir}/${roiName}_mask.nii.gz -thr 0.5 ${roiOutDir}/${roiName}_mask.nii.gz
-		fslmaths ${roiOutDir}/${roiName}_mask.nii.gz -bin ${roiOutDir}/${roiName}_mask.nii.gz
-		roiMask=${roiOutDir}/${roiName}_mask.nii.gz
-	else
-  	echo "$roiName has already been mapped from MNI to EPI"
-  	echo "roimask: ${roiMask}"
-
-	fi
-
-	# Check to see that resultant, warped file has any volume (if seed is too small, warped output may have a zero volume)
-
-	seedVol=$(fslstats ${roiMask} -V | awk '{print $2}')
-	if [[ $seedVol == 0.000000 ]]; then
-		echo $roiName >> ${roiOutDir}/seedsTooSmall.txt
-		rm ${roiOutDir}/${roiName}_mask.nii.gz
-	else
-		# Account for $motionscrubFlag
-		# Extract the time-series per ROI
-		# Will need the "normal" time-series, regardless of motion-scrubbing flag so, if condition = 1 or 2, write out regular time-series
-		if [[ $motionscrubFlag == 0 ]]; then
-				clobber ${roiOutDir}/${roiName}_residvol_ts.txt &&\
-				fslmeants -i ${epiData} -o ${roiOutDir}/${roiName}_residvol_ts.txt -m ${roiMask}
-		elif [[ $motionscrubFlag == 1 ]]; then
-				clobber ${roiOutDir}/${roiName}_residvol_ts.txt &&\
-				fslmeants -i ${epiData} -o ${roiOutDir}/${roiName}_residvol_ts.txt -m ${roiMask}
-				clobber ${roiOutDir}/${roiName}_residvol_ms_ts.txt &&\
-				fslmeants -i ${rawEpiDir}/motionScrub/"$(basename ${epiData/.nii/_ms.nii})" -o ${roiOutDir}/${roiName}_residvol_ms_ts.txt -m ${roiMask}
-		fi
-
-		# Output of fslmeants is a text file with space-delimited values.  There is only one "true" ts value (first column) and the blank space is interpreted as a "0" value in matlab.  Write to temp file then move (rewrite original)
-		if [[ $motionscrubFlag == 0 ]]; then
-			cat ${roiOutDir}/${roiName}_residvol_ts.txt | awk '{print $1}' > ${roiOutDir}/temp_${roiName}_residvol_ts.txt
-			mv ${roiOutDir}/temp_${roiName}_residvol_ts.txt ${roiOutDir}/${roiName}_residvol_ts.txt
-		elif [[ $motionscrubFlag == 1 ]]; then
-			cat ${roiOutDir}/${roiName}_residvol_ts.txt | awk '{print $1}' > ${roiOutDir}/temp_${roiName}_residvol_ts.txt
-			cat ${roiOutDir}/${roiName}_residvol_ms_ts.txt | awk '{print $1}' > ${roiOutDir}/temp_${roiName}_residvol_ms_ts.txt
-			mv ${roiOutDir}/temp_${roiName}_residvol_ts.txt ${roiOutDir}/${roiName}_residvol_ts.txt
-			mv ${roiOutDir}/temp_${roiName}_residvol_ms_ts.txt ${roiOutDir}/${roiName}_residvol_ms_ts.txt
-		fi
-		echo "$roiName" >> "$roiOutDir"/seeds.txt
-	fi
-
-}
-
-export -f extractROIts
-
-
-printf "will cite\n" | parallel --citation
-
 parallel --progress extractROIts ::: $(cat ${roiInFile})
 
 
@@ -329,111 +431,8 @@ if [ ! -e $seedQCdir/temp ]; then
 fi
 
 # Create underlay/overlay images for each seed
-function roi_qc()
-{
-  local roi=$1
-	echo $roi
-	roiName=$(basename ${roi} .nii.gz)
-	roiMask=$(find "$outDir" -maxdepth 3 -type f -name "${roiName}_mask.nii.gz" | head -n 1)
-	if [ ! -f $seedQCdir/${roi}_axial.png ] || [ ! -f $seedQCdir/${roi}_sagittal.png ] || [ ! -f $seedQCdir/${roi}_coronal.png ]; then
-		for splitdirection in x y z; do
-		    echo "......Preparing $roi ($splitdirection)"
-
-		    underlayBase="$rawEpiDir"/mcImgMean.nii.gz
-		    overlayBase=${roiMask}
-
-		    # Compute Center-Of-Gravity for seed mask to determine which axial slice to use for both underlay and overlay
-		    # Adding 0.5 to COG for xyz dimensions to handle rounding issues
-		    # Need to account for slices named 0007, 0017, 0107, etc. (have to be able to handle 4-digit numbers)
-		    if [[ $splitdirection == "x" ]]; then
-		      suffix=sagittal
-		      sliceCutTEMP=$(fslstats $overlayBase -C | awk '{printf("%d\n",$1 + 0.5)}')
-		      sliceCutLength=$(echo $sliceCutTEMP | awk '{print length($1)}')
-		      if [[ $sliceCutLength == 1 ]]; then
-		        sliceCut=000${sliceCutTEMP}
-		      elif [[ $sliceCutLength == 2 ]]; then
-		        sliceCut=00${sliceCutTEMP}
-		      else
-		        sliceCut=0${sliceCutTEMP}
-		      fi
-		    elif [[ $splitdirection == "y" ]]; then
-		      suffix=coronal
-		      sliceCutTEMP=$(fslstats $overlayBase -C | awk '{printf("%d\n",$2 + 0.5)}')
-		      sliceCutLength=$(echo $sliceCutTEMP | awk '{print length($1)}')
-		      if [[ $sliceCutLength == 1 ]]; then
-		        sliceCut=000${sliceCutTEMP}
-		      elif [[ $sliceCutLength == 2 ]]; then
-		        sliceCut=00${sliceCutTEMP}
-		      else
-		        sliceCut=0${sliceCutTEMP}
-		      fi
-		    else
-		      suffix=axial
-		      sliceCutTEMP=$(fslstats $overlayBase -C | awk '{printf("%d\n",$3 + 0.5)}')
-		      sliceCutLength=$(echo $sliceCutTEMP | awk '{print length($1)}')
-		      if [[ $sliceCutLength == 1 ]]; then
-		        sliceCut=000${sliceCutTEMP}
-		      elif [[ $sliceCutLength == 2 ]]; then
-		        sliceCut=00${sliceCutTEMP}
-		      else
-		        sliceCut=0${sliceCutTEMP}
-		      fi
-		    fi
-
-		    # Split apart seed mask and example EPI image
-		    fslsplit $underlayBase $seedQCdir/temp/underlay_split_${suffix} -${splitdirection}
-		    fslsplit $overlayBase $seedQCdir/temp/overlay_split_${suffix} -${splitdirection}
-
-		    # Set variables for underlay and overlay images
-		    underlayImage=$(find "$seedQCdir" -name "underlay_split_${suffix}${sliceCut}.nii.gz")
-		    overlayImage=$(find "$seedQCdir" -name "overlay_split_${suffix}${sliceCut}.nii.gz")
-		    # Copy over underlay/overlay images, uncompress
-		    # Will need to check for presence of unzipped NIFTI file (from previous runs (otherwise "clobber" won't work))
-		    if [[ -e $seedQCdir/${roi}_underlay_${suffix}.nii ]]; then
-		      if [[ ! -e $seedQCdir/oldSeeds ]]; then
-		        mkdir $seedQCdir/oldSeeds
-		      fi
-
-		      mv $seedQCdir/${roi}_underlay_${suffix}.nii $seedQCdir/oldSeeds
-		    fi
-
-		    cp $underlayImage $seedQCdir/${roi}_underlay_${suffix}.nii.gz
-		    if [[ -e $seedQCdir/${roi}_overlay_${suffix}.nii ]]; then
-		      if [[ ! -e $seedQCdir/oldSeeds ]]; then
-		        mkdir $seedQCdir/oldSeeds
-		      fi
-
-		      mv $seedQCdir/${roi}_overlay_${suffix}.nii $seedQCdir/oldSeeds
-		    fi
-
-		    cp $overlayImage $seedQCdir/${roi}_overlay_${suffix}.nii.gz
-
-		    # Need to reorient coronal and sagittal images in order for matlab to process correctly (axial is already OK)
-		    # Coronal images will also need the orientation swapped to update header AND image info
-		    if [ $suffix == "sagittal" ]; then
-		      fslswapdim $seedQCdir/${roi}_underlay_${suffix}.nii.gz y z x $seedQCdir/${roi}_underlay_${suffix}.nii.gz
-		      fslswapdim $seedQCdir/${roi}_overlay_${suffix}.nii.gz y z x $seedQCdir/${roi}_overlay_${suffix}.nii.gz
-		    elif [ $suffix == "coronal" ]; then
-		      fslswapdim $seedQCdir/${roi}_underlay_${suffix}.nii.gz x z y $seedQCdir/${roi}_underlay_${suffix}.nii.gz
-		      fslorient -swaporient $seedQCdir/${roi}_underlay_${suffix}.nii.gz
-		      fslswapdim $seedQCdir/${roi}_overlay_${suffix}.nii.gz x z y $seedQCdir/${roi}_overlay_${suffix}.nii.gz
-		      fslorient -swaporient $seedQCdir/${roi}_overlay_${suffix}.nii.gz
-		    fi
-
-		    # Need to gunzip the files for use with matlab
-		    gunzip -f $seedQCdir/${roi}_underlay_${suffix}.nii.gz
-		    gunzip -f $seedQCdir/${roi}_overlay_${suffix}.nii.gz
-	  	done
-	else
-		echo "$roi QC already exists"
-	fi
-}
-
-export -f roi_qc
-
 parallel --progress roi_qc ::: $(cat "$roiOutDir"/seeds.txt)
 
-echo "here"; exit
 
 
 # Create an output directory for QC seed images
