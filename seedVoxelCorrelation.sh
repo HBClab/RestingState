@@ -272,6 +272,111 @@ function roi_qc()
 
 export -f roi_qc
 
+ function corrmap2mni()
+  {
+    local roi=$1
+    echo "...Mapping Correlation For $roi to MNI"
+    # Adjust for motion scrubbing
+    if [[ $motionscrubFlag == 0 ]]; then
+      # No motionscrubbing
+      if [ -e ${roi}.png ]; then
+        rm ${roi}.png
+      fi
+
+      echo here
+      # Nonlinear warp from EPI to MNI
+      clobber ${seedcorrDir}/${roi}_corrmap_standard.nii.gz &&\
+      applywarp --in=${seedcorrDir}/${roi}_corrmap_native.nii \
+      --ref=${preproc}/reg/standard.nii.gz \
+      --out=${seedcorrDir}/${roi}_corrmap_standard.nii \
+      --warp=${preproc}/reg/example_func2standard_warp.nii.gz \
+      --datatype=float
+      echo applywarp done
+      # Mask out data with MNI mask
+      fslmaths ${seedcorrDir}/${roi}_corrmap_standard.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_corrmap_standard_masked.nii.gz
+
+      
+      # Creating new plots with fsl_tsplot
+      # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
+      yMax=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
+      yMin=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
+
+      clobber "$roiOutDir"/${roi}.png &&\
+      fsl_tsplot -i ${roiOutDir}/${roi}_residvol_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$roiOutDir"/${roi}.png
+
+      echo "<br><img src=\"$roiOutDir/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
+
+    elif [[ $motionscrubFlag == 1 ]]; then
+      # Non-motionscrubbed data
+      if [ -e ${roi}.png ]; then
+        rm ${roi}.png
+      fi
+      if [ -e ${roi}_ms.png ]; then
+        rm ${roi}_ms.png
+      fi
+
+
+      # Nonlinear warp from EPI to MNI
+      clobber ${roiOutDir}/${roi}_ms_corrmap_standard.nii.gz &&\
+      applywarp --in=${seedcorrDir}/${roi}_corrmap_ms_native.nii \
+      --ref=${preproc}/reg/standard.nii.gz \
+      --out=${seedcorrDir}/${roi}_ms_corrmap_standard.nii.gz \
+      --warp=${preproc}/reg/example_func2standard_warp.nii.gz \
+      --datatype=float
+
+      # Mask out data with MNI mask
+      fslmaths ${seedcorrDir}/${roi}_ms_corrmap_standard.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_ms_corrmap_standard_masked.nii.gz
+
+      # Look for the presence of deleted volumes.  ONLY create "spike" (ms) images if found, otherwise default to non-motionscrubbed images
+      scrubDataCheck=$(cat ${rawEpiDir}/motionScrub/deleted_vols.txt | head -1)
+
+      if [[ $scrubDataCheck != "" ]]; then
+        # Presence of scrubbed volumes
+
+        # Creating new plots with fsl_tsplot
+        # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
+        yMax=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
+        yMin=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
+
+        # Log the "scrubbed TRs"
+        xNum=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | wc -l)
+        count=1
+        while [ $count -le $xNum ]; do
+          tsPlotIn=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | head -${count} | tail -1)
+
+          delPlotCheck=$(cat ${rawEpiDir}/motionScrub/deleted_vols.txt | awk '{$1=$1}1' | grep -E '(^| )'${count}'( |$)')
+          if [ "$delPlotCheck" == "" ]; then
+            delPlot=$yMin
+          else
+            delPlot=$yMax
+          fi
+          echo $delPlot >> ${roiOutDir}/${roi}_censored_TRplot.txt
+        let count=count+1
+        done
+
+        #Plot of "scrubbed" data
+        clobber "$roiOutDir"/${roi}_ms.png &&\
+        fsl_tsplot -i ${roiOutDir}/${roi}_residvol_ms_ts.txt -t "$roi Time Series (Scrubbed)" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$roiOutDir"/${roi}_ms.png
+
+        echo "<br><img src=\"$roiOutDir/${roi}.png\" alt=\"${roi} seed\"><img src=\"$roiOutDir/${roi}_ms.png\" alt=\"${roi}_ms seed\"><br>" >> "$rawEpiDir"/analysisResults.html
+
+      else
+        # Absence of scrubbed volumes
+
+        # Creating new plots with fsl_tsplot
+        # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
+        yMax=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
+        yMin=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
+
+        fsl_tsplot -i ${roiOutDir}/${roi}_residvol_ms_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$roiOutDir"/${roi}.png
+
+        echo "<br><img src=\"$roiOutDir/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
+      fi
+    fi
+  }
+
+  export -f corrmap2mni
+
 # Parse Command line arguments
 
 ##########
@@ -568,113 +673,8 @@ if [ "${seedmapFlag}" -eq 1 ]; then
   # HTML setup
   echo "<hr><h2>Seed Time Series</h2>" >> "$rawEpiDir"/analysisResults.html
 
-    
-  function corrmap2mni()
-  {
-    local roi=$1
-    echo "...Mapping Correlation For $roi to MNI"
-    # Adjust for motion scrubbing
-    if [[ $motionscrubFlag == 0 ]]; then
-      # No motionscrubbing
-      if [ -e ${roi}.png ]; then
-        rm ${roi}.png
-      fi
-
-      echo here
-      # Nonlinear warp from EPI to MNI
-      clobber ${seedcorrDir}/${roi}_corrmap_standard.nii.gz &&\
-      applywarp --in=${seedcorrDir}/${roi}_corrmap_native.nii \
-      --ref=${preproc}/reg/standard.nii.gz \
-      --out=${seedcorrDir}/${roi}_corrmap_standard.nii \
-      --warp=${preproc}/reg/example_func2standard_warp.nii.gz \
-      --datatype=float
-      echo applywarp done
-      # Mask out data with MNI mask
-      fslmaths ${seedcorrDir}/${roi}_corrmap_standard.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_corrmap_standard_masked.nii.gz
-
-      
-      # Creating new plots with fsl_tsplot
-      # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
-      yMax=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
-      yMin=$(cat ${roiOutDir}/${roi}_residvol_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
-
-      clobber "$roiOutDir"/${roi}.png &&\
-      fsl_tsplot -i ${roiOutDir}/${roi}_residvol_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$roiOutDir"/${roi}.png
-
-      echo "<br><img src=\"$roiOutDir/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
-
-    elif [[ $motionscrubFlag == 1 ]]; then
-      # Non-motionscrubbed data
-      if [ -e ${roi}.png ]; then
-        rm ${roi}.png
-      fi
-      if [ -e ${roi}_ms.png ]; then
-        rm ${roi}_ms.png
-      fi
-
-
-      # Nonlinear warp from EPI to MNI
-      clobber ${roiOutDir}/${roi}_ms_corrmap_standard.nii.gz &&\
-      applywarp --in=${seedcorrDir}/${roi}_corrmap_ms_native.nii \
-      --ref=${preproc}/reg/standard.nii.gz \
-      --out=${seedcorrDir}/${roi}_ms_corrmap_standard.nii.gz \
-      --warp=${preproc}/reg/example_func2standard_warp.nii.gz \
-      --datatype=float
-
-      # Mask out data with MNI mask
-      fslmaths ${seedcorrDir}/${roi}_ms_corrmap_standard.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_ms_corrmap_standard_masked.nii.gz
-
-      # Look for the presence of deleted volumes.  ONLY create "spike" (ms) images if found, otherwise default to non-motionscrubbed images
-      scrubDataCheck=$(cat ${rawEpiDir}/motionScrub/deleted_vols.txt | head -1)
-
-      if [[ $scrubDataCheck != "" ]]; then
-        # Presence of scrubbed volumes
-
-        # Creating new plots with fsl_tsplot
-        # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
-        yMax=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
-        yMin=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
-
-        # Log the "scrubbed TRs"
-        xNum=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | wc -l)
-        count=1
-        while [ $count -le $xNum ]; do
-          tsPlotIn=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | head -${count} | tail -1)
-
-          delPlotCheck=$(cat ${rawEpiDir}/motionScrub/deleted_vols.txt | awk '{$1=$1}1' | grep -E '(^| )'${count}'( |$)')
-          if [ "$delPlotCheck" == "" ]; then
-            delPlot=$yMin
-          else
-            delPlot=$yMax
-          fi
-          echo $delPlot >> ${roiOutDir}/${roi}_censored_TRplot.txt
-        let count=count+1
-        done
-
-        #Plot of "scrubbed" data
-        clobber "$roiOutDir"/${roi}_ms.png &&\
-        fsl_tsplot -i ${roiOutDir}/${roi}_residvol_ms_ts.txt -t "$roi Time Series (Scrubbed)" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$roiOutDir"/${roi}_ms.png
-
-        echo "<br><img src=\"$roiOutDir/${roi}.png\" alt=\"${roi} seed\"><img src=\"$roiOutDir/${roi}_ms.png\" alt=\"${roi}_ms seed\"><br>" >> "$rawEpiDir"/analysisResults.html
-
-      else
-        # Absence of scrubbed volumes
-
-        # Creating new plots with fsl_tsplot
-        # ~2.2% plotting difference between actual Ymin and Ymax values (higher and lower), with fsl_tsplot
-        yMax=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | sort -r | tail -1 | awk '{print ($1+($1*0.0022))}')
-        yMin=$(cat ${roiOutDir}/${roi}_residvol_ms_ts.txt | tail -1 | awk '{print ($1-($1*0.0022))}')
-
-        fsl_tsplot -i ${roiOutDir}/${roi}_residvol_ms_ts.txt -t "$roi Time Series" -u 1 --start=1 -x 'Time Points (TR)' --ymin=$yMin --ymax=$yMax -w 800 -h 300 -o "$roiOutDir"/${roi}.png
-
-        echo "<br><img src=\"$roiOutDir/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
-      fi
-    fi
-  }
-
-  export -f corrmap2mni
-
-parallel corrmap2mni ::: $(cat "$roiOutDir"/seeds_orig.txt)
+  # warp corrmaps to MNI  
+  parallel corrmap2mni ::: $(cat "$roiOutDir"/seeds_orig.txt)
 
 fi
 #################################
