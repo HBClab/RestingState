@@ -294,28 +294,23 @@ while [ $# -ge 1 ] ; do
         fi
   	    shift;;
     --roiList)
-      roiInFile=$(get_arg1 $1);
+      export roiInFile=$(get_arg1 $1);
       IFS=$'\r\n' GLOBIGNORE='*' command eval  'roiList=($(cat ${roiInFile}))';
       shift;;
     --compcor)
-      compcorFlag=1;
-      export compcorFlag;
+      export compcorFlag=1;
       shift;;
     --compcor_global)
-      compcor_globalFlag=1;
-      export compcor_globalFlag;
+      export compcor_globalFlag=1;
       shift;;
     --seedmaps)
-      seedmapFlag=1;
-      export seedmapFlag;
+      export seedmapFlag=1;
       shift;;
     --motionscrub)
-      motionscrubFlag=1;
-      export motionscrubFlag;
+      export motionscrubFlag=1;
       shift;;
     --clobber)
-      clob=true;
-      export clob;
+      export clob=true;
       shift;;
     -h)
       Usage;
@@ -330,11 +325,11 @@ done
 # A few default parameters (if input not specified, these parameters are assumed)
 
 if [[ -z $motionscrubFlag ]]; then
-motionscrubFlag=0
+export motionscrubFlag=0
 fi
 
 if [[ -z $seedmapFlag ]]; then
-seedmapFlag=0
+export seedmapFlag=0
 fi
 
 
@@ -349,7 +344,7 @@ fi
 
 indir=$(dirname $epiData)
 export rawEpiDir="${indir//\/nuisanceRegression*}"
-preproc="${rawEpiDir}"/preproc
+export preproc="${rawEpiDir}"/preproc
 logDir="${rawEpiDir}"
 
 
@@ -515,7 +510,7 @@ done
 #### Seed Voxel Correlation (Setup) ############
 if [ "${seedmapFlag}" -eq 1 ]; then
   echo "...Seed Voxel Correlation Setup"
-  seedcorrDir=${outDir}/seedmaps
+  export seedcorrDir=${outDir}/seedmaps
   mkdir -p ${seedcorrDir}
   cd ${seedcorrDir} || exit
   # Dimensions of EPI data
@@ -529,14 +524,14 @@ if [ "${seedmapFlag}" -eq 1 ]; then
 
   # check if seeding results exist, re-populate seeds.txt with non existing seeds
   for roi in $(cat "$roiOutDir"/seeds_orig.txt); do
-  	if [[ $motionscrubFlag == 0 ]] && [ ! -f $seedcorrDir/${roi}_corrmap_native.nii.gz ] && [ ! -f $seedcorrDir/${roi}_corrmap_standard.nii.gz ]; then
+  	if [[ $motionscrubFlag == 0 ]] && [ ! -f $seedcorrDir/${roi}_corrmap_native.nii ] && [ ! -f $seedcorrDir/${roi}_corrmap_standard.nii ]; then
   		echo $roi >> "$roiOutDir"/seeds.txt
   	fi
   	if [[ $motionscrubFlag == 1 ]]; then
-  		if [ ! -f $seedcorrDir/${roi}_corrmap_native.nii.gz ] && [ ! -f $seedcorrDir/${roi}_corrmap_standard.nii.gz ]; then
+  		if [ ! -f $seedcorrDir/${roi}_corrmap_native.nii ] && [ ! -f $seedcorrDir/${roi}_corrmap_standard.nii ]; then
   			echo $roi >> "$roiOutDir"/seeds.txt
   		fi
-  		if [ ! -f $seedcorrDir/${roi}_ms native.nii.gz ] && [ ! -f $seedcorrDir/${roi}_ms_corrmap_standard.nii.gz ]; then
+  		if [ ! -f $seedcorrDir/${roi}_ms native.nii ] && [ ! -f $seedcorrDir/${roi}_ms_corrmap_standard.nii ]; then
   			echo $roi >> "$roiOutDir"/seeds_ms.txt
   		fi
   	fi
@@ -556,7 +551,6 @@ if [ "${seedmapFlag}" -eq 1 ]; then
       parallel --header : 3dAFNItoNIFTI ${seedcorrDir}/{roi}_corrmap_native+orig -prefix ${seedcorrDir}/{roi}_corrmap_native.nii ::: roi $(cat "$roiOutDir"/seeds.txt)
 
     if [[ $motionscrubFlag == 1 ]]; then
-      seedList=
       parallel --header : 3dTcorr1D -prefix ${seedcorrDir}/${roi}_corrmap_ms_native -Fisher ${epiData} ${roiOutDir}/${roi}_residvol_ms_ts.txt ::: roi $(cat "$roiOutDir"/seeds_ms.txt)
       parallel --header : 3dAFNItoNIFTI ${seedcorrDir}/${roi}_corrmap_ms_native+orig -prefix ${seedcorrDir}/${roi}_corrmap_ms_native.nii ::: roi $(cat "$roiOutDir"/seeds_ms.txt)
     fi
@@ -566,7 +560,6 @@ if [ "${seedmapFlag}" -eq 1 ]; then
   fi
 #################################
 
-echo "here"; exit
 #### Zstat Results (to T1/MNI) ############
 
 
@@ -587,7 +580,10 @@ echo "here"; exit
   # HTML setup
   echo "<hr><h2>Seed Time Series</h2>" >> "$rawEpiDir"/analysisResults.html
 
-  for roi in $(cat "$roiOutDir"/seeds_orig.txt); do
+    
+  function corrmap2mni()
+  {
+    local roi=$1
     echo "...Mapping Correlation For $roi to MNI"
     # Adjust for motion scrubbing
     if [[ $motionscrubFlag == 0 ]]; then
@@ -596,15 +592,15 @@ echo "here"; exit
         rm ${roi}.png
       fi
 
-
+      echo here
       # Nonlinear warp from EPI to MNI
       clobber ${seedcorrDir}/${roi}_corrmap_standard.nii.gz &&\
       applywarp --in=${seedcorrDir}/${roi}_corrmap_native.nii \
       --ref=${preproc}/reg/standard.nii.gz \
-      --out=${seedcorrDir}/${roi}_corrmap_standard.nii.gz \
+      --out=${seedcorrDir}/${roi}_corrmap_standard.nii \
       --warp=${preproc}/reg/example_func2standard_warp.nii.gz \
       --datatype=float
-
+      echo applywarp done
       # Mask out data with MNI mask
       fslmaths ${seedcorrDir}/${roi}_corrmap_standard.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_corrmap_standard_masked.nii.gz
 
@@ -705,7 +701,12 @@ echo "here"; exit
         echo "<br><img src=\"$roiOutDir/${roi}.png\" alt=\"$roi seed\"><br>" >> "$rawEpiDir"/analysisResults.html
       fi
     fi
-  done
+  }
+
+  export -f corrmap2mni
+
+parallel corrmap2mni ::: $(cat "$roiOutDir"/seeds_orig.txt)
+
 fi
 #################################
 # workaround to prevent permissions 
