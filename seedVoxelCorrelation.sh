@@ -285,7 +285,7 @@ export -f roi_qc
 
       echo here
       # Nonlinear warp from EPI to MNI
-      clobber ${seedcorrDir}/${roi}_corrmap_standard.nii.gz &&\
+      clobber ${seedcorrDir}/${roi}_corrmap_standard.nii &&\
       applywarp --in=${seedcorrDir}/${roi}_corrmap_native.nii \
       --ref=${preproc}/reg/standard.nii.gz \
       --out=${seedcorrDir}/${roi}_corrmap_standard.nii \
@@ -293,7 +293,7 @@ export -f roi_qc
       --datatype=float
       echo applywarp done
       # Mask out data with MNI mask
-      fslmaths ${seedcorrDir}/${roi}_corrmap_standard.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_corrmap_standard_masked.nii.gz
+      fslmaths ${seedcorrDir}/${roi}_corrmap_standard -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask ${seedcorrDir}/${roi}_corrmap_standard_masked
 
       
       # Creating new plots with fsl_tsplot
@@ -317,15 +317,15 @@ export -f roi_qc
 
 
       # Nonlinear warp from EPI to MNI
-      clobber ${roiOutDir}/${roi}_ms_corrmap_standard.nii.gz &&\
+      clobber ${roiOutDir}/${roi}_corrmap_ms_standard.nii &&\
       applywarp --in=${seedcorrDir}/${roi}_corrmap_ms_native.nii \
       --ref=${preproc}/reg/standard.nii.gz \
-      --out=${seedcorrDir}/${roi}_ms_corrmap_standard.nii.gz \
+      --out=${seedcorrDir}/${roi}_corrmap_ms_standard.nii \
       --warp=${preproc}/reg/example_func2standard_warp.nii.gz \
       --datatype=float
 
       # Mask out data with MNI mask
-      fslmaths ${seedcorrDir}/${roi}_ms_corrmap_standard.nii.gz -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask.nii.gz ${seedcorrDir}/${roi}_ms_corrmap_standard_masked.nii.gz
+      fslmaths ${seedcorrDir}/${roi}_corrmap_ms_standard -mas $FSLDIR/data/standard/MNI152_T1_2mm_brain_mask ${seedcorrDir}/${roi}_corrmap_ms_standard_masked
 
       # Look for the presence of deleted volumes.  ONLY create "spike" (ms) images if found, otherwise default to non-motionscrubbed images
       scrubDataCheck=$(cat ${rawEpiDir}/motionScrub/deleted_vols.txt | head -1)
@@ -636,7 +636,7 @@ if [ "${seedmapFlag}" -eq 1 ]; then
   		if [ ! -f $seedcorrDir/${roi}_corrmap_native.nii ] && [ ! -f $seedcorrDir/${roi}_corrmap_standard.nii ]; then
   			echo $roi >> "$roiOutDir"/seeds.txt
   		fi
-  		if [ ! -f $seedcorrDir/${roi}_ms native.nii ] && [ ! -f $seedcorrDir/${roi}_ms_corrmap_standard.nii ]; then
+  		if [ ! -f $seedcorrDir/${roi}_corrmap_ms_native.nii ] && [ ! -f $seedcorrDir/${roi}_corrmap_ms_standard.nii ]; then
   			echo $roi >> "$roiOutDir"/seeds_ms.txt
   		fi
   	fi
@@ -680,7 +680,7 @@ fi
 #################################
 # workaround to prevent permissions 
 if [ ${seedmapFlag} -eq 1 ]; then
-  parallel chmod 774 ::: "$(find "${seedcorrDir}" -type f \( -name "highres2standard.nii.gz" -o -name "seeds*.txt" -o -name "rsParams*" -o -name "run*.m" -o -name "highres.nii.gz" -o -name "standard.nii.gz" \))"
+  parallel chmod 774 ::: "$(find "${roiOutDir}" -maxdepth 1 -type f \( -name "seeds*.txt" -o -name "run*.m" \))" "$(find "${rawEpiDir}" -maxdepth 1 -type f -name "rsParams*")"
 fi
 
 echo "$0 Complete"
