@@ -453,7 +453,7 @@ export preproc="${rawEpiDir}"/preproc
 logDir="${rawEpiDir}"
 
 
-if [ "${compcorFlag}" -eq 1 ]; then
+if [[ "${compcorFlag}" = 1 ]]; then
   outDir=${rawEpiDir}/seedCorrelation/compcor
 elif [[ "${compcor_globalFlag}" = 1 ]]; then
   outDir=${rawEpiDir}/seedCorrelation/compcor_global
