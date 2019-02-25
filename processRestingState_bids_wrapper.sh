@@ -53,11 +53,6 @@ function softwareCheck()
       exit 1
   fi
 
-  if [ "$(which freesurfer)" == "" ]; then
-      echo "freesurfer is either not downloaded or not defined in your path, exiting script"
-      exit 1
-  fi
-
 }
 
 function clobber()
