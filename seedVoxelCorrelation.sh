@@ -96,7 +96,7 @@ function clobber()
 	# fslmaths input.nii.gz -mul 10 test.nii.gz
 }
 # default
-clob=false
+export clob=false
 export -f clobber
 
 # Map the ROIs
