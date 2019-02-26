@@ -143,7 +143,7 @@ jobs:
       - run:
           name: Test seedmapping --compcor_global --motionscrub
           command: |
-            # run the original script
+            # run seedmap only
             docker run -ti --rm=false \
             -v /tmp/data/ds005:/data \
             --entrypoint /opt/RestingState/seedVoxelCorrelation.sh \
