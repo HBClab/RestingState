@@ -150,7 +150,7 @@ jobs:
             hbclab/restingstate:latest \
             --epi=/data/derivatives/rsOut/sub-01/nuisanceRegression/compcor_global/nonfiltered_smooth_data_bp_res4d_normandscaled.nii.gz \
             --motionscrub \
-            --roiList=/data/derivatives/rois/roi_list.txt \
+            --roiList=/data/derivatives/data/roi_list.txt \
             --compcor_global \
             --seedmaps
       - run:
