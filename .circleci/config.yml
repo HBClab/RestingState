@@ -141,6 +141,19 @@ jobs:
             --roiList=/data/derivatives/data/roi_list.txt \
             --compcor_global
       - run:
+          name: Test seedmapping --compcor_global --motionscrub
+          command: |
+            # run the original script
+            docker run -ti --rm=false \
+            -v /tmp/data/ds005:/data \
+            --entrypoint /opt/RestingState/seedVoxelCorrelation.sh \
+            hbclab/restingstate:latest \
+            --epi=/data/derivatives/rsOut/sub-01/nuisanceRegression/compcor_global/nonfiltered_smooth_data_bp_res4d_normandscaled.nii.gz \
+            --motionscrub \
+            --roiList=/data/derivatives/rois/roi_list.txt \
+            --compcor_global \
+            --seedmaps
+      - run:
           name: Test roi-roi correlations
           command: |
             # inputs for run_getroicorrs
