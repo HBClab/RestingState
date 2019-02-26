@@ -656,8 +656,8 @@ if [ "${seedmapFlag}" -eq 1 ]; then
       parallel --header : 3dAFNItoNIFTI ${seedcorrDir}/{roi}_corrmap_native+orig -prefix ${seedcorrDir}/{roi}_corrmap_native.nii ::: roi $(cat "$roiOutDir"/seeds.txt)
 
     if [[ $motionscrubFlag == 1 ]]; then
-      parallel --header : 3dTcorr1D -prefix ${seedcorrDir}/${roi}_corrmap_ms_native -Fisher ${epiData} ${roiOutDir}/${roi}_residvol_ms_ts.txt ::: roi $(cat "$roiOutDir"/seeds_ms.txt)
-      parallel --header : 3dAFNItoNIFTI ${seedcorrDir}/${roi}_corrmap_ms_native+orig -prefix ${seedcorrDir}/${roi}_corrmap_ms_native.nii ::: roi $(cat "$roiOutDir"/seeds_ms.txt)
+      parallel --header : 3dTcorr1D -prefix ${seedcorrDir}/{roi}_corrmap_ms_native -Fisher ${epiData} ${roiOutDir}/{roi}_residvol_ms_ts.txt ::: roi $(cat "$roiOutDir"/seeds_ms.txt)
+      parallel --header : 3dAFNItoNIFTI ${seedcorrDir}/{roi}_corrmap_ms_native+orig -prefix ${seedcorrDir}/{roi}_corrmap_ms_native.nii ::: roi $(cat "$roiOutDir"/seeds_ms.txt)
     fi
 
   else
