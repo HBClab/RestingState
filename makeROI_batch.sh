@@ -32,7 +32,7 @@ awk -F","  'NR!=1{print $1}' tmp_seedList.csv | while IFS= read -r seed; do
     coord=$(awk -v var="$seed" -F"," '{if($1==var) print $2,$3,$4;}' tmp_seedList.csv)
 
     if [[ $2 == "" ]]; then
-    study=$(awk -v var="$seed" -F"," '{if($1==var) print $6;}' tmp_seedList.csv)
+        study=$(awk -v var="$seed" -F"," '{if($1==var) print $6;}' tmp_seedList.csv)
     else
         study=${2}
     fi
