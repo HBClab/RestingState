@@ -24,6 +24,7 @@ function Usage {
   echo "   --roiList Data file with seed list, one seed per line"
   echo "        **Use ONLY one option, -r or -R, NOT both"
   echo "   --compcor Flag if CompCor reg was performed"
+  echo "   --compcor_global Flag if CompCorGlobal reg was performed"
   echo "   --seedmaps Flag to output seedmaps (default is off)"
   echo "   --clobber overwrite previous results"
   echo ""
