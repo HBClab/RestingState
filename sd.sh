@@ -49,7 +49,7 @@ arith_mean ()
   local am=0         # Arithmetic mean.
   local ct=0         # Number of data points.
 
-  while read value   # Read one data point at a time.
+  while read -r value   # Read one data point at a time.
   do
     rt=$(echo "scale=$SC; $rt + $value" | bc)
     (( ct++ ))
@@ -57,7 +57,7 @@ arith_mean ()
 
   am=$(echo "scale=$SC; $rt / $ct" | bc)
 
-  echo $am; return $ct   # This function "returns" TWO values!
+  echo "$am"; return $ct   # This function "returns" TWO values!
   #  Caution: This little trick will not work if $ct > 255!
   #  To handle a larger number of data points,
   #+ simply comment out the "return $ct" above.
@@ -71,7 +71,7 @@ sd ()
   avg2=0    # Average of $sum2.
   sdev=0    # Standard Deviation.
 
-  while read value   # Read one line at a time.
+  while read -r value   # Read one line at a time.
   do
     diff=$(echo "scale=$SC; $mean1 - $value" | bc)
     # Difference between arith. mean and data point.
@@ -81,16 +81,16 @@ sd ()
 
     avg2=$(echo "scale=$SC; $sum2 / $n" | bc)  # Avg. of sum of squares.
     sdev=$(echo "scale=$SC; sqrt($avg2)" | bc) # Square root =
-    echo $sdev                                 # Standard Deviation.
+    echo "$sdev"                                 # Standard Deviation.
 
 } <"$datafile"   # Rewinds data file.
 
 
 # ======================================================= #
 mean=$(arith_mean); count=$?   # Two returns from function!
-std_dev=$(sd $mean $count)
+std_dev=$(sd "$mean" $count)
 
-echo $std_dev
+echo "$std_dev"
 
 # ======================================================= #
 

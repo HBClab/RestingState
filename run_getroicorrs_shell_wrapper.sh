@@ -7,6 +7,6 @@ roiList=$3
 scriptdir=$(dirname "$0")
 
   octave -q "${scriptdir}"/run_getroicorrs.m \
-  ${input_dir} \
-  ${subList} \
-  ${roiList}
+  "${input_dir}" \
+  "${subList}" \
+  "${roiList}"
