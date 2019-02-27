@@ -266,7 +266,7 @@ function roi_qc()
 		    gunzip -f $seedQCdir/${roi}_overlay_${suffix}.nii.gz
 	  	done
 	else
-		echo "$roi QC already exists"
+		echo "Under/overlay niftis already exist for ${roi}! Skipping..."
 	fi
 }
 
@@ -547,7 +547,7 @@ for i in $(cat "$roiOutDir"/seeds.txt); do
 	if [ ! -f $seedQCOutdir/${i}_axial.png ] || [ ! -f $seedQCOutdir/${i}_coronal.png ] || [ ! -f $seedQCOutdir/${i}_sagittal.png ]; then
 		echo "${i}" >> "$roiOutDir"/seeds_forQC.txt
 	else
-		echo "$i QC already exists"
+		echo "png images for QC already exist for $i! Skipping..."
 	fi
 done
 
