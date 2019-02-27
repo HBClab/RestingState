@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 ##################################################################################################################
 # Time Series Correlation from Seed/ROI masks
@@ -576,7 +576,7 @@ addpath(statsScripts);
 fid=fopen('$roiOutDir/seeds_forQC.txt');
 roiList=textscan(fid,'%s');
 fclose(fid);
-seedDir='"$seedQCdir"';
+seedDir='$seedQCdir';
 imageDir='$seedQCOutdir';
 seedregistrationcheck(seedDir,roiList,imageDir)
 quit;
