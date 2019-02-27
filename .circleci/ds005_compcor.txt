@@ -280,7 +280,6 @@
 /sub-01/rot_mm.png
 /sub-01/rot.png
 /sub-01/rot_trans.png
-/sub-01/rsParam
 /sub-01/rsParams
 /sub-01/rsParams_log
 /sub-01/run_motionscrub.m
