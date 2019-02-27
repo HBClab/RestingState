@@ -541,7 +541,7 @@ function EPItoT1reg() {
       echo "MNItoEPIWarp=${epiWarpDir}/MNItoEPI_warp.nii.gz"
       echo "EPItoMNI=${epiWarpDir}/EPItoMNI.nii.gz"
       echo "EPItoMNIWarp=${epiWarpDir}/EPItoMNI_warp.nii.gz"
-    }  >> "$logDir"/rsParam
+    }  >> "$logDir"/rsParams
     
   fi
 
