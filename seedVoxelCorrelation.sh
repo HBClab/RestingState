@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 ##################################################################################################################
 # Time Series Correlation from Seed/ROI masks
@@ -343,7 +343,7 @@ export -f roi_qc
         xNum=$(wc -l "${roiOutDir}"/"${roi}"_residvol_ms_ts.txt)
         count=1
         while [ $count -le "$xNum" ]; do
-					# unused code
+					# TODO: remove unused code
           # tsPlotIn=$(cat "${roiOutDir}"/"${roi}"_residvol_ms_ts.txt | head -${count} | tail -1)
           delPlotCheck=$(awk '{$1=$1}1' "${rawEpiDir}"/motionScrub/deleted_vols.txt | grep -E '(^| )'${count}'( |$)')
           if [ "$delPlotCheck" == "" ]; then
@@ -481,7 +481,7 @@ if [[ "$seedTest" != "$roiTest" ]]; then
   echo "seeds=$seeds" >> "$rawEpiDir"/rsParams
 fi
 
-# TODO: unused code
+# TODO: remove unused code
 # if [ $motionscrubFlag == 0 ]; then
 #  filename=run_firstlevelseeding_parallel.m
 # elif [ $motionscrubFlag = 1 ]; then
@@ -489,7 +489,7 @@ fi
 #  filename2=run_firstlevelseeding_parallel_ms.m
 # fi
 
-# TODO: unused code
+# TODO: remove unused code
 # if [[ $roiInd == 1 ]]; then
 #   echo "$seeds" >> $logDir/rsParams_log
 # else
@@ -533,7 +533,7 @@ echo "...QC Image Setup"
 # Create underlay/overlay NIFTI files for QC check
 # Create a temp directory
 export seedQCdir="${roiOutDir}"/seedQC
-if [ ! -e "$seedQCdir"/temp ]; then
+if [ ! -d "$seedQCdir"/temp ]; then
   mkdir -p "$seedQCdir"/temp
 fi
 
@@ -544,10 +544,11 @@ parallel --progress roi_qc ::: "$(cat "$roiOutDir"/seeds.txt)"
 
 # Create an output directory for QC seed images
 seedQCOutdir="$roiOutDir"/seedQC
-if [ ! -e "$seedQCOutdir" ]; then
-  mkdir "$seedQCOutdir"
+if [ ! -d "$seedQCOutdir" ]; then
+  mkdir -p "$seedQCOutdir"
 fi
-# TODO: unused code
+
+# TODO: remove unused code
 # > "$roiOutDir"/seeds_forQC.txt
 while IFS= read -r i; do
 	if [ ! -f "$seedQCOutdir"/"${i}"_axial.png ] || [ ! -f "$seedQCOutdir"/"${i}"_coronal.png ] || [ ! -f "$seedQCOutdir"/"${i}"_sagittal.png ]; then
