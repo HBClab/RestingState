@@ -303,7 +303,6 @@
 /sub-01/seedCorrelation/compcor/rois/seedQC/UIUC_VIS_rvis_underlay_coronal.nii
 /sub-01/seedCorrelation/compcor/rois/seedQC/UIUC_VIS_rvis_underlay_sagittal.nii
 /sub-01/seedCorrelation/compcor/rois/seeds_forQC.txt
-/sub-01/seedCorrelation/compcor/rois/seeds_ms.txt
 /sub-01/seedCorrelation/compcor/rois/seeds.txt
 /sub-01/seedCorrelation/compcor/rois/UIUC_VIS_lvis_mask.nii.gz
 /sub-01/seedCorrelation/compcor/rois/UIUC_VIS_lvis_residvol_ms_ts.txt
