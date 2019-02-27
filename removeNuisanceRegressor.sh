@@ -354,7 +354,7 @@ do
     exit 1
   fi
   # check if needs binarize
-  if [[ $(printf %.0f $(($(fslstats "$outDir"/rois/"${roiName}"_native.nii.gz -M)))) -ne 1 ]]; then
+  if [[ $(printf "%.0f" "$(bc <<< "$(fslstats "$outDir"/rois/"${roiName}"_native.nii.gz -M)")") -ne 1 ]]; then
     fslmaths "$outDir"/rois/"${roiName}"_native.nii.gz -thr 0.5 -bin "$outDir"/rois/"${roiName}"_native.nii.gz
   fi
 
