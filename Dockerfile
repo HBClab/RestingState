@@ -80,6 +80,9 @@ ENV FSLDIR=/usr/share/fsl/5.0 \
     FSLWISH=/usr/bin/wish \
     PATH="/opt/ICA-AROMA:/opt/RestingState:/usr/lib/afni/bin/:/usr/lib/fsl/5.0:$PATH"
 
+# silence gnu parallel
+RUN printf "will cite\n" | parallel --citation
+
 # clean up
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
