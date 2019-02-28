@@ -16,7 +16,7 @@ function Usage {
 
 ########## FSL's arg parsing functions ###################
 get_opt1() {
-    arg=$(echo $1 | sed 's/=.*//')
+    arg=${1//=*/}
     echo "$arg"
 }
 
@@ -27,12 +27,12 @@ get_imarg1() {
 }
 
 get_arg1() {
-    if [ X"$(echo $1 | grep '=')" = X ] ; then
+    if [ X"$(echo "$1" | grep '=')" = X ] ; then
 	echo "Option $1 requires an argument" 1>&2
 	exit 1
     else
-	arg=`echo $1 | sed 's/.*=//'`
-	if [ X$arg = X ] ; then
+	arg=${1//*=/}
+	if [ X"$arg" = X ] ; then
 	    echo "Option $1 requires an argument" 1>&2
 	    exit 1
 	fi
@@ -93,14 +93,14 @@ export -f clobber
 
 
 function RPI_orient() {
-    local infile=$1 &&\
-    [ ! -z  "${infile}" ] ||\
+    local infile=$1
+		[ ! -z  "${infile}" ] ||\
     ( printf '%s\n' "${FUNCNAME[0]}, input not defined" && return 1 )
 
     #Determine qform-orientation to properly reorient file to RPI (MNI) orientation
-	xorient=`fslhd ${infile} | grep "^qform_xorient" | awk '{print $2}' | cut -c1`
-	yorient=`fslhd ${infile} | grep "^qform_yorient" | awk '{print $2}' | cut -c1`
-	zorient=`fslhd ${infile} | grep "^qform_zorient" | awk '{print $2}' | cut -c1`
+	xorient=$(fslhd "${infile}" | grep "^qform_xorient" | awk '{print $2}' | cut -c1)
+	yorient=$(fslhd "${infile}" | grep "^qform_yorient" | awk '{print $2}' | cut -c1)
+	zorient=$(fslhd "${infile}" | grep "^qform_zorient" | awk '{print $2}' | cut -c1)
 
 	native_orient=${xorient}${yorient}${zorient}
 
@@ -279,12 +279,12 @@ function RPI_orient() {
 	  echo "flipping by ${flipFlag}"
 
 	  #Reorienting image and checking for warning messages
-	  warnFlag=`fslswapdim ${infile} ${flipFlag} ${infile%.nii.gz}.nii.gz`
-	  warnFlagCut=`echo ${warnFlag} | awk -F":" '{print $1}'`
+	  warnFlag=$(fslswapdim "${infile}" "${flipFlag}" "${infile%.nii.gz}".nii.gz)
+	  warnFlagCut=$(echo "${warnFlag}" | awk -F":" '{print $1}')
 
 	  #Reorienting the file may require swapping out the flag orientation to match the .img block
 	  if [[ $warnFlagCut == "WARNING" ]]; then
-		fslorient -swaporient ${infile%.nii.gz}.nii.gz
+		fslorient -swaporient "${infile%.nii.gz}".nii.gz
 	  fi
 
 	else
@@ -298,11 +298,11 @@ function RPI_orient() {
 
 if [ $# -lt 2 ] ; then Usage; exit 0; fi
 while [ $# -ge 1 ] ; do
-  iarg=$(get_opt1 $1);
+  iarg=$(get_opt1 "$1");
   case "$iarg"
 in
   --epi)
-      inFile=`get_arg1 $1`;
+      inFile=$(get_arg1 "$1");
       export inFile;
       if [ "$inFile" == "" ]; then
         echo "Error: The restingStateImage (--epi) is a required option"
@@ -310,7 +310,7 @@ in
       fi
       shift;;
   --t1)
-      t1=`get_arg1 $1`;
+      t1=$(get_arg1 "$1");
       export t1;
       if [ "$t1" == "" ]; then
         echo "Error: T1 (--t1) required"
@@ -318,7 +318,7 @@ in
       fi
       shift;;
   --t1_mask)
-      t1_mask=`get_arg1 $1`;
+      t1_mask=$(get_arg1 "$1");
       export t1_mask;
       if [ "$t1_mask" == "" ]; then
         echo "Error: T1 mask (--t1_mask) required"
@@ -326,7 +326,7 @@ in
       fi
       shift;;
   --roiList)
-      roilist=$(get_arg1 $1);
+      roilist=$(get_arg1 "$1");
       shift;;
   --compcor)
       compcorFlag=1;
@@ -391,16 +391,16 @@ clobber "${rsOut_anat}" &&\
 mkdir -p "${rsOut_anat}"
 
 # copy t1 files to anat mirrored to functional directories, this will keep T1 intermediate files related to this script contained within rsOut/anat
-clobber ${rsOut_anat}/T1w.nii.gz &&\
-cp ${t1} ${rsOut_anat}/T1w.nii.gz
+clobber "${rsOut_anat}"/T1w.nii.gz &&\
+cp "${t1}" "${rsOut_anat}"/T1w.nii.gz
 
-clobber ${rsOut_anat}/T1w_mask.nii.gz &&\
-cp ${t1_mask} ${rsOut_anat}/T1w_mask.nii.gz
+clobber "${rsOut_anat}"/T1w_mask.nii.gz &&\
+cp "${t1_mask}" "${rsOut_anat}"/T1w_mask.nii.gz
 
 # check orientation of t1 and change to RPI if needed
 # ok to check existing files, orientation will stay as RPI and filename will not change
-RPI_orient ${rsOut_anat}/T1w.nii.gz
-RPI_orient ${rsOut_anat}/T1w_mask.nii.gz
+RPI_orient "${rsOut_anat}"/T1w.nii.gz
+RPI_orient "${rsOut_anat}"/T1w_mask.nii.gz
 
 # if these are not RPI, the function above will make them RPI without naming them; they are copies so fine if all in RPI within rsOut
 # rename t1 variable to rsOut/anat file
@@ -408,8 +408,8 @@ t1="${rsOut_anat}/T1w.nii.gz"
 t1_mask="${rsOut_anat}/T1w_mask.nii.gz"
 
 # make the t1_brain image if it doesn't exist
-clobber ${rsOut_anat}/T1w_brain.nii.gz &&\
-fslmaths ${t1} -mul ${t1_mask} ${rsOut_anat}/T1w_brain.nii.gz
+clobber "${rsOut_anat}"/T1w_brain.nii.gz &&\
+fslmaths "${t1}" -mul "${t1_mask}" "${rsOut_anat}"/T1w_brain.nii.gz
 
 t1_brain="${rsOut_anat}/T1w_brain.nii.gz"
 

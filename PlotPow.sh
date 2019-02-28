@@ -15,7 +15,7 @@
 
 shopt -s nullglob # No-match globbing expands to null
 TmpDir=/tmp
-Tmp=$TmpDir/`basename $0`-${$}-
+Tmp=$TmpDir/$(basename "$0")-${$}-
 trap CleanUp INT
 
 ###############################################################################
@@ -26,7 +26,7 @@ trap CleanUp INT
 
 Usage() {
 cat <<EOF
-Usage: `basename $0` [options] 4Dimage mask PlotNm
+Usage: $(basename "$0") [options] 4Dimage mask PlotNm
 
 Within mask voxels, computes power spectrum at each point in 4Dimage, creating a
 plot in file PlotNm.png.  Image is always demeaned before computing the powerspectrum; 
@@ -47,7 +47,7 @@ exit
 }
 
 CleanUp () {
-    /bin/rm -f ${Tmp}*
+    /bin/rm -f "${Tmp}*"
     exit 0
 }
 
@@ -60,6 +60,7 @@ CleanUp () {
 
 TR=1
 Units=""
+VarNorm=0
 while (( $# > 1 )) ; do
     case "$1" in
         "-help")
@@ -132,13 +133,13 @@ fi
 
 # High pass?
 if [ "$HighPass" = "1" ] ; then
-    HPsigma=$(echo 100/2/$TR | bc -l)
+    HPsigma=$(echo 100/2/"$TR" | bc -l)
     fslmaths "$Img" -bptf "$HPsigma" -1 $Tmp-HPf
     Img=$Tmp-HPf
 fi
 
 # Center and possibly variance normalize 
-if [ "$VolNorm" = "1" ] ; then
+if [ "$VarNorm" = "1" ] ; then
     fslmaths "$Img" -Tstd $Tmp-sd -odt float
     fslmaths "$Img" -sub $Tmp-mean -div $Tmp-sd -mas "$Mask" $Tmp-img -odt float 
 else
@@ -150,9 +151,9 @@ fslpspec $Tmp-img  $Tmp-pspec
 
 # Make the plot
 fslmeants -i $Tmp-pspec -m $Tmp-mean -o "$Plot".txt
-Len=$(cat "$Plot".txt | wc -l )
+Len=$(wc -l < "$Plot".txt)
 Nyq=$(echo "0.5/$TR/$Len" | bc -l);
-fsl_tsplot -i "$Plot".txt -u $Nyq -t "$(basename $Plot)" -y "Power" -x "Frequency$Units" -o "$Plot".png
+fsl_tsplot -i "$Plot".txt -u "$Nyq" -t "$(basename "$Plot")" -y "Power" -x "Frequency$Units" -o "$Plot".png
 
 
 ###############################################################################

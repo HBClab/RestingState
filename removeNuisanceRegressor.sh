@@ -37,7 +37,7 @@ function Usage {
 
 ########## FSL's arg parsing functions ###################
 get_opt1() {
-    arg=$(echo $1 | sed 's/=.*//')
+    arg=${1//=*/}
     echo "$arg"
 }
 
@@ -48,12 +48,12 @@ get_imarg1() {
 }
 
 get_arg1() {
-    if [ X"$(echo $1 | grep '=')" = X ] ; then
+    if [ X"$(echo "$1" | grep '=')" = X ] ; then
 	echo "Option $1 requires an argument" 1>&2
 	exit 1
     else
-	arg=`echo $1 | sed 's/.*=//'`
-	if [ X$arg = X ] ; then
+	arg=${1//*=/}
+	if [ "X$arg" = X ] ; then
 	    echo "Option $1 requires an argument" 1>&2
 	    exit 1
 	fi
@@ -276,7 +276,7 @@ else
 fi
 
 mkdir -p "${outDir}"/rois
-cd "${outDir}"
+cd "${outDir}" || exit
 
 # If new nuisance regressors were added, echo them out to the rsParams file (only if they don't already exist in the file)
 # Making a *strong* assumption that any nuisanceROI lists added after initial processing won't reuse the first ROI (e.g. pccrsp)
@@ -333,7 +333,7 @@ echo "Running $0 ..."
 
 #################################
 #### Nuisance ROI mapping ############
-for roi in $(cat "$nuisanceInFile")
+while IFS= read -r roi
 do
   roiName="$(get_filename "${roi}")"
 
@@ -354,7 +354,7 @@ do
     exit 1
   fi
   # check if needs binarize
-  if [[ $(printf %.0f $(fslstats "$outDir"/rois/"${roiName}"_native.nii.gz -M)) -ne 1 ]]; then
+  if [[ $(printf "%.0f" "$(bc <<< "$(fslstats "$outDir"/rois/"${roiName}"_native.nii.gz -M)")") -ne 1 ]]; then
     fslmaths "$outDir"/rois/"${roiName}"_native.nii.gz -thr 0.5 -bin "$outDir"/rois/"${roiName}"_native.nii.gz
   fi
 
@@ -382,18 +382,18 @@ do
     clobber "$outDir"/rois/mean_"${roiName}"_ts.txt &&\
     fslmeants -i "$epiData" -o "$outDir"/rois/mean_"${roiName}"_ts.txt -m "$outDir"/rois/"${roiName}"_native.nii.gz
   fi
-done
+done < "$nuisanceInFile"
 
 
 ###### simultaneous bandpass + regression #####
 
 # paste regressor timeseries into one file
 if [[ "${compcorFlag}" -eq 1 ]]; then
-  IFS=" " read -r -a arr <<< "$(for i in $(cat "$nuisanceInFile"); do echo "$outDir"/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' ')"
+  IFS=" " read -r -a arr <<< "$(while IFS= read -r i; do echo "$outDir"/rois/mean_"$(get_filename "${i}")"_ts.txt; done < "$nuisanceInFile" | tr '\n' ' ')"
 elif [[ "${compcor_globalFlag}" -eq 1 ]]; then
-  IFS=" " read -r -a arr <<< "$(for i in $(cat "$nuisanceInFile"); do echo "$outDir"/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' '; echo "$rawEpiDir"/mcImg.par)"
+  IFS=" " read -r -a arr <<< "$(while IFS= read -r i; do echo "$outDir"/rois/mean_"$(get_filename "${i}")"_ts.txt; done < "$nuisanceInFile" | tr '\n' ' '; echo "$rawEpiDir"/mcImg.par)"
 else # append motion parameters to regressor list
-  IFS=" " read -r -a arr <<< "$(for i in $(cat "$nuisanceInFile"); do echo "$outDir"/rois/mean_"$(get_filename "${i}")"_ts.txt; done | tr '\n' ' '; echo "$rawEpiDir"/mcImg.par)"
+  IFS=" " read -r -a arr <<< "$(while IFS= read -r i; do echo "$outDir"/rois/mean_"$(get_filename "${i}")"_ts.txt; done < "$nuisanceInFile" | tr '\n' ' '; echo "$rawEpiDir"/mcImg.par)"
 fi
 
 paste "${arr[@]}" > "$outDir"/NuisanceRegressor_ts.txt

@@ -24,6 +24,6 @@ outputImage=$4
 
 # ROI is arbitrarily set to %age of xy voxel dimensions ($2)
 
-fslmaths $inputImage -mul 0 -add 1 -roi 0 -1 ${1} 1 0 -1 0 1 $outputImage -odt float
-fslmaths $outputImage -kernel sphere $2 -fmean $outputImage -odt float
-fslmaths $outputImage -bin $outputImage
+fslmaths "$inputImage" -mul 0 -add 1 -roi 0 -1 "${1}" 1 0 -1 0 1 "$outputImage" -odt float
+fslmaths "$outputImage" -kernel sphere "$2" -fmean "$outputImage" -odt float
+fslmaths "$outputImage" -bin "$outputImage"
