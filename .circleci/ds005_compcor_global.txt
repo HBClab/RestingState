@@ -76,7 +76,6 @@
 /sub-01/normscore.png
 /sub-01/nuisanceList.txt
 /sub-01/nuisanceRegression/compcor_global/analysisResults.html
-/sub-01/nuisanceRegression/compcor_global/bp_mean.nii.gz
 /sub-01/nuisanceRegression/compcor_global/mask1000.nii.gz
 /sub-01/nuisanceRegression/compcor_global/mask.nii.gz
 /sub-01/nuisanceRegression/compcor_global/nonfiltered_smooth_data_bp_res4d_dmean.nii.gz
