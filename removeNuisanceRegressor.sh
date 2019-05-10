@@ -153,8 +153,7 @@ function SimultBandpassNuisanceReg()
 	3dTproject -input "${inData}" -prefix "$outDir"/tmp_bp.nii.gz -mask "${mask}" -bandpass "${fbot}" "${ftop}" -ort "${regressorsFile}" -verb &&\
   # add mean back in
 	3dTstat -mean -prefix "$outDir"/orig_mean.nii.gz "${inData}" &&\
-	3dTstat -mean -prefix "$outDir"/bp_mean.nii.gz "$outDir"/tmp_bp.nii.gz &&\
-	3dcalc -a "$outDir"/tmp_bp.nii.gz -b "$outDir"/orig_mean.nii.gz -c "$outDir"/bp_mean.nii.gz -expr "a+b-c" -prefix "${outDir}"/"$(basename "${inData%%.nii*}")"_bp_res4d.nii.gz
+	3dcalc -a "$outDir"/tmp_bp.nii.gz -b "$outDir"/orig_mean.nii.gz -expr "a+b" -prefix "${outDir}"/"$(basename "${inData%%.nii*}")"_bp_res4d.nii.gz
 
   {
     echo "lowpassFilt=$ftop"
