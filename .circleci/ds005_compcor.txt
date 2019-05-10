@@ -227,7 +227,6 @@
 /sub-01/normscore.png
 /sub-01/nuisanceList.txt
 /sub-01/nuisanceRegression/compcor/analysisResults.html
-/sub-01/nuisanceRegression/compcor/bp_mean.nii.gz
 /sub-01/nuisanceRegression/compcor/denoised_func_data_nonaggr_bp_res4d_dmean.nii.gz
 /sub-01/nuisanceRegression/compcor/denoised_func_data_nonaggr_bp_res4d.nii.gz
 /sub-01/nuisanceRegression/compcor/denoised_func_data_nonaggr_bp_res4d_normandscaled.nii.gz
